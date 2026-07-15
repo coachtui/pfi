@@ -12,7 +12,7 @@ Repo initialized (Next.js 16 / TS strict / Tailwind 4 / Vitest / ESLint / Pretti
 - ⬜ Onboarding flow (identity, cohorts, privacy, sample data)
 - ✅ Rankings screen (mock cohort data)
 - ✅ Data/benchmarks screen (mock aggregates)
-- ⬜ Report screen (mock shareholder report)
+- ✅ Report screen (shareholder report computed from demo data via the `report.ts` engine, not mock text)
 - ⬜ Blue Reef Partners + North Shore Capital demo profiles
 - ⬜ PWA manifest & installability; Playwright smoke test
 
