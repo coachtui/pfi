@@ -34,6 +34,16 @@ export function railPositions(
       indexed[k].pct = indexed[k - 1].pct + minGapPct;
     }
   }
+  const last = indexed[indexed.length - 1];
+  if (last && last.pct > 100) {
+    const overflow = last.pct - 100;
+    for (const item of indexed) item.pct = Math.max(0, item.pct - overflow);
+    for (let k = 1; k < indexed.length; k++) {
+      if (indexed[k].pct <= indexed[k - 1].pct) {
+        indexed[k].pct = Math.min(100, indexed[k - 1].pct + 0.01);
+      }
+    }
+  }
   const out: Array<number | null> = [...raw];
   for (const { pct, i } of indexed) out[i] = pct;
   return out;

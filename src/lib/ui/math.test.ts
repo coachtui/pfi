@@ -37,6 +37,17 @@ describe("railPositions", () => {
   it("handles a flat domain without NaN", () => {
     expect(railPositions([5, 5], 5, 5, 0)).toEqual([50, 50]);
   });
+  it("shifts a nudged cluster back up instead of overflowing 100", () => {
+    const out = railPositions([100, 99, 98, 97], 0, 100, 40) as number[];
+    for (const pct of out) {
+      expect(pct).toBeGreaterThanOrEqual(0);
+      expect(pct).toBeLessThanOrEqual(100);
+    }
+    // order and minimum gaps preserved where space allows
+    expect(out[0]).toBeLessThan(out[1]);
+    expect(out[1]).toBeLessThan(out[2]);
+    expect(out[2]).toBeLessThan(out[3]);
+  });
 });
 
 describe("formatOrdinal", () => {
