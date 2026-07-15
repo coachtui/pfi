@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { completeOnboarding } from "@/app/actions/onboarding";
 import { onboardingSchema, type OnboardingValues } from "@/lib/validation/onboarding";
 import { AGE_COHORTS, COL_CATEGORIES, HOUSEHOLD_TYPES, INCOME_BANDS, OBJECTIVES } from "@/lib/config/cohorts";
@@ -28,8 +29,15 @@ export function OnboardingForm() {
 
   async function onSubmit(values: OnboardingValues) {
     setServerError(null);
-    const result = await completeOnboarding(values);
-    if (result?.error) setServerError(result.error);
+    try {
+      const result = await completeOnboarding(values);
+      if (result?.error) setServerError(result.error);
+    } catch (err) {
+      // redirect() works by throwing; if the framework ever surfaces that
+      // error here, it must propagate for the navigation to happen.
+      if (isRedirectError(err)) throw err;
+      setServerError("Something went wrong. Please try again.");
+    }
   }
 
   return (

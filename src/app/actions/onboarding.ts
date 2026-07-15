@@ -36,7 +36,10 @@ export async function completeOnboarding(values: OnboardingValues): Promise<{ er
   const { error: companyErr } = await supabase.from("personal_companies").insert({
     user_id: user.id, name: v.companyName, ticker: `$${v.ticker}`,
   });
-  if (companyErr) return { error: companyErr.message };
+  // 23505 (unique user_id) means the company already exists from a prior
+  // half-completed attempt or a double-submit — treat as success and proceed
+  // to stamping completion instead of failing the retry.
+  if (companyErr && companyErr.code !== "23505") return { error: companyErr.message };
 
   // Only stamp onboarding as complete once the company exists, so a failure
   // above never leaves the user "completed" with no company (which would
