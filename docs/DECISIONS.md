@@ -80,3 +80,10 @@ Format: date, decision, context, alternatives, reasoning, consequences. Do not m
 **Alternatives:** keep the `middleware.ts` name used through Phase 0–1 planning and in the original ARCHITECTURE.md wording.
 **Reasoning:** Next.js 16 renamed the route-interception convention from `middleware` to `proxy`; the app pins to Next 16.2.10, so the new filename is required for Next to pick it up.
 **Consequences:** "middleware" in older docs/discussion refers to what is now `src/proxy.ts`; re-check this convention name on future Next major-version upgrades.
+
+## 12. 2026-07-15 — Transactions/categorization UI will be a dashboard drill-down, not a nav item
+
+**Decision:** when Phase 3 ships the transaction list and correction workflow (recategorization, essential/discretionary marking, transfers, splits), it will live as a drill-down from the Home dashboard (e.g. tapping "Available Capital" or "What moved your line" → transaction detail), not as a fifth bottom-nav tab or a settings subsection. User approved this direction.
+**Alternatives:** fifth nav item ("Accounts"); accounts section behind profile/settings.
+**Reasoning:** the mockups define a four-tab nav (Home/Rankings/Data/Report) with no transactions surface, and the product addendum's UX hierarchy requires the diagnosis (score, drivers, actions) above dense transaction lists — a drill-down keeps detail beneath the diagnosis instead of promoting it to a peer destination.
+**Consequences:** Phase 3's plan should design the drill-down entry points and routes (likely `/accounts` or `/transactions` reachable from dashboard cards); bottom nav stays four tabs; deep-linking to a specific transaction remains possible via route, just not via nav.
