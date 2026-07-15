@@ -14,8 +14,9 @@ describe("validateEnv", () => {
   });
 
   it("throws when Supabase URL is missing", () => {
-    const { NEXT_PUBLIC_SUPABASE_URL: _omit, ...rest } = valid;
-    expect(() => validateEnv(rest as NodeJS.ProcessEnv)).toThrow(/NEXT_PUBLIC_SUPABASE_URL/);
+    const rest: NodeJS.ProcessEnv = { ...valid };
+    delete rest.NEXT_PUBLIC_SUPABASE_URL;
+    expect(() => validateEnv(rest)).toThrow(/NEXT_PUBLIC_SUPABASE_URL/);
   });
 
   it("throws when the anon key is empty", () => {
