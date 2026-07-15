@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { FinancialChart, type ChartMarker } from "@/components/chart/FinancialChart";
 import { CompanyHeader } from "@/components/dashboard/CompanyHeader";
 import { MetricCard, type MetricTone } from "@/components/dashboard/MetricCard";
+import { Segmented } from "@/components/ui/Segmented";
 import { WhatMovedYourLine } from "@/components/dashboard/WhatMovedYourLine";
 import {
   availablePosition,
@@ -111,27 +112,12 @@ export function HomeDashboard({ profile, snapshots, events }: HomeDashboardProps
               <span className="text-tertiary">Today</span>
             </p>
           </div>
-          <div
-            role="group"
-            aria-label="Chart time range"
-            className="flex rounded-full border border-border-subtle bg-inset p-0.5"
-          >
-            {RANGES.map((r) => (
-              <button
-                key={r.key}
-                type="button"
-                onClick={() => setRange(r.key)}
-                aria-pressed={range === r.key}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  range === r.key
-                    ? "bg-elevated-2 text-primary shadow-card"
-                    : "text-secondary hover:text-primary"
-                }`}
-              >
-                {r.key}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            options={RANGES.map((r) => ({ key: r.key, label: r.key }))}
+            value={range}
+            onChange={(key) => setRange(key as RangeKey)}
+            ariaLabel="Chart time range"
+          />
         </div>
         <div className="mt-4">
           <FinancialChart
