@@ -1,13 +1,25 @@
-import { Trophy } from "lucide-react";
-import { ComingSoon } from "@/components/ui/ComingSoon";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getCompany, getProfile } from "@/lib/data/queries";
+import { getLeagues, VIEWER_LEVEL } from "@/lib/demo-data/cohorts";
+import { RankingsView } from "./RankingsView";
 
-export default function RankingsPage() {
+export default async function RankingsPage() {
+  const supabase = await createClient();
+  const profile = await getProfile(supabase);
+  if (!profile?.onboarding_completed_at) redirect("/onboarding");
+  const company = await getCompany(supabase);
+  if (!company) redirect("/onboarding");
+
   return (
-    <ComingSoon
-      icon={Trophy}
-      title="Rankings"
-      phase="Phase 1"
-      description="Anonymized cohort leagues ranked by normalized improvement — never by absolute wealth. Age, income, region, and overall leagues with quarterly challenges."
+    <RankingsView
+      leagues={getLeagues()}
+      identity={{
+        companyName: company.name,
+        ticker: company.ticker,
+        username: profile.username,
+        level: VIEWER_LEVEL,
+      }}
     />
   );
 }
