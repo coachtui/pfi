@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { enumeratePeriods, latestCompletePeriod } from "./report";
+import { enumeratePeriods, latestCompletePeriod, buildManagementCommentary } from "./report";
 import type { DailySnapshot } from "./types";
 import { computePeriodStatement } from "./report";
 import type { FinancialEvent, IndexPoint } from "./types";
 import type { TransactionInput } from "./snapshot-builder";
+import type { PeriodStatement } from "./report";
 
 const snap = (date: string): DailySnapshot => ({
   date, liquidAssets: 0, revolvingBalances: 0, nearTermObligations: 0,
@@ -182,8 +183,6 @@ describe("computePeriodStatement", () => {
   });
 });
 
-import { buildManagementCommentary } from "./report";
-
 describe("buildManagementCommentary", () => {
   const lines = buildManagementCommentary(
     computePeriodStatement(stmtSnapshots, stmtTxns, stmtEvents, stmtIndex, junePeriod),
@@ -206,5 +205,31 @@ describe("buildManagementCommentary", () => {
   it("returns several sentences", () => {
     expect(lines.length).toBeGreaterThanOrEqual(3);
     expect(lines.length).toBeLessThanOrEqual(5);
+  });
+
+  it("uses correct phrasing for negative owner-created equity", () => {
+    const negativeEquityStatement: PeriodStatement = {
+      period: junePeriod,
+      revenue: 5000,
+      operatingExpenses: 3000,
+      freeCashFlow: 2000,
+      savings: 1000,
+      investments: 500,
+      debtReduction: 200,
+      ownerCreatedEquity: -300,
+      marketAppreciation: 0,
+      indexStart: 100,
+      indexEnd: 100,
+      indexChange: 0,
+      savingsRatePct: 20,
+    };
+    const commentaryLines = buildManagementCommentary(negativeEquityStatement, "Test Corp");
+    const commentary = commentaryLines.join(" ");
+
+    // Should contain the correct phrasing for negative equity
+    expect(commentary).toContain("reducing owner-created equity by $300");
+
+    // Should NOT contain a double-negative (minus sign immediately after "reducing")
+    expect(commentary).not.toMatch(/reducing\s+−/);
   });
 });
