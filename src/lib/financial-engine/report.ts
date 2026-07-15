@@ -1,5 +1,6 @@
 import type { DailySnapshot, FinancialEvent, IndexPoint, ISODate } from "./types";
 import type { TransactionInput } from "./snapshot-builder";
+import { formatDollars, formatSignedDollars } from "./format";
 
 export type ReportGranularity = "monthly" | "quarterly";
 
@@ -175,4 +176,26 @@ export function computePeriodStatement(
     indexChange: round2(indexEnd - indexStart),
     savingsRatePct,
   };
+}
+
+/**
+ * Deterministic shareholder-letter commentary assembled only from the
+ * statement's computed figures. No fabrication; the UI tags this
+ * "Calculated · AI narration in Phase 4".
+ */
+export function buildManagementCommentary(statement: PeriodStatement, companyName: string): string[] {
+  const s = statement;
+  const fcfVerb = s.freeCashFlow >= 0 ? "produced" : "posted";
+  const equityVerb = s.ownerCreatedEquity >= 0 ? "building" : "reducing";
+  const indexPhrase =
+    s.indexChange > 0 ? `rose ${s.indexChange.toFixed(1)} points`
+    : s.indexChange < 0 ? `fell ${Math.abs(s.indexChange).toFixed(1)} points`
+    : "was unchanged";
+
+  return [
+    `During ${s.period.label}, ${companyName} recorded ${formatDollars(s.revenue)} of revenue against ${formatDollars(s.operatingExpenses)} of operating expenses, and ${fcfVerb} ${formatSignedDollars(s.freeCashFlow)} of free cash flow.`,
+    `That surplus was allocated across ${formatDollars(s.savings)} of retained cash, ${formatDollars(s.investments)} of investment contributions, and ${formatSignedDollars(s.debtReduction)} of debt reduction — ${equityVerb} ${formatSignedDollars(s.ownerCreatedEquity)} of owner-created equity, with no market appreciation recorded this period.`,
+    `The personal index ${indexPhrase} over the period, ending at ${s.indexEnd.toFixed(1)}.`,
+    `The household retained ${s.savingsRatePct.toFixed(1)}% of revenue as cash this period.`,
+  ];
 }

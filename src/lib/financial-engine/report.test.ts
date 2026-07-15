@@ -181,3 +181,30 @@ describe("computePeriodStatement", () => {
     expect(Number.isNaN(future.ownerCreatedEquity)).toBe(false);
   });
 });
+
+import { buildManagementCommentary } from "./report";
+
+describe("buildManagementCommentary", () => {
+  const lines = buildManagementCommentary(
+    computePeriodStatement(stmtSnapshots, stmtTxns, stmtEvents, stmtIndex, junePeriod),
+    "Koa Holdings",
+  );
+  const text = lines.join(" ");
+
+  it("names the company and period", () => {
+    expect(text).toContain("Koa Holdings");
+    expect(text).toContain("June 2026");
+  });
+
+  it("states the actual computed figures", () => {
+    expect(text).toContain("$6,400"); // revenue
+    expect(text).toContain("$4,500"); // operating expenses
+    expect(text).toContain("$1,900"); // free cash flow / owner equity
+    expect(text).toContain("8.4"); // index movement
+  });
+
+  it("returns several sentences", () => {
+    expect(lines.length).toBeGreaterThanOrEqual(3);
+    expect(lines.length).toBeLessThanOrEqual(5);
+  });
+});
