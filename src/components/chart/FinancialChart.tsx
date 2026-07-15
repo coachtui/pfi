@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { FinancialEvent, IndexPoint } from "@/lib/financial-engine/types";
 import { formatShortDate } from "@/lib/financial-engine/format";
+import { railPositions } from "@/lib/ui/math";
 
 export interface ChartMarker {
   event: FinancialEvent;
@@ -38,126 +39,120 @@ export function FinancialChart({ points, markers, ariaDescription }: FinancialCh
   // ~5 x-axis labels regardless of range length.
   const tickInterval = Math.max(1, Math.floor(points.length / 5));
 
+  const lastPoint = points[points.length - 1];
+  const yValues = points.flatMap((p) => [p.actual, p.waterline, ...(p.baseline === null ? [] : [p.baseline])]);
+  const domainMin = Math.floor(Math.min(...yValues) - 4);
+  const domainMax = Math.ceil(Math.max(...yValues) + 4);
+  const [actualPos, baselinePos, waterlinePos] = railPositions(
+    [lastPoint?.actual ?? null, lastPoint?.baseline ?? null, lastPoint?.waterline ?? null],
+    domainMin,
+    domainMax,
+    9,
+  );
+
   return (
     <figure aria-label={ariaDescription} className="m-0">
-      <div className="h-64 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: -18 }}>
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--chart-actual-fill-from)" />
-                <stop offset="100%" stopColor="var(--chart-actual-fill-to)" />
-              </linearGradient>
-            </defs>
-            <XAxis
-              dataKey="date"
-              tickFormatter={formatShortDate}
-              interval={tickInterval}
-              tickLine={false}
-              axisLine={false}
-              tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-              minTickGap={24}
-            />
-            <YAxis
-              domain={[(min: number) => Math.floor(min - 4), (max: number) => Math.ceil(max + 4)]}
-              tickLine={false}
-              axisLine={false}
-              tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-              width={46}
-              tickFormatter={(v: number) => String(Math.round(v))}
-            />
-            <Tooltip
-              content={<ChartTooltip />}
-              cursor={{ stroke: "var(--border-strong)", strokeDasharray: "3 3" }}
-            />
-            <Area
-              type="monotone"
-              dataKey="actual"
-              name="Actual"
-              stroke="var(--chart-actual)"
-              strokeWidth={2}
-              fill={`url(#${gradientId})`}
-              dot={false}
-              activeDot={{ r: 4, fill: "var(--chart-actual)", stroke: "var(--bg-elevated)" }}
-              isAnimationActive={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="baseline"
-              name="Baseline"
-              stroke="var(--chart-baseline)"
-              strokeWidth={1.5}
-              strokeDasharray="1 4"
-              strokeLinecap="round"
-              dot={false}
-              activeDot={false}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="waterline"
-              name="Waterline"
-              stroke="var(--chart-waterline)"
-              strokeWidth={1.5}
-              strokeDasharray="6 5"
-              dot={false}
-              activeDot={false}
-              isAnimationActive={false}
-            />
-            {markers.map((m) => (
-              <ReferenceDot
-                key={m.event.id}
-                x={m.event.date}
-                y={m.y}
-                r={4}
-                fill={m.event.direction === "inflow" ? "var(--positive)" : "var(--negative)"}
-                stroke="var(--bg-elevated)"
-                strokeWidth={2}
+      <div className="flex w-full items-stretch">
+        <div className="h-64 min-w-0 flex-1">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: -18 }}>
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--chart-actual-fill-from)" />
+                  <stop offset="100%" stopColor="var(--chart-actual-fill-to)" />
+                </linearGradient>
+              </defs>
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatShortDate}
+                interval={tickInterval}
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
+                minTickGap={24}
               />
-            ))}
-          </ComposedChart>
-        </ResponsiveContainer>
+              <YAxis
+                domain={[domainMin, domainMax]}
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
+                width={46}
+                tickFormatter={(v: number) => String(Math.round(v))}
+              />
+              <Tooltip
+                content={<ChartTooltip />}
+                cursor={{ stroke: "var(--border-strong)", strokeDasharray: "3 3" }}
+              />
+              <Area
+                type="monotone"
+                dataKey="actual"
+                name="Actual"
+                stroke="var(--chart-actual)"
+                strokeWidth={2}
+                fill={`url(#${gradientId})`}
+                dot={false}
+                activeDot={{ r: 4, fill: "var(--chart-actual)", stroke: "var(--bg-elevated)" }}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="baseline"
+                name="Baseline"
+                stroke="var(--chart-baseline)"
+                strokeWidth={1.5}
+                strokeDasharray="1 4"
+                strokeLinecap="round"
+                dot={false}
+                activeDot={false}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="waterline"
+                name="Waterline"
+                stroke="var(--chart-waterline)"
+                strokeWidth={1.5}
+                strokeDasharray="6 5"
+                dot={false}
+                activeDot={false}
+                isAnimationActive={false}
+              />
+              {markers.map((m) => (
+                <ReferenceDot
+                  key={m.event.id}
+                  x={m.event.date}
+                  y={m.y}
+                  r={4}
+                  fill={m.event.direction === "inflow" ? "var(--positive)" : "var(--negative)"}
+                  stroke="var(--bg-elevated)"
+                  strokeWidth={2}
+                />
+              ))}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+        <div aria-hidden className="relative h-64 w-16 shrink-0">
+          <RailLabel top={actualPos} color="var(--chart-actual)" label="Actual" />
+          <RailLabel top={baselinePos} color="var(--chart-baseline)" label="Baseline" />
+          <RailLabel top={waterlinePos} color="var(--chart-waterline)" label="Waterline" />
+        </div>
       </div>
       <figcaption className="sr-only">{ariaDescription}</figcaption>
-      <ChartLegend />
     </figure>
   );
 }
 
-/** Legend distinguishes lines by shape as well as color (never color alone). */
-function ChartLegend() {
-  return (
-    <div className="mt-3 flex items-center gap-5 text-xs text-secondary">
-      <LegendItem swatch={<span className="h-0.5 w-5 rounded bg-[var(--chart-actual)]" />} label="Actual" />
-      <LegendItem
-        swatch={
-          <span className="flex w-5 items-center justify-between" aria-hidden>
-            {[0, 1, 2].map((i) => (
-              <span key={i} className="size-1 rounded-full bg-[var(--chart-baseline)]" />
-            ))}
-          </span>
-        }
-        label="Baseline"
-      />
-      <LegendItem
-        swatch={
-          <span className="flex w-5 items-center justify-between" aria-hidden>
-            {[0, 1].map((i) => (
-              <span key={i} className="h-0.5 w-2 rounded bg-[var(--chart-waterline)]" />
-            ))}
-          </span>
-        }
-        label="Waterline"
-      />
-    </div>
-  );
-}
+const X_AXIS_HEIGHT = 30; // Recharts default XAxis height
 
-function LegendItem({ swatch, label }: { swatch: React.ReactNode; label: string }) {
+function RailLabel({ top, color, label }: { top: number | null; color: string; label: string }) {
+  if (top === null) return null;
   return (
-    <span className="flex items-center gap-1.5">
-      {swatch}
+    <span
+      className="absolute left-1 flex -translate-y-1/2 items-center gap-1 text-[11px] text-secondary"
+      style={{ top: `calc(${top} * (100% - ${X_AXIS_HEIGHT}px) / 100 + 8px)` }}
+    >
+      <span className="size-1.5 rounded-full" style={{ background: color }} />
       {label}
     </span>
   );
