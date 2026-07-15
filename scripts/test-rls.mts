@@ -30,10 +30,13 @@ async function makeUser(tag: string): Promise<{ id: string; client: SupabaseClie
   return { id: data.user.id, client };
 }
 
-const a = await makeUser("a");
-const b = await makeUser("b");
+let a: { id: string; client: SupabaseClient } | undefined;
+let b: { id: string; client: SupabaseClient } | undefined;
 
 try {
+  a = await makeUser("a");
+  b = await makeUser("b");
+
   // A creates their rows.
   const { error: pErr } = await a.client.from("user_profiles").insert({
     id: a.id, username: `rls_a_${randomUUID().slice(0, 6)}`, age_cohort: "30–39",
@@ -55,38 +58,72 @@ try {
   });
 
   // B attempts to touch A's data.
-  const { data: readProfiles } = await b.client.from("user_profiles").select("*").eq("id", a.id);
-  check("B cannot read A's profile", (readProfiles ?? []).length === 0);
+  const { data: readProfiles, error: readProfilesErr } = await b.client
+    .from("user_profiles").select("*").eq("id", a.id);
+  check(
+    "B cannot read A's profile",
+    !readProfilesErr && (readProfiles ?? []).length === 0,
+    readProfilesErr?.message ?? "",
+  );
 
-  const { data: readAccounts } = await b.client.from("financial_accounts").select("*").eq("user_id", a.id);
-  check("B cannot read A's accounts", (readAccounts ?? []).length === 0);
+  const { data: readAccounts, error: readAccountsErr } = await b.client
+    .from("financial_accounts").select("*").eq("user_id", a.id);
+  check(
+    "B cannot read A's accounts",
+    !readAccountsErr && (readAccounts ?? []).length === 0,
+    readAccountsErr?.message ?? "",
+  );
 
   const { error: forgeErr } = await b.client.from("financial_accounts")
     .insert({ user_id: a.id, provider: "manual", type: "checking", display_name: "forged" });
   check("B cannot insert rows owned by A", !!forgeErr);
 
-  const { data: updated } = await b.client.from("financial_accounts")
+  const { data: updated, error: updatedErr } = await b.client.from("financial_accounts")
     .update({ display_name: "hacked" }).eq("id", acct!.id).select();
-  check("B cannot update A's account", (updated ?? []).length === 0);
+  check(
+    "B cannot update A's account",
+    !updatedErr && (updated ?? []).length === 0,
+    updatedErr?.message ?? "",
+  );
 
-  const { data: deleted } = await b.client.from("financial_accounts")
+  const { data: deleted, error: deletedErr } = await b.client.from("financial_accounts")
     .delete().eq("id", acct!.id).select();
-  check("B cannot delete A's account", (deleted ?? []).length === 0);
+  check(
+    "B cannot delete A's account",
+    !deletedErr && (deleted ?? []).length === 0,
+    deletedErr?.message ?? "",
+  );
 
-  const { data: snapForge } = await b.client.from("daily_snapshots")
+  const { data: snapForge, error: snapErr } = await b.client.from("daily_snapshots")
     .insert({
       user_id: a.id, date: "2026-01-01", liquid_assets: 0, revolving_balances: 0,
       near_term_obligations: 0, essential_obligations: 0, safety_buffer: 0, net_worth: 0,
       engine_version: "test",
     }).select();
-  check("B cannot insert snapshots for A", (snapForge ?? []).length === 0 || snapForge === null);
+  check("B cannot insert snapshots for A", !!snapErr || (snapForge ?? []).length === 0);
 
   const anonClient = createClient(url, anonKey);
-  const { data: anonRead } = await anonClient.from("user_profiles").select("*");
-  check("Unauthenticated client reads nothing", (anonRead ?? []).length === 0);
+  const { data: anonRead, error: anonReadErr } = await anonClient.from("user_profiles").select("*");
+  check(
+    "Unauthenticated client reads nothing",
+    !anonReadErr && (anonRead ?? []).length === 0,
+    anonReadErr?.message ?? "",
+  );
 } finally {
-  await admin.auth.admin.deleteUser(a.id);
-  await admin.auth.admin.deleteUser(b.id);
+  if (a) {
+    try {
+      await admin.auth.admin.deleteUser(a.id);
+    } catch (err) {
+      console.error(`cleanup: failed to delete user A: ${(err as Error).message}`);
+    }
+  }
+  if (b) {
+    try {
+      await admin.auth.admin.deleteUser(b.id);
+    } catch (err) {
+      console.error(`cleanup: failed to delete user B: ${(err as Error).message}`);
+    }
+  }
 }
 
 console.log(failures === 0 ? "\nRLS isolation: ALL CHECKS PASSED" : `\nRLS isolation: ${failures} FAILURES`);
