@@ -15,8 +15,7 @@ async function insertChunked(
   rows: unknown[],
 ) {
   for (let i = 0; i < rows.length; i += CHUNK) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await supabase.from(table).insert(rows.slice(i, i + CHUNK) as any);
+    const { error } = await supabase.from(table).insert(rows.slice(i, i + CHUNK));
     if (error) throw new Error(`insert into ${table} failed: ${error.message}`);
   }
 }
@@ -40,7 +39,8 @@ export async function loadDemoData(): Promise<void> {
 
   const accountIdMap = new Map<string, string>();
   accounts.forEach((a) => {
-    const match = insertedAccounts!.find((r) => r.display_name === a.displayName)!;
+    const match = (insertedAccounts ?? []).find((r) => r.display_name === a.displayName);
+    if (!match) throw new Error(`demo seed: no inserted account matching "${a.displayName}"`);
     accountIdMap.set(a.id, match.id);
   });
 
@@ -63,7 +63,7 @@ async function clearDemoRows(
   userId: string,
 ): Promise<void> {
   // Transactions cascade from accounts. Events and snapshots are demo-only in this phase.
-  const del1 = await supabase.from("financial_accounts").delete().eq("provider", "demo");
+  const del1 = await supabase.from("financial_accounts").delete().eq("provider", "demo").eq("user_id", userId);
   if (del1.error) throw new Error(del1.error.message);
   const del2 = await supabase.from("financial_events").delete().eq("user_id", userId);
   if (del2.error) throw new Error(del2.error.message);
