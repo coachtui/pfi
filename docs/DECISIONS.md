@@ -45,3 +45,38 @@ Format: date, decision, context, alternatives, reasoning, consequences. Do not m
 **Alternatives:** generate relative to the real current date.
 **Reasoning:** full determinism — identical charts in tests, screenshots, reviews; no snapshot drift between runs.
 **Consequences:** the demo dashboard always shows the same "today"; acceptable until real data phases.
+
+## 7. 2026-07-15 — Supabase infrastructure pulled forward ahead of remaining Phase 1 screens
+
+**Decision:** build auth (magic link/PKCE), schema + RLS (migrations 0001/0002), the snapshot builder, demo-seed pipeline, and a DB-backed dashboard now, before the rankings/data/report screens land.
+**Alternatives:** finish all Phase 1 screens on demo-only (in-memory) data first and defer persistence to Phase 3 as originally sequenced (see #3).
+**Reasoning:** user decision. Validating the real data path — auth, RLS, snapshot derivation — early de-risks the highest-uncertainty parts of the system before more UI is built on assumptions that only hold for demo data. This supersedes #3's deferral: #3's noted consequence ("env vars flip from optional to required then") has now happened.
+**Consequences:** ROADMAP's Phase 3 boundary narrows — schema, RLS, and auth are already done, so Phase 3 is now "manual data + CSV import" on top of live infrastructure. Rankings/data/report screens still ship on mock/demo data next, but now sit on top of a real Supabase project rather than a purely synthetic one.
+
+## 8. 2026-07-15 — Daily snapshots store raw dollar components; index computed at read time
+
+**Decision:** `daily_snapshots` (migration 0001) persists raw numeric components — `liquid_assets`, `revolving_balances`, `near_term_obligations`, `essential_obligations`, `safety_buffer`, `net_worth` — not a precomputed index/baseline/waterline.
+**Alternatives:** store the computed index, baseline, and waterline per day alongside the components.
+**Reasoning:** the index anchor (FINANCIAL_INDEX_METHODOLOGY) is a pure function of the raw component history. Storing only components lets methodology changes (anchor formula, scale floor, future score versions) replay against history without a data migration, and keeps `financial-engine` the single source of truth for derived math.
+**Consequences:** every dashboard read recomputes index/baseline/waterline from the stored raw series (cheap — pure functions over a bounded window). `health_score`/`score_version` columns from the original DATA_MODEL draft are deferred to Phase 2 when score work begins; the draft's inline `financial_index`/`available_position` fields are superseded by the implemented raw-components shape.
+
+## 9. 2026-07-15 — Magic-link-only auth
+
+**Decision:** Supabase auth configured for email magic link (PKCE flow) only — no password, no OAuth providers, in this phase.
+**Alternatives:** password auth; social OAuth (Google, etc.).
+**Reasoning:** magic link removes password storage/reset surface entirely, matching a personal-finance product's low-friction, low-attack-surface bar for this phase. PKCE via `/auth/callback` is the modern secure pattern for browser redirect auth.
+**Consequences:** `admin.generateLink` (used for local dev bootstrap) emits implicit tokens, not PKCE codes, so `scripts/dev-login.ts` can't hit the code-only callback directly — it uses `verifyOtp` instead. The production email-click flow is architecturally sound but unverified end-to-end with a real inbox (see KNOWN_LIMITATIONS). All future auth settings must live in `supabase/config.toml`: `supabase config push` syncs the whole `[auth]` section, so any setting configured only via dashboard is reverted on the next push (see SECURITY_MODEL).
+
+## 10. 2026-07-15 — Demo data seeds through the real persistence pipeline
+
+**Decision:** the demo generator's accounts and transactions are written to Supabase (`financial_accounts`/`transactions` with `provider = 'demo'`) through the same server actions and snapshot builder a real data source would use, rather than a synthetic in-memory-only demo path.
+**Alternatives:** keep demo data client-side/in-memory (as in Phase 0–1) and wire real persistence separately later.
+**Reasoning:** exercising the real insert → snapshot-build → RLS-read path with demo data is the cheapest way to prove the persistence and security layers work before any real user data exists, and it means the dashboard has no separate demo-only code branch to maintain.
+**Consequences:** `clearDemoData` currently deletes by `user_id` (all `financial_events`/`daily_snapshots` for that user, plus `financial_accounts` where `provider = 'demo'`) — correct while demo is the only data source, but must become source-scoped once manual/CSV data coexists with demo data (see KNOWN_LIMITATIONS).
+
+## 11. 2026-07-15 — `middleware.ts` renamed to `proxy.ts`
+
+**Decision:** the Next.js route guard lives at `src/proxy.ts`, not `src/middleware.ts`.
+**Alternatives:** keep the `middleware.ts` name used through Phase 0–1 planning and in the original ARCHITECTURE.md wording.
+**Reasoning:** Next.js 16 renamed the route-interception convention from `middleware` to `proxy`; the app pins to Next 16.2.10, so the new filename is required for Next to pick it up.
+**Consequences:** "middleware" in older docs/discussion refers to what is now `src/proxy.ts`; re-check this convention name on future Next major-version upgrades.

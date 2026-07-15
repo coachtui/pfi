@@ -18,13 +18,17 @@ Repo initialized (Next.js 16 / TS strict / Tailwind 4 / Vitest / ESLint / Pretti
 
 Exit: all primary screens responsive; demo user navigates the full experience; components reusable; suitable for product review.
 
+## Phase 1.5 — Infrastructure ✅ (2026-07-15)
+
+Pulled forward ahead of the remaining Phase 1 screens (DECISIONS.md #7): Supabase auth (magic link/PKCE, `/auth/callback`, route guard at `src/proxy.ts`), schema + default-deny RLS (migrations `0001_core`/`0002_integrity`), snapshot builder (backward balance replay + obligation windows), demo generator seeded through the real persistence pipeline, onboarding flow, DB-backed dashboard with loading/empty states, and an automated RLS tenant-isolation test (`pnpm test:rls`).
+
 ## Phase 2 — Financial engine
 
 Metric registry (savings margin, FCF margin, debt-service ratio, fixed-cost ratio, utilization, liquid runway, volatility, income consistency, drawdown, owner-created equity, contribution consistency, momentum); 0–900 health score with versioning + deterministic score-delta explanations; confidence/data-coverage model; methodology docs. Exit: no displayed metric is hard-coded; everything tested and explainable; partial data handled.
 
-## Phase 3 — Manual data & CSV import (+ Supabase)
+## Phase 3 — Manual data & CSV import (persistence already live)
 
-Auth, schema, RLS, tenant isolation (SECURITY_MODEL.md rules land here). Manual accounts/transactions, CSV import (column mapping, preview, dedupe, transfer detection, import summary), recurring detection, daily snapshot builder, correction workflow with audit trail. Exit: a user can replace demo data with their own; errors recoverable; data isolated per user.
+Auth, schema, RLS, tenant isolation, and the snapshot builder landed in Phase 1.5 — this phase is now scoped to manual accounts/transactions CRUD, CSV import (column mapping, preview, dedupe, transfer detection, import summary), recurring detection (replacing the obligations proxy — see KNOWN_LIMITATIONS), and a correction workflow with audit trail (`transactions.user_override`, already the intended path per migration 0002's immutability trigger). Exit: a user can replace demo data with their own; errors recoverable; data isolated per user.
 
 ## Phase 4 — AI financial interpreter
 

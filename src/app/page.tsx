@@ -1,11 +1,33 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getCompany, getDashboardData, getProfile } from "@/lib/data/queries";
 import { HomeDashboard } from "@/components/dashboard/HomeDashboard";
-import { generateKoaHoldings } from "@/lib/demo-data/koa-holdings";
+import { EmptyDashboard } from "@/components/dashboard/EmptyDashboard";
+import { SignOutButton } from "@/components/nav/SignOutButton";
 
-/**
- * Home dashboard. Phase 1 renders the deterministic Koa Holdings demo
- * dataset; real user data replaces this in Phase 3 (manual data + CSV).
- */
-export default function HomePage() {
-  const { profile, snapshots, events } = generateKoaHoldings();
-  return <HomeDashboard profile={profile} snapshots={snapshots} events={events} />;
+export default async function HomePage() {
+  const supabase = await createClient();
+  const profile = await getProfile(supabase);
+  if (!profile?.onboarding_completed_at) redirect("/onboarding");
+  const company = await getCompany(supabase);
+  if (!company) redirect("/onboarding");
+
+  const { snapshots, events } = await getDashboardData(supabase);
+
+  return (
+    <div className="flex flex-col gap-6">
+      {snapshots.length === 0 ? (
+        <EmptyDashboard companyName={company.name} />
+      ) : (
+        <HomeDashboard
+          profile={{ companyName: company.name, ticker: company.ticker, username: profile.username }}
+          snapshots={snapshots}
+          events={events}
+        />
+      )}
+      <div className="flex justify-end">
+        <SignOutButton />
+      </div>
+    </div>
+  );
 }

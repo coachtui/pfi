@@ -40,7 +40,7 @@ A personal-finance platform that presents a household's finances like a publicly
 - Next.js 16 App Router + strict TypeScript + Tailwind 4 (design tokens in `src/app/globals.css` only) + Recharts + Zod + Vitest. pnpm.
 - Single app, deliberately not a monorepo yet; `src/lib/financial-engine` and `src/lib/demo-data` must stay free of React/Next imports so they can be extracted to packages later.
 - Demo data is seeded and deterministic (`src/lib/demo-data`, fixed seed + fixed end date). Same types as future real providers; swapping data sources touches page loaders only.
-- Supabase (auth/Postgres/RLS) arrives in Phase 3 together with its security rules — env vars are validated in `src/lib/config/env.ts` and flip from optional to required then.
+- Supabase (auth/Postgres/RLS) landed ahead of schedule as Phase 1.5 infrastructure (see docs/DECISIONS.md #7) — env vars are validated in `src/lib/config/env.ts` and are now required, not optional.
 
 ## Commands
 

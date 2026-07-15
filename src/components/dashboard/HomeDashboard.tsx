@@ -20,8 +20,6 @@ import {
   type FinancialEvent,
   type Momentum,
 } from "@/lib/financial-engine";
-import type { koaProfile } from "@/lib/demo-data/koa-holdings";
-
 const RANGES = [
   { key: "30D", days: 30 },
   { key: "90D", days: 90 },
@@ -40,8 +38,15 @@ const MARKER_PRIORITY: FinancialEvent["type"][] = [
 ];
 const MAX_MARKERS = 8;
 
+export interface DashboardIdentity {
+  companyName: string;
+  ticker: string;
+  username: string;
+  level?: number;
+}
+
 interface HomeDashboardProps {
-  profile: typeof koaProfile;
+  profile: DashboardIdentity;
   snapshots: DailySnapshot[];
   events: FinancialEvent[];
 }

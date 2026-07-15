@@ -1,6 +1,6 @@
 # Data Model
 
-Status: **drafted** (Phase 0). Only `DailySnapshot`, `FinancialEvent`, and the demo profile exist as TypeScript types today (`src/lib/financial-engine/types.ts`). The SQL schema lands with Supabase in Phase 3. This draft is the target shape; document deviations in DECISIONS.md.
+Status: six core tables **implemented** (migration `0001_core`, integrity hardening in `0002_integrity`) — `user_profiles`, `personal_companies`, `financial_accounts`, `transactions`, `financial_events`, `daily_snapshots`. All have default-deny RLS with owner-only policies (see SECURITY_MODEL.md), verified by `pnpm test:rls`. `financial_goals`, `recommendations`, `cohorts`/`cohort_benchmarks`, and `challenges`/`achievements` remain **drafts** — no SQL yet, target shape below. Where the implemented schema differs from the original draft, the implementation wins; deviations are recorded in DECISIONS.md (#8).
 
 ## Design reasoning
 
@@ -11,25 +11,27 @@ Status: **drafted** (Phase 0). Only `DailySnapshot`, `FinancialEvent`, and the d
 
 ## Entities
 
-### user_profiles
-`user_id (auth FK)`, `username`, `display_prefs`, `age_cohort`, `income_band`, `household_type`, `col_cohort`, `objective`, `privacy_settings (jsonb)`, `onboarding_completed_at`.
+### user_profiles — implemented (migration 0001)
+`id (= auth.users.id, FK, cascade delete)`, `username (unique)`, `age_cohort`, `income_band`, `household_type`, `col_cohort`, `objective`, `privacy_settings (jsonb, default '{}')`, `onboarding_completed_at`, `created_at`.
 
-Cohort fields are **bands, never exact values** (privacy by construction).
+Cohort fields are **bands, never exact values** (privacy by construction). `display_prefs` from the original draft is not yet a column — add when a display-preference UI exists.
 
-### personal_companies
-`id`, `user_id`, `name`, `ticker`, `logo_path`, `public_profile_enabled`, `created_at`, `data_coverage_state`.
+### personal_companies — implemented (migration 0001)
+`id`, `user_id (unique FK)`, `name`, `ticker`, `logo_path`, `public_profile_enabled (default false)`, `data_coverage_state (default 'demo')`, `created_at`. Matches the original draft.
 
-### financial_accounts
-`id`, `user_id`, `provider ('manual' | 'csv' | 'plaid' | …)`, `institution`, `type` (checking, savings, money_market, credit_card, mortgage, auto_loan, student_loan, personal_loan, brokerage, retirement, property, other_asset, other_liability), `subtype`, `display_name`, `mask`, `currency`, `current_balance`, `available_balance`, `credit_limit`, `interest_rate`, `include_in_calculations`, `include_in_public_score`, `connection_status`, `last_synced_at`.
+### financial_accounts — implemented (migration 0001)
+`id`, `user_id (FK)`, `provider (check: 'demo' | 'manual' | 'csv')`, `institution`, `type` (check: checking, savings, money_market, credit_card, mortgage, auto_loan, student_loan, personal_loan, brokerage, retirement, property, other_asset, other_liability), `subtype`, `display_name`, `mask`, `currency (default 'USD')`, `current_balance`, `available_balance`, `credit_limit`, `interest_rate`, `include_in_calculations (default true)`, `include_in_public_score (default false)`, `connection_status (default 'ok')`, `last_synced_at`, `created_at`. `provider`'s check constraint only allows `demo`/`manual`/`csv` today — `plaid` (or other aggregator values) needs a migration when Phase 7 lands.
 
-### transactions
-`id`, `account_id`, `user_id`, `posted_date`, `authorized_date`, `amount`, `direction`, `description`, `category`, `subcategory`, `type`, `recurring_status`, `essential (bool | null)`, `is_transfer`, `transfer_pair_id`, `confidence`, `user_override (jsonb)`, `notes`.
+### transactions — implemented (migration 0001 + 0002 integrity)
+`id`, `account_id (FK)`, `user_id (FK)`, `posted_date`, `authorized_date`, `amount (check >= 0)`, `direction (check: 'inflow' | 'outflow')`, `description`, `category`, `subcategory`, `txn_type` (renamed from the draft's `type` — reserved-adjacent name avoided), `recurring_status`, `essential (bool | null)`, `is_transfer (default false)`, `transfer_pair_id`, `confidence (check 0–1)`, `user_override (jsonb)`, `notes`, `created_at`. Migration 0002 adds two triggers: `transactions_immutable_source` blocks updates to any source column after insert (corrections go through `user_override` only — see KNOWN_LIMITATIONS on backfills), and `transactions_account_ownership` rejects insert/update if `account_id` doesn't belong to `user_id` (relies on RLS visibility of `financial_accounts`, SECURITY INVOKER).
 
-### financial_events
-Typed notable events (paycheck, bonus, mortgage payment, large purchase, insurance, investment contribution, debt payoff, tax payment, unexpected expense) — chart markers and driver inputs. May be derived from transactions rather than stored, decision pending (DECISIONS.md when Phase 3 starts).
+### financial_events — implemented (migration 0001)
+`id`, `user_id (FK)`, `date`, `type` (check: paycheck, bonus, mortgage_payment, large_purchase, insurance_payment, investment_contribution, debt_payment, debt_payoff, tax_payment, unexpected_expense), `label`, `amount (check >= 0, added in 0002)`, `direction`, `created_at`. Implemented as its own table (not derived from transactions) — resolves the "decision pending" note from the original draft.
 
-### daily_snapshots
-`user_id`, `date`, `liquid_assets`, `current_liabilities`, `near_term_obligations`, `essential_obligations`, `safety_buffer`, `available_position`, `baseline`, `waterline`, `net_worth`, `owner_created_equity`, `financial_index`, `health_score`, `score_version`, `data_coverage_confidence`.
+### daily_snapshots — implemented (migration 0001), raw-components shape
+`user_id`, `date` (composite PK), `liquid_assets`, `revolving_balances`, `near_term_obligations`, `essential_obligations`, `safety_buffer`, `net_worth`, `engine_version`, `data_coverage_confidence (default 'demo')`, `created_at`.
+
+This is the raw-dollar-components shape, not the original draft's shape (which included `available_position`, `baseline`, `waterline`, `owner_created_equity`, `financial_index`, `health_score`, `score_version` as stored columns). Those derived values are computed at read time from the stored components by `src/lib/financial-engine` — see DECISIONS.md #8 and FINANCIAL_INDEX_METHODOLOGY.md's "Snapshot derivation (v1)" section. `health_score`/`score_version` remain deferred to Phase 2.
 
 ### financial_goals
 `id`, `user_id`, `type`, `name`, `target_amount`, `target_date`, `current_amount`, `monthly_target`, `priority`, `status`.

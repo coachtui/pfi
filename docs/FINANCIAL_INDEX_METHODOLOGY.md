@@ -66,6 +66,20 @@ The minimum available position needed to cover near-term essentials plus a user-
 
 Average of the last 7 days of the indexed actual vs the 7 days prior. Within ±1.0 index point is "stable" so daily noise is not labeled a trend (`computeMomentum()`).
 
+## Snapshot derivation (v1)
+
+Implemented in `src/lib/financial-engine/snapshot-builder.ts` (`buildDailySnapshots`). Produces the raw dollar components stored in `daily_snapshots` (DECISIONS.md #8) for every day between a config `startDate` and `endDate`, from a set of accounts and transactions.
+
+**Balance replay is backward.** Only the current balance (as of `endDate`) is known per account. The builder walks dates backward from `endDate` to `startDate`, undoing each day's transactions (`dayDelta`, sign-flipped for liability account types) to reconstruct the balance as of the end of every prior day. `liquid_assets`, `revolving_balances`, and `net_worth` for each date fall out of that day's reconstructed per-account balances.
+
+**Income-date detection.** `buildObligationContext` scans transactions for inflows on liquid accounts categorized `income`, dedupes and sorts the dates, and takes the median gap between consecutive income dates (`DEFAULT_INCOME_GAP_DAYS = 15` when there's no income history to compute a gap from). This median gap stands in for "typical time between paychecks" wherever a forward-looking income date isn't available.
+
+**Obligation windows.** For a given snapshot date, `computeObligations` finds the next income date after it; the obligation window runs from that date to the next income date (or `date + medianGap` if none exists). Every non-transfer outflow from a liquid account inside that window counts toward `near_term_obligations` (and `essential_obligations` when the source transaction is flagged `essential`); a transfer whose paired leg lands on a liability account counts as a debt payment.
+
+**The 28-day previous-cycle proxy, and its known edge case.** Near the end of known transaction history, a forward-looking window can run past `config.endDate` (no transaction data exists there to sum). When that happens, the window is shifted back by a fixed `PROXY_SHIFT_DAYS = 28` — using the previous income cycle's actual spending as a proxy for the (unobserved) upcoming one, on the assumption that most cycles are close to biweekly/monthly. **This is a single fixed offset, not a search for a cycle length that fits.** If the actual income gap is materially larger than 28 days (an irregular or quarterly income pattern), the shifted window can *still* end after `config.endDate`, and the resulting obligation figure is derived from whatever partial data the shifted window does cover. Recurrence detection (replacing the fixed proxy with a detected cycle length) is deferred to when real recurring-transaction data exists — see KNOWN_LIMITATIONS.
+
+**Liability-vs-asset replay semantics.** `dayDelta` sign-flips liability account transactions before applying them to the balance walk (a payment reduces liability balance; a charge increases it), so `revolving_balances` and `net_worth` stay correct through the backward replay regardless of account type. Non-liability, non-liquid accounts (property, other_asset) still contribute to `net_worth` but not to `liquid_assets`.
+
 ## Contributions vs market appreciation
 
 Not yet separated (no investment holdings data in phase 1). When investment accounts arrive, the index decomposition must separate contributions, withdrawals, market appreciation, debt reduction, and retained cash so owner-created equity can be reported honestly. Tracked in ROADMAP Phase 2/7.
