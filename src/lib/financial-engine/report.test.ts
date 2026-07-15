@@ -153,13 +153,31 @@ describe("computePeriodStatement", () => {
     expect(s.savingsRatePct).toBeCloseTo(18.75, 2); // 1200 / 6400
   });
 
-  it("returns zeroes without NaN for a period with no data", () => {
+  it("returns zeroes without NaN for a period entirely before any snapshot data, and the reconciliation identity still holds", () => {
     const empty = computePeriodStatement(
       stmtSnapshots, [], [], stmtIndex,
       { key: "2026-M01", label: "January 2026", start: "2026-01-01", end: "2026-01-31", complete: false },
     );
     expect(empty.revenue).toBe(0);
+    expect(empty.operatingExpenses).toBe(0);
+    expect(empty.savings).toBe(0);
+    expect(empty.investments).toBe(0);
+    expect(empty.debtReduction).toBe(0);
+    expect(empty.ownerCreatedEquity).toBe(0);
+    expect(empty.freeCashFlow).toBe(0);
     expect(empty.savingsRatePct).toBe(0);
     expect(Number.isNaN(empty.ownerCreatedEquity)).toBe(false);
+  });
+
+  it("returns a zero delta without NaN for a period entirely after any snapshot data", () => {
+    const future = computePeriodStatement(
+      stmtSnapshots, [], [], stmtIndex,
+      { key: "2026-M12", label: "December 2026", start: "2026-12-01", end: "2026-12-31", complete: false },
+    );
+    expect(future.savings).toBe(0);
+    expect(future.debtReduction).toBe(0);
+    expect(future.ownerCreatedEquity).toBe(0);
+    expect(future.freeCashFlow).toBe(0);
+    expect(Number.isNaN(future.ownerCreatedEquity)).toBe(false);
   });
 });

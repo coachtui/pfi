@@ -147,8 +147,8 @@ export function computePeriodStatement(
     if (inRange(e.date, start, end) && e.type === "investment_contribution") investments += e.amount;
   }
 
-  const prevSnap = lastWhere(snapshots, (s) => s.date < start) ?? snapshots[0];
-  const endSnap = lastWhere(snapshots, (s) => s.date <= end) ?? snapshots[snapshots.length - 1];
+  const endSnap = lastWhere(snapshots, (s) => s.date <= end) ?? snapshots[0];
+  const prevSnap = lastWhere(snapshots, (s) => s.date < start) ?? endSnap;
   const savings = prevSnap && endSnap ? endSnap.liquidAssets - prevSnap.liquidAssets : 0;
   const debtReduction = prevSnap && endSnap ? prevSnap.revolvingBalances - endSnap.revolvingBalances : 0;
   const ownerCreatedEquity = savings + investments + debtReduction;
