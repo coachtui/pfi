@@ -4,7 +4,7 @@ import { z } from "zod";
  * Environment validation. All env access goes through this module so a
  * missing or malformed variable fails loudly at startup, not at runtime.
  *
- * Supabase is now wired for Phase 2+ (auth, persistence, RLS).
+ * Supabase is wired (Phase 1.5 infrastructure) — auth, persistence, RLS.
  */
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),

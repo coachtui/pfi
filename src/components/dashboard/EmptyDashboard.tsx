@@ -1,6 +1,7 @@
 import { Database } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { loadDemoData } from "@/app/actions/demo";
+import { LoadDemoButton } from "@/components/dashboard/LoadDemoButton";
 
 export function EmptyDashboard({ companyName }: { companyName: string }) {
   return (
@@ -17,9 +18,7 @@ export function EmptyDashboard({ companyName }: { companyName: string }) {
           </p>
         </div>
         <form action={loadDemoData}>
-          <button type="submit" className="rounded-xl bg-positive-strong px-5 py-3 text-sm font-semibold text-base">
-            Load demo data
-          </button>
+          <LoadDemoButton />
         </form>
       </Card>
     </div>
