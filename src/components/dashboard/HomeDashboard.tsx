@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowUpRight, ArrowRight, ArrowDownRight, Info } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { FinancialChart, type ChartMarker } from "@/components/chart/FinancialChart";
+import { FinancialChart, type ChartMarker, type StemMarker } from "@/components/chart/FinancialChart";
 import { CompanyHeader } from "@/components/dashboard/CompanyHeader";
 import { MetricCard, type MetricTone } from "@/components/dashboard/MetricCard";
 import { Segmented } from "@/components/ui/Segmented";
@@ -39,6 +39,9 @@ const MARKER_PRIORITY: FinancialEvent["type"][] = [
 ];
 const MAX_MARKERS = 8;
 
+const STEM_TYPES: FinancialEvent["type"][] = ["paycheck", "mortgage_payment", "bonus"];
+const STEM_MAX_RANGE_DAYS = 45;
+
 export interface DashboardIdentity {
   companyName: string;
   ticker: string;
@@ -66,7 +69,8 @@ export function HomeDashboard({ profile, snapshots, events }: HomeDashboardProps
 
     const drivers = computeDrivers(events, { start, end });
     const markers = selectMarkers(events, visible);
-    return { visible, drivers, markers, start, end };
+    const stems = selectStems(events, visible);
+    return { visible, drivers, markers, stems, start, end };
   }, [points, events, range]);
 
   const latest = snapshots[snapshots.length - 1];
@@ -123,6 +127,7 @@ export function HomeDashboard({ profile, snapshots, events }: HomeDashboardProps
           <FinancialChart
             points={view.visible}
             markers={view.markers}
+            stems={view.stems}
             ariaDescription={`Personal financial index over the selected ${range} range. Current value ${latestPoint.actual.toFixed(1)}, baseline ${latestPoint.baseline?.toFixed(1) ?? "n/a"}, waterline ${latestPoint.waterline.toFixed(1)}.`}
           />
         </div>
@@ -192,6 +197,21 @@ function selectMarkers(
     if (chosen.length >= MAX_MARKERS) break;
   }
   return chosen.map((event) => ({ event, y: byDate.get(event.date)! }));
+}
+
+function selectStems(
+  events: FinancialEvent[],
+  visible: { date: string }[],
+): StemMarker[] {
+  if (visible.length === 0 || visible.length > STEM_MAX_RANGE_DAYS) return [];
+  const indexByDate = new Map(visible.map((p, i) => [p.date, i]));
+  const stems: StemMarker[] = [];
+  for (const type of STEM_TYPES) {
+    // most recent event of each type within the visible window
+    const match = [...events].reverse().find((e) => e.type === type && indexByDate.has(e.date));
+    if (match) stems.push({ event: match, pointIndex: indexByDate.get(match.date)! });
+  }
+  return stems.sort((a, b) => a.pointIndex - b.pointIndex);
 }
 
 function MomentumCard({ momentum }: { momentum: Momentum }) {

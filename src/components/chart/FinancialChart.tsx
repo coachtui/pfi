@@ -6,6 +6,7 @@ import {
   ComposedChart,
   Line,
   ReferenceDot,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,7 +14,8 @@ import {
 } from "recharts";
 import type { FinancialEvent, IndexPoint } from "@/lib/financial-engine/types";
 import { formatShortDate } from "@/lib/financial-engine/format";
-import { railPositions } from "@/lib/ui/math";
+import { markerXFraction, railPositions } from "@/lib/ui/math";
+import { eventIcons } from "@/components/dashboard/WhatMovedYourLine";
 
 export interface ChartMarker {
   event: FinancialEvent;
@@ -21,19 +23,27 @@ export interface ChartMarker {
   y: number;
 }
 
+export interface StemMarker {
+  event: FinancialEvent;
+  pointIndex: number;
+}
+
 interface FinancialChartProps {
   points: IndexPoint[];
   markers: ChartMarker[];
+  stems?: StemMarker[];
   /** Plain-language description for screen readers. */
   ariaDescription: string;
 }
+
+const PLOT_LEFT_INSET = 28; // YAxis width 46 + chart margin left −18
 
 /**
  * The core PFI chart: indexed actual position (area), personal baseline
  * (dotted), and financial waterline (dashed). Purely presentational — every
  * value is computed upstream in the financial engine.
  */
-export function FinancialChart({ points, markers, ariaDescription }: FinancialChartProps) {
+export function FinancialChart({ points, markers, stems = [], ariaDescription }: FinancialChartProps) {
   const gradientId = useId();
 
   // ~5 x-axis labels regardless of range length.
@@ -129,6 +139,14 @@ export function FinancialChart({ points, markers, ariaDescription }: FinancialCh
                   strokeWidth={2}
                 />
               ))}
+              {stems.map((s) => (
+                <ReferenceLine
+                  key={`stem-${s.event.id}`}
+                  x={s.event.date}
+                  stroke="var(--border-strong)"
+                  strokeDasharray="3 4"
+                />
+              ))}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -138,7 +156,38 @@ export function FinancialChart({ points, markers, ariaDescription }: FinancialCh
           <RailLabel top={waterlinePos} color="var(--chart-waterline)" label="Waterline" />
         </div>
       </div>
-      <figcaption className="sr-only">{ariaDescription}</figcaption>
+      {stems.length > 0 && (
+        <div
+          aria-hidden
+          className="relative mt-1 h-14"
+          style={{ marginLeft: PLOT_LEFT_INSET, marginRight: 4 + 64 }}
+        >
+          {stems.map((s) => {
+            const Icon = eventIcons[s.event.type];
+            const leftPct = markerXFraction(s.pointIndex, points.length) * 100;
+            const inflow = s.event.direction === "inflow";
+            return (
+              <div
+                key={`chip-${s.event.id}`}
+                className="absolute flex w-16 -translate-x-1/2 flex-col items-center gap-1"
+                style={{ left: `${leftPct}%` }}
+              >
+                <span
+                  className={`flex size-7 items-center justify-center rounded-full border bg-elevated ${inflow ? "border-positive/40 text-positive" : "border-negative/40 text-negative"}`}
+                >
+                  <Icon size={13} />
+                </span>
+                <span className="max-w-16 truncate text-[10px] text-tertiary">{s.event.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <figcaption className="sr-only">
+        {ariaDescription}
+        {stems.length > 0 &&
+          ` Notable events: ${stems.map((s) => `${s.event.label} on ${formatShortDate(s.event.date)}`).join(", ")}.`}
+      </figcaption>
     </figure>
   );
 }

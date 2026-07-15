@@ -14,7 +14,7 @@ import { driverDisplay, type Driver } from "@/lib/financial-engine";
 import { formatShortDate, formatSignedDollars } from "@/lib/financial-engine/format";
 import type { FinancialEventType } from "@/lib/financial-engine/types";
 
-const eventIcons: Record<FinancialEventType, LucideIcon> = {
+export const eventIcons: Record<FinancialEventType, LucideIcon> = {
   paycheck: Banknote,
   bonus: Star,
   mortgage_payment: Home,
