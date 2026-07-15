@@ -14,19 +14,38 @@ export async function completeOnboarding(values: OnboardingValues): Promise<{ er
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   const v = parsed.data;
 
-  const { error: profileErr } = await supabase.from("user_profiles").insert({
-    id: user.id, username: v.username, age_cohort: v.ageCohort, income_band: v.incomeBand,
-    household_type: v.householdType, col_cohort: v.colCohort, objective: v.objective,
-    onboarding_completed_at: new Date().toISOString(),
-  });
-  if (profileErr) {
-    return { error: profileErr.code === "23505" ? "That username is taken." : profileErr.message };
+  // Re-entrant: a user who half-completed onboarding earlier (profile exists,
+  // company insert failed) should be able to retry without hitting the
+  // profile's primary-key uniqueness violation.
+  const { data: existingProfile } = await supabase
+    .from("user_profiles")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (!existingProfile) {
+    const { error: profileErr } = await supabase.from("user_profiles").insert({
+      id: user.id, username: v.username, age_cohort: v.ageCohort, income_band: v.incomeBand,
+      household_type: v.householdType, col_cohort: v.colCohort, objective: v.objective,
+    });
+    if (profileErr) {
+      return { error: profileErr.code === "23505" ? "That username is taken." : profileErr.message };
+    }
   }
 
   const { error: companyErr } = await supabase.from("personal_companies").insert({
     user_id: user.id, name: v.companyName, ticker: `$${v.ticker}`,
   });
   if (companyErr) return { error: companyErr.message };
+
+  // Only stamp onboarding as complete once the company exists, so a failure
+  // above never leaves the user "completed" with no company (which would
+  // otherwise cause an infinite redirect loop between "/" and "/onboarding").
+  const { error: updErr } = await supabase
+    .from("user_profiles")
+    .update({ onboarding_completed_at: new Date().toISOString() })
+    .eq("id", user.id);
+  if (updErr) return { error: updErr.message };
 
   if (v.loadDemo) await loadDemoData();
   redirect("/");

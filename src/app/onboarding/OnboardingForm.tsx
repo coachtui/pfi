@@ -38,14 +38,14 @@ export function OnboardingForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         {step === 1 && (
           <>
-            <Field label="Company name" error={errors.companyName?.message}>
-              <input className={inputCls} placeholder="Koa Holdings" {...register("companyName")} />
+            <Field id="companyName" label="Company name" error={errors.companyName?.message}>
+              <input id="companyName" aria-invalid={!!errors.companyName} aria-describedby={errors.companyName ? "companyName-error" : undefined} className={inputCls} placeholder="Koa Holdings" {...register("companyName")} />
             </Field>
-            <Field label="Ticker (2–5 letters)" error={errors.ticker?.message}>
-              <input className={`${inputCls} uppercase`} placeholder="KOAH" maxLength={5} {...register("ticker")} />
+            <Field id="ticker" label="Ticker (2–5 letters)" error={errors.ticker?.message}>
+              <input id="ticker" aria-invalid={!!errors.ticker} aria-describedby={errors.ticker ? "ticker-error" : undefined} className={`${inputCls} uppercase`} placeholder="KOAH" maxLength={5} {...register("ticker")} />
             </Field>
-            <Field label="Username" error={errors.username?.message}>
-              <input className={inputCls} placeholder="IslandBuilder" {...register("username")} />
+            <Field id="username" label="Username" error={errors.username?.message}>
+              <input id="username" aria-invalid={!!errors.username} aria-describedby={errors.username ? "username-error" : undefined} className={inputCls} placeholder="IslandBuilder" {...register("username")} />
             </Field>
             <button type="button" onClick={next} className="mt-2 rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base">
               Continue
@@ -54,26 +54,26 @@ export function OnboardingForm() {
         )}
         {step === 2 && (
           <>
-            <Field label="Age range" error={errors.ageCohort?.message}>
-              <Select options={AGE_COHORTS} {...register("ageCohort")} />
+            <Field id="ageCohort" label="Age range" error={errors.ageCohort?.message}>
+              <Select id="ageCohort" aria-invalid={!!errors.ageCohort} aria-describedby={errors.ageCohort ? "ageCohort-error" : undefined} options={AGE_COHORTS} {...register("ageCohort")} />
             </Field>
-            <Field label="Household income" error={errors.incomeBand?.message}>
-              <Select options={INCOME_BANDS} {...register("incomeBand")} />
+            <Field id="incomeBand" label="Household income" error={errors.incomeBand?.message}>
+              <Select id="incomeBand" aria-invalid={!!errors.incomeBand} aria-describedby={errors.incomeBand ? "incomeBand-error" : undefined} options={INCOME_BANDS} {...register("incomeBand")} />
             </Field>
-            <Field label="Household type" error={errors.householdType?.message}>
-              <Select options={HOUSEHOLD_TYPES} {...register("householdType")} />
+            <Field id="householdType" label="Household type" error={errors.householdType?.message}>
+              <Select id="householdType" aria-invalid={!!errors.householdType} aria-describedby={errors.householdType ? "householdType-error" : undefined} options={HOUSEHOLD_TYPES} {...register("householdType")} />
             </Field>
-            <Field label="Cost of living" error={errors.colCohort?.message}>
-              <Select options={COL_CATEGORIES} {...register("colCohort")} />
+            <Field id="colCohort" label="Cost of living" error={errors.colCohort?.message}>
+              <Select id="colCohort" aria-invalid={!!errors.colCohort} aria-describedby={errors.colCohort ? "colCohort-error" : undefined} options={COL_CATEGORIES} {...register("colCohort")} />
             </Field>
-            <Field label="Primary objective" error={errors.objective?.message}>
-              <select className={inputCls} defaultValue="" {...register("objective")}>
+            <Field id="objective" label="Primary objective" error={errors.objective?.message}>
+              <select id="objective" aria-invalid={!!errors.objective} aria-describedby={errors.objective ? "objective-error" : undefined} className={inputCls} defaultValue="" {...register("objective")}>
                 <option value="" disabled>Select…</option>
                 {OBJECTIVES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </Field>
-            <label className="flex items-center gap-2 text-sm text-primary">
-              <input type="checkbox" {...register("loadDemo")} className="size-4" />
+            <label htmlFor="loadDemo" className="flex items-center gap-2 text-sm text-primary">
+              <input id="loadDemo" type="checkbox" {...register("loadDemo")} className="size-4" />
               Load sample data so I can explore first
             </label>
             {serverError && <p className="text-sm text-negative" role="alert">{serverError}</p>}
@@ -92,12 +92,12 @@ export function OnboardingForm() {
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className={labelCls}>{label}</label>
+      <label htmlFor={id} className={labelCls}>{label}</label>
       {children}
-      {error && <p className="text-xs text-negative" role="alert">{error}</p>}
+      {error && <p id={`${id}-error`} className="text-xs text-negative" role="alert">{error}</p>}
     </div>
   );
 }
