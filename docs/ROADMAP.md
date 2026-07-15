@@ -10,8 +10,8 @@ Repo initialized (Next.js 16 / TS strict / Tailwind 4 / Vitest / ESLint / Pretti
 
 - ✅ Home dashboard: company header, personal index, actual/baseline/waterline chart with event markers + 30D/90D/1Y/All, metric cards, "What moved your line", deterministic performance brief
 - ⬜ Onboarding flow (identity, cohorts, privacy, sample data)
-- ⬜ Rankings screen (mock cohort data)
-- ⬜ Data/benchmarks screen (mock aggregates)
+- ✅ Rankings screen (mock cohort data)
+- ✅ Data/benchmarks screen (mock aggregates)
 - ⬜ Report screen (mock shareholder report)
 - ⬜ Blue Reef Partners + North Shore Capital demo profiles
 - ⬜ PWA manifest & installability; Playwright smoke test
