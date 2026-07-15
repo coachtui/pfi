@@ -76,3 +76,33 @@ describe("buildDailySnapshots — balance replay", () => {
     expect(buildDailySnapshots(accounts, [], { ...config, endDate: "2025-12-31" })).toEqual([]);
   });
 });
+
+describe("buildDailySnapshots — obligations", () => {
+  const snaps = buildDailySnapshots(accounts, transactions, config);
+
+  it("sums non-transfer liquid outflows plus card-payment transfers before next income", () => {
+    // Day Jan 01 → next income Jan 15. Window (Jan01, Jan15]:
+    // rent 1200 (Jan02) + card payment transfer 300 (Jan08, pair on card)
+    // + groceries 100 (Jan10) = 1600. Coffee (t3) is on the card, not liquid — excluded.
+    expect(snaps.find((s) => s.date === "2026-01-01")!.nearTermObligations).toBe(1600);
+  });
+
+  it("counts only essential non-transfer outflows as essential obligations", () => {
+    // Window (Jan01, Jan15]: rent 1200 + groceries 100 = 1300.
+    expect(snaps.find((s) => s.date === "2026-01-01")!.essentialObligations).toBe(1300);
+  });
+
+  it("shrinks the window as the next income approaches", () => {
+    // Day Jan 09 → window (Jan09, Jan15]: groceries 100 only.
+    expect(snaps.find((s) => s.date === "2026-01-09")!.nearTermObligations).toBe(100);
+    expect(snaps.find((s) => s.date === "2026-01-09")!.essentialObligations).toBe(100);
+  });
+
+  it("uses a previous-cycle proxy when the window runs past endDate", () => {
+    // Day Jan 16 has no future income within history. Median gap = 14 (Jan01→Jan15),
+    // so the window (Jan16, Jan30] shifts back 28 days to (Dec19, Jan02], which
+    // contains the Jan02 rent (1200). Finite, and never reads past endDate.
+    expect(snaps.find((s) => s.date === "2026-01-16")!.nearTermObligations).toBe(1200);
+    expect(snaps.find((s) => s.date === "2026-01-16")!.essentialObligations).toBe(1200);
+  });
+});
