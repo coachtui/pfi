@@ -6,14 +6,17 @@ A personal-finance platform that makes a household's finances feel like managing
 
 ## Status
 
-Phase 1 (visual prototype). The app runs entirely on deterministic demo data — no auth, no persistence, no real financial data yet. See `docs/CURRENT_PHASE.md`.
+Phase 1 (visual prototype) + Phase 1.5 infrastructure. Auth (Supabase magic link) and the database (Postgres + RLS) are live; the app persists data through the real pipeline. The only data flowing through it today is the seeded Koa Holdings demo dataset — manual entry and CSV import land in Phase 3. See `docs/CURRENT_PHASE.md`.
 
 ## Getting started
 
 ```bash
 pnpm install
+cp .env.example .env.local   # fill in NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY
 pnpm dev          # http://localhost:3000
 ```
+
+`.env.local` needs `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to run the app (validated at startup, `src/lib/config/env.ts`). `pnpm test:rls` additionally needs `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` — never used by application code, only by the RLS test script and local dev-login bootstrap under `scripts/`.
 
 ## Scripts
 
@@ -21,6 +24,7 @@ pnpm dev          # http://localhost:3000
 |---|---|
 | `pnpm dev` | Dev server |
 | `pnpm test` | Unit tests (Vitest) |
+| `pnpm test:rls` | Live Supabase RLS tenant-isolation check (needs `SUPABASE_SERVICE_ROLE_KEY`) |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm lint` | ESLint |
 | `pnpm build` | Production build |
