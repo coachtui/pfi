@@ -150,7 +150,7 @@ function RailLabel({ top, color, label }: { top: number | null; color: string; l
   return (
     <span
       className="absolute left-1 flex -translate-y-1/2 items-center gap-1 text-[11px] text-secondary"
-      style={{ top: `calc(${top} * (100% - ${X_AXIS_HEIGHT}px) / 100 + 8px)` }}
+      style={{ top: `calc(${top} * (100% - ${X_AXIS_HEIGHT}px - 8px) / 100 + 8px)` }}
     >
       <span className="size-1.5 rounded-full" style={{ background: color }} />
       {label}
