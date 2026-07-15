@@ -23,8 +23,17 @@ A personal-finance platform that presents a household's finances like a publicly
 - **Separate owner-created equity from market appreciation** wherever investment data appears.
 - **Privacy by design:** public surfaces show only fictional company identity, indexed values, percentiles, broad bands. See `docs/SECURITY_MODEL.md`.
 - **Every score/index must be explainable** ("How is this calculated?" always answerable; score-delta explanations are deterministic, produced before AI narration).
-- The health score (0–900, Phase 2) is **not a credit score** and must never be described as one.
+- The health score (0–900, Phase 2) is **not a credit score** and must never be described as one. Scores are versioned; methodology changes never silently rewrite history. Material data gaps lower displayed **confidence**, never silently the score.
+- **Prioritized actions, not advice lists.** The default experience answers: what is the single most useful financial action I can take next? No generic advice ("spend less", "make a budget").
 - No shame-oriented language; no celebration of extreme austerity.
+- **Analytics privacy:** product analytics never receive raw balances, transaction values, or merchant names.
+
+## UX requirements
+
+- **Mobile-first, always.** Design and verify at ~390px before desktop; desktop adapts from the mobile layout, not the reverse. Ship as an installable PWA (manifest pending — see KNOWN_LIMITATIONS).
+- Accessible: keyboard navigable, screen-reader labels, sufficient contrast, and **never communicate positive/negative state through color alone** (pair with shape, sign, or text).
+- Every screen handles loading, empty, error, and partial-data states; dashboards get skeletons.
+- Every metric/score offers "How is this calculated?"; every recommendation offers "Why am I seeing this?".
 
 ## Architecture (details in docs/ARCHITECTURE.md)
 
