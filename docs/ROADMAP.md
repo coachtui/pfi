@@ -1,0 +1,51 @@
+# Roadmap
+
+Phases merge the original brief with the strategy addendum (explainable financial health, prioritized actions, scenario modeling before aggregation). Update as work progresses; status lives in CURRENT_PHASE.md.
+
+## Phase 0 — Product foundation ✅ (2026-07-15)
+
+Repo initialized (Next.js 16 / TS strict / Tailwind 4 / Vitest / ESLint / Prettier), design tokens, centralized branding, env validation, docs suite, deterministic demo-data strategy, navigation shell. Supabase wiring deliberately deferred (DECISIONS #3).
+
+## Phase 1 — Visual prototype 🔨 (in progress)
+
+- ✅ Home dashboard: company header, personal index, actual/baseline/waterline chart with event markers + 30D/90D/1Y/All, metric cards, "What moved your line", deterministic performance brief
+- ⬜ Onboarding flow (identity, cohorts, privacy, sample data)
+- ⬜ Rankings screen (mock cohort data)
+- ⬜ Data/benchmarks screen (mock aggregates)
+- ⬜ Report screen (mock shareholder report)
+- ⬜ Blue Reef Partners + North Shore Capital demo profiles
+- ⬜ PWA manifest & installability; Playwright smoke test
+
+Exit: all primary screens responsive; demo user navigates the full experience; components reusable; suitable for product review.
+
+## Phase 2 — Financial engine
+
+Metric registry (savings margin, FCF margin, debt-service ratio, fixed-cost ratio, utilization, liquid runway, volatility, income consistency, drawdown, owner-created equity, contribution consistency, momentum); 0–900 health score with versioning + deterministic score-delta explanations; confidence/data-coverage model; methodology docs. Exit: no displayed metric is hard-coded; everything tested and explainable; partial data handled.
+
+## Phase 3 — Manual data & CSV import (+ Supabase)
+
+Auth, schema, RLS, tenant isolation (SECURITY_MODEL.md rules land here). Manual accounts/transactions, CSV import (column mapping, preview, dedupe, transfer detection, import summary), recurring detection, daily snapshot builder, correction workflow with audit trail. Exit: a user can replace demo data with their own; errors recoverable; data isolated per user.
+
+## Phase 4 — AI financial interpreter
+
+Provider-agnostic AI service; structured input/output with Zod validation; "What moved my line?", weekly brief, recommendation cards (green/yellow/red policy enforced), quarterly shareholder report; AI logging without sensitive data. Exit: AI only explains verified metrics; unsafe categories blocked; every recommendation shows evidence and assumptions.
+
+## Phase 5 — Scenario simulator & goals
+
+Goals; deterministic scenario engine (income/expense/debt/savings/purchase/income-loss); projected chart, waterline, runway, goal-date, score impact; highest-impact action engine (detect weakness → candidate actions → code-estimated impact → ranked). Exit: common decisions modelable; AI explains only engine outputs; assumptions visible.
+
+## Phase 6 — Cohorts, rankings & gamification
+
+Anonymized cohorts with minimum sizes + suppression; percentile rankings on normalized improvement metrics (never absolute wealth); challenges, badges, quarterly seasons; opt-in public tickers; anti-gaming + data-coverage requirements. Exit: private data never exposed; opt-out works; manipulation constrained.
+
+## Phase 7 — Account aggregation
+
+Plaid/MX evaluation behind the existing provider abstraction; linking, incremental sync, connection health, reconciliation, webhooks; production security review. Exit: sync failures visible/recoverable; duplicates and transfers tested.
+
+## Phase 8 — Aggregate intelligence
+
+Anonymized benchmark pipeline, household financial-conditions indexes, privacy thresholds, suppression, differential-privacy consideration, documented permitted/prohibited uses. Merchant/geographic trend analytics remain out of scope until value, scale, privacy architecture, legal review, and consent all exist. Exit: no individual reconstructable; consent explicit; outputs auditable; raw data never sold.
+
+## Phase 9 — Production readiness
+
+Accessibility & security audits, performance, monitoring, terms/privacy, fintech legal review, AI-output review, backup/recovery, incident response, closed beta.

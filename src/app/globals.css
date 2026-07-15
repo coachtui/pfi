@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/*
+ * PFI design tokens.
+ * Dark stock-terminal aesthetic: charcoal background, elevated cards,
+ * emerald positive / restrained red negative, thin borders, rounded cards.
+ * All colors live here — components reference semantic token names only.
+ */
+:root {
+  /* Backgrounds */
+  --bg-base: #0b0d0f;
+  --bg-elevated: #15181c;
+  --bg-elevated-2: #1b1f24;
+  --bg-inset: #101317;
+
+  /* Text */
+  --text-primary: #f4f6f7;
+  --text-secondary: #9aa3ab;
+  --text-tertiary: #67707a;
+
+  /* Semantic states */
+  --positive: #34d399;
+  --positive-strong: #10b981;
+  --positive-muted: rgba(52, 211, 153, 0.12);
+  --negative: #f87171;
+  --negative-muted: rgba(248, 113, 113, 0.12);
+  --warning: #fbbf24;
+  --warning-muted: rgba(251, 191, 36, 0.12);
+  --neutral: #8b98a5;
+  --neutral-muted: rgba(139, 152, 165, 0.12);
+
+  /* Chart */
+  --chart-actual: #34d399;
+  --chart-actual-fill-from: rgba(52, 211, 153, 0.28);
+  --chart-actual-fill-to: rgba(52, 211, 153, 0.02);
+  --chart-baseline: #9aa3ab;
+  --chart-waterline: #60a5fa;
+  --chart-grid: rgba(255, 255, 255, 0.05);
+
+  /* Borders & shadows */
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.25);
+
+  /* Radii */
+  --radius-card: 1.25rem;
+  --radius-control: 9999px;
+}
+
+@theme inline {
+  --color-base: var(--bg-base);
+  --color-elevated: var(--bg-elevated);
+  --color-elevated-2: var(--bg-elevated-2);
+  --color-inset: var(--bg-inset);
+
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-tertiary: var(--text-tertiary);
+
+  --color-positive: var(--positive);
+  --color-positive-strong: var(--positive-strong);
+  --color-positive-muted: var(--positive-muted);
+  --color-negative: var(--negative);
+  --color-negative-muted: var(--negative-muted);
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-neutral: var(--neutral);
+  --color-neutral-muted: var(--neutral-muted);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  --radius-card: var(--radius-card);
+  --shadow-card: var(--shadow-card);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numeric readouts should not jitter as values change */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
