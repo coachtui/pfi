@@ -27,7 +27,7 @@ const accentClasses: Record<LeaderboardEntry["accent"], string> = {
   orange: "border-warning/60 text-warning",
 };
 
-interface Identity { companyName: string; ticker: string; username: string; level: number; }
+interface Identity { companyName: string; ticker: string; username: string; }
 
 export function RankingsView({
   leagues,

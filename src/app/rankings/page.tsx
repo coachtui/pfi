@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCompany, getProfile } from "@/lib/data/queries";
-import { getLeagues, VIEWER_LEVEL } from "@/lib/demo-data/cohorts";
+import { getLeagues } from "@/lib/demo-data/cohorts";
 import { RankingsView } from "./RankingsView";
 
 export default async function RankingsPage() {
@@ -18,7 +18,6 @@ export default async function RankingsPage() {
         companyName: company.name,
         ticker: company.ticker,
         username: profile.username,
-        level: VIEWER_LEVEL,
       }}
     />
   );

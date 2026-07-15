@@ -37,6 +37,12 @@ interface FinancialChartProps {
 }
 
 const PLOT_LEFT_INSET = 28; // YAxis width 46 + chart margin left −18
+// Coupled to recharts' default point-scale (edge-to-edge) category axis on XAxis,
+// where the first/last points sit flush with the plot edges — that's what lets
+// markerXFraction's 0..1 fraction map directly onto this inset/right-margin box.
+// A band-scale axis (e.g. adding a Bar series) insets points from the edges instead,
+// or any change to the chart's left/right margins, will desync the chip row from the
+// line; revisit this constant and markerXFraction together if either changes.
 
 /**
  * The core PFI chart: indexed actual position (area), personal baseline

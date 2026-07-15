@@ -1,4 +1,4 @@
-import { clampPercent } from "@/lib/ui/math";
+import { clampPercent, formatOrdinal } from "@/lib/ui/math";
 
 /** Horizontal percentile bar with a 50th-percentile tick. Meaning is always
  * duplicated in adjacent text — the bar itself is decorative reinforcement. */
@@ -14,7 +14,7 @@ export function PercentileBar({
   return (
     <div
       role="img"
-      aria-label={`${pct}th percentile`}
+      aria-label={`${formatOrdinal(pct)} percentile`}
       className="relative h-1.5 w-full rounded-full bg-elevated-2"
     >
       <div className={`absolute inset-y-0 left-0 rounded-full ${barColor}`} style={{ width: `${pct}%` }} />

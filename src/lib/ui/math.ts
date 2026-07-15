@@ -13,7 +13,11 @@ export function markerXFraction(index: number, count: number): number {
 /**
  * Vertical label positions (percent from top) for values on a shared axis
  * rail: max maps to 0, min to 100. Labels closer than `minGapPct` are nudged
- * downward in value order so they never overlap. Nulls pass through.
+ * downward in value order so they stay at least `minGapPct` apart when space
+ * allows; if the resulting span overflows 0–100%, positions are compressed
+ * back into range and can end up closer than `minGapPct`, down to a 0.01
+ * floor — so labels can still touch when the span can't fit. Nulls pass
+ * through.
  */
 export function railPositions(
   values: Array<number | null>,
