@@ -35,9 +35,8 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 
 ## Technical (2026-07-15)
 
-- **Chart texture:** the demo actual line is visually smooth because near-term obligations decline roughly in step with liquid between paydays. Honest but less "market-like" than the mockups; consider modeling more spending variance when tuning demo profiles.
+- **Chart texture is jagged-er but still subtler than the mockup art** even after the widened demo spending variance (2026-07-15): the mockups are illustrative; further tuning is bounded by the demo tests' solvency/arc constraints.
 - **Bottom nav on desktop:** tab bar persists at all viewports. Acceptable for prototype; consider a rail/top nav at `lg+` later.
-- **Chart markers** are simple dots on the line (direction-colored); the mockups show labeled stems below the axis. Revisit during Phase 1 polish.
 - **`% Today`** is the day-over-day change of the index level, which reads large when the index level is far from its scale; consider switching to index-point change display.
 - **No Playwright yet;** browser verification is manual/screenshot-based.
 - **No PWA manifest yet.**
