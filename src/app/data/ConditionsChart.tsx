@@ -16,7 +16,7 @@ export function ConditionsChart({ data }: { data: Array<{ date: string; value: n
               <stop offset="100%" stopColor="var(--chart-actual-fill-to)" />
             </linearGradient>
           </defs>
-          <XAxis dataKey="date" tickFormatter={formatShortDate} interval={6} tickLine={false} axisLine={false} tick={{ fill: "var(--text-tertiary)", fontSize: 10 }} />
+          <XAxis dataKey="date" tickFormatter={formatShortDate} interval="preserveStartEnd" minTickGap={28} tickLine={false} axisLine={false} tick={{ fill: "var(--text-tertiary)", fontSize: 10 }} />
           <YAxis orientation="right" domain={[40, 80]} ticks={[40, 60, 80]} tickLine={false} axisLine={false} tick={{ fill: "var(--text-tertiary)", fontSize: 10 }} width={26} />
           <Area type="monotone" dataKey="value" stroke="var(--chart-actual)" strokeWidth={2} fill={`url(#${gradientId})`} dot={false} isAnimationActive={false} />
         </AreaChart>

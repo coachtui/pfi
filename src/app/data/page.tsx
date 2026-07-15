@@ -9,6 +9,7 @@ import { getBenchmarks, type CompareRow } from "@/lib/demo-data/cohorts";
 import { Card } from "@/components/ui/Card";
 import { PercentileBar } from "@/components/ui/PercentileBar";
 import { TrendStatCard } from "@/components/dashboard/TrendStatCard";
+import { formatSignedPercent } from "@/lib/financial-engine/format";
 import { formatOrdinal } from "@/lib/ui/math";
 import { ConditionsChart } from "./ConditionsChart";
 
@@ -120,7 +121,7 @@ export default async function DataPage() {
             <TrendStatCard
               key={t.label}
               label={t.label}
-              value={`${t.changePct > 0 ? "+" : "−"}${Math.abs(t.changePct).toFixed(1)}%`}
+              value={formatSignedPercent(t.changePct)}
               sub="vs last quarter"
               tone={(t.changePct >= 0) === t.goodWhenRising ? "positive" : "negative"}
               trend={t.trend}
