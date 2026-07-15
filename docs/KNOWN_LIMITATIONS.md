@@ -17,8 +17,6 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **Magic-link email deliverability is unverified on default SMTP.** Supabase's default email provider has low rate limits and no deliverability guarantees; production magic-link flow has not been exercised end-to-end with a real inbox click (DECISIONS.md #9). A transactional email provider is needed before real users onboard.
 - **`clearDemoData` clears all `financial_events`/`daily_snapshots` for the user, not just demo-sourced rows.** Correct while demo is the only data source (DECISIONS.md #10); must become source-scoped once manual/CSV data can coexist with demo data.
 - **Migration 0002's transaction-immutability trigger blocks legitimate backfills.** Any future script that needs to correct a transaction source column directly (rather than through `user_override`) must disable `transactions_immutable_source` around the update and re-enable it after.
-- **No styled `src/app/error.tsx`.** Uncaught errors below the root fall through to Next's default error UI rather than a designed empty/error state.
-- **Load-demo button has no pending state.** `loadDemoData()` can take a few seconds (chunked inserts); the button gives no visual feedback while it runs.
 - **Onboarding retry keeps first-attempt form values** rather than resetting them, which is usually desirable but hasn't been deliberately verified against every field type.
 - **`OnboardingForm.tsx` imports `next/dist/client/components/redirect-error`,** a private Next.js internal path (`isRedirectError` has no public export in this Next version). Build-fails-loud on a Next upgrade that moves/removes it, rather than failing silently.
 - **Lockfile engines want `node>=22`; repo has no `engines` field and pins `@types/node@^20`.** No enforced Node version; works today but is a latent mismatch.
@@ -32,3 +30,9 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **No Playwright yet;** browser verification is manual/screenshot-based.
 - **No PWA manifest yet.**
 - **Percent/number formatting** is US-locale hard-coded; internationalization out of scope for now.
+- **Latent redirect loop if a `personal_companies` row is deleted after onboarding completes** (`/` ↔ `/onboarding`); unreachable via the UI today (2026-07-15).
+- **`src/proxy.ts` PUBLIC_PREFIXES uses `startsWith("/auth")`** — a future route like `/authors` would silently become public; tighten to exact segments when routes grow (2026-07-15).
+- **`supabase/config.toml` auth URLs are localhost-only;** any deploy must add the deployed origin to `site_url`/`additional_redirect_urls` (2026-07-15).
+- **`transactions.transfer_pair_id` has no FK/same-owner constraint.** RLS prevents any leak; this is an integrity-only gap for a future migration (2026-07-15).
+- **Trigger functions lack pinned `search_path=''`** (Supabase linter warning class); add via `alter function` in a future migration (2026-07-15).
+- **No `engines` field in package.json** while Supabase packages declare `node>=22` (local Node 24 fine) (2026-07-15).
