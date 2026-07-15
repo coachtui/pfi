@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
+import { Sparkline } from "@/components/chart/Sparkline";
 
 export type MetricTone = "positive" | "negative" | "warning" | "neutral";
 
@@ -8,13 +9,6 @@ const toneText: Record<MetricTone, string> = {
   negative: "text-negative",
   warning: "text-warning",
   neutral: "text-primary",
-};
-
-const toneStroke: Record<MetricTone, string> = {
-  positive: "var(--positive)",
-  negative: "var(--negative)",
-  warning: "var(--warning)",
-  neutral: "var(--neutral)",
 };
 
 interface MetricCardProps {
@@ -43,28 +37,11 @@ export function MetricCard({
       <p className={`tabular mt-1 text-xl font-semibold ${toneText[tone]}`}>{value}</p>
       {trend && trend.length > 1 && (
         <>
-          <Sparkline values={trend} stroke={toneStroke[tone]} />
+          <Sparkline values={trend} tone={tone} />
           {trendDescription && <span className="sr-only">{trendDescription}</span>}
         </>
       )}
       {footer}
     </Card>
-  );
-}
-
-function Sparkline({ values, stroke }: { values: number[]; stroke: string }) {
-  const w = 96;
-  const h = 20;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const step = w / (values.length - 1);
-  const d = values
-    .map((v, i) => `${i === 0 ? "M" : "L"}${(i * step).toFixed(1)},${(h - 2 - ((v - min) / span) * (h - 4)).toFixed(1)}`)
-    .join(" ");
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="mt-2 h-5 w-full" aria-hidden focusable="false">
-      <path d={d} fill="none" stroke={stroke} strokeWidth={1.5} strokeLinecap="round" opacity={0.9} />
-    </svg>
   );
 }

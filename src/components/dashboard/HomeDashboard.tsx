@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import { ArrowUpRight, ArrowRight, ArrowDownRight, Info } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { FinancialChart, type ChartMarker } from "@/components/chart/FinancialChart";
+import { FinancialChart, type ChartMarker, type StemMarker } from "@/components/chart/FinancialChart";
 import { CompanyHeader } from "@/components/dashboard/CompanyHeader";
 import { MetricCard, type MetricTone } from "@/components/dashboard/MetricCard";
+import { Segmented } from "@/components/ui/Segmented";
 import { WhatMovedYourLine } from "@/components/dashboard/WhatMovedYourLine";
 import {
   availablePosition,
@@ -38,6 +39,9 @@ const MARKER_PRIORITY: FinancialEvent["type"][] = [
 ];
 const MAX_MARKERS = 8;
 
+const STEM_TYPES: FinancialEvent["type"][] = ["paycheck", "mortgage_payment", "bonus"];
+const STEM_MAX_RANGE_DAYS = 45;
+
 export interface DashboardIdentity {
   companyName: string;
   ticker: string;
@@ -65,7 +69,8 @@ export function HomeDashboard({ profile, snapshots, events }: HomeDashboardProps
 
     const drivers = computeDrivers(events, { start, end });
     const markers = selectMarkers(events, visible);
-    return { visible, drivers, markers, start, end };
+    const stems = selectStems(events, visible);
+    return { visible, drivers, markers, stems, start, end };
   }, [points, events, range]);
 
   const latest = snapshots[snapshots.length - 1];
@@ -111,32 +116,18 @@ export function HomeDashboard({ profile, snapshots, events }: HomeDashboardProps
               <span className="text-tertiary">Today</span>
             </p>
           </div>
-          <div
-            role="group"
-            aria-label="Chart time range"
-            className="flex rounded-full border border-border-subtle bg-inset p-0.5"
-          >
-            {RANGES.map((r) => (
-              <button
-                key={r.key}
-                type="button"
-                onClick={() => setRange(r.key)}
-                aria-pressed={range === r.key}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  range === r.key
-                    ? "bg-elevated-2 text-primary shadow-card"
-                    : "text-secondary hover:text-primary"
-                }`}
-              >
-                {r.key}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            options={RANGES.map((r) => ({ key: r.key, label: r.key }))}
+            value={range}
+            onChange={(key) => setRange(key as RangeKey)}
+            ariaLabel="Chart time range"
+          />
         </div>
         <div className="mt-4">
           <FinancialChart
             points={view.visible}
             markers={view.markers}
+            stems={view.stems}
             ariaDescription={`Personal financial index over the selected ${range} range. Current value ${latestPoint.actual.toFixed(1)}, baseline ${latestPoint.baseline?.toFixed(1) ?? "n/a"}, waterline ${latestPoint.waterline.toFixed(1)}.`}
           />
         </div>
@@ -208,6 +199,33 @@ function selectMarkers(
   return chosen.map((event) => ({ event, y: byDate.get(event.date)! }));
 }
 
+function selectStems(
+  events: FinancialEvent[],
+  visible: { date: string }[],
+): StemMarker[] {
+  if (visible.length === 0 || visible.length > STEM_MAX_RANGE_DAYS) return [];
+  const indexByDate = new Map(visible.map((p, i) => [p.date, i]));
+  const stems: StemMarker[] = [];
+  for (const type of STEM_TYPES) {
+    // most recent event of each type within the visible window
+    const match = [...events].reverse().find((e) => e.type === type && indexByDate.has(e.date));
+    if (match) stems.push({ event: match, pointIndex: indexByDate.get(match.date)! });
+  }
+  return stems.sort((a, b) => a.pointIndex - b.pointIndex);
+}
+
+function MomentumBars({ direction }: { direction: Momentum["direction"] }) {
+  const heights = direction === "improving" ? [5, 8, 11, 14] : direction === "declining" ? [14, 11, 8, 5] : [9, 9, 9, 9];
+  const fill = direction === "improving" ? "var(--positive)" : direction === "declining" ? "var(--warning)" : "var(--neutral)";
+  return (
+    <svg viewBox="0 0 30 16" className="h-4 w-8" aria-hidden focusable="false">
+      {heights.map((h, i) => (
+        <rect key={i} x={i * 8} y={16 - h} width={5} height={h} rx={1.5} fill={fill} opacity={0.4 + i * 0.2} />
+      ))}
+    </svg>
+  );
+}
+
 function MomentumCard({ momentum }: { momentum: Momentum }) {
   const config: Record<
     Momentum["direction"],
@@ -224,11 +242,12 @@ function MomentumCard({ momentum }: { momentum: Momentum }) {
       value={label}
       tone={tone}
       footer={
-        <p className="mt-2 flex items-center gap-1 text-xs text-secondary">
+        <p className="mt-2 flex items-center gap-2 text-xs text-secondary">
           <Icon size={14} aria-hidden />
+          <MomentumBars direction={momentum.direction} />
           <span className="tabular">
             {momentum.delta >= 0 ? "+" : ""}
-            {momentum.delta.toFixed(1)} pts vs prior {momentum.windowDays}d
+            {momentum.delta.toFixed(1)} pts
           </span>
         </p>
       }

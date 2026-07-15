@@ -5,9 +5,21 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 ## Product (2026-07-15)
 
 - **Demo data is the only data source.** Auth and persistence are live, but the only data flowing through the pipeline is Koa Holdings' seeded dataset, loaded via `loadDemoData()` through the real insert/snapshot pipeline (fixed "today" of 2026-07-15). No manual entry or CSV import yet (ROADMAP Phase 3).
-- **Rankings / Data / Report are stubs** with Coming Soon states. Mock-data versions are the next Phase 1 slice.
+- **Report is a stub** with a Coming Soon state; a demo-data-computed version is the next Phase 1 slice.
 - **Performance brief is template text** assembled from calculated metrics — clearly labeled; real AI narration is Phase 4.
 - **Financial-health score not yet implemented** (spec in FINANCIAL_HEALTH_SCORE.md).
+
+## Visual parity slice (2026-07-15)
+
+- **Rankings and Data run on sample cohort data**, not a real cohort pipeline — league tabs, leaderboard, percentile compares, and benchmark metrics all read from the deterministic mock module `src/lib/demo-data/cohorts.ts` until Phase 6 builds anonymized cohorts with real minimum-size/suppression rules.
+- **Rankings leagues and quarterly challenges are samples.** The Age/Income/Region/Overall tabs switch between four distinct but hand-authored sample leagues (no real cohort computation behind them), and challenge cards aren't wired to real progress; both are placeholders for Phase 6.
+- **Chart stem chips (paycheck/mortgage/bonus markers below the axis) are approximate-positioned**, driven by plot-inset constants in `FinancialChart`/`src/lib/ui/math.ts` rather than exact plot geometry, and are hidden entirely on ranges longer than 45 days to avoid crowding.
+- **Leaderboard row chevrons imply tappable rows that aren't tappable yet.** Rows read as links (mockup-mandated affordance) but don't navigate; they become real profile links once Phase 6 ships other cohort profiles.
+- **`eventIcons` lives in `WhatMovedYourLine`** (`src/components/dashboard/WhatMovedYourLine.tsx`) but is imported by the chart layer (`src/components/chart/FinancialChart.tsx`), an inverted dependency (chart importing from dashboard). Extraction to a shared module is a candidate cleanup once a third consumer appears.
+- **`railPositions`'s docstring overstates its overlap guarantee.** It says labels "never overlap," but when the label span can't fit within 0–100%, the overflow-compression step (`src/lib/ui/math.ts`) can push gaps below `minGapPct`, including down to a 0.01 floor — so labels can end up arbitrarily close, just not literally coincident.
+- **3-up mobile grids (Data "Cohort trends", Rankings "Quarterly Challenges") stay `grid grid-cols-3` down to 390px** rather than switching to a horizontal-scroll row. Verified live at 390×844: card titles wrap to at most 2 lines and no stat/value is clipped, so the narrower columns read as compact-but-readable; kept as-is rather than adding scroll-row complexity for a marginal gain. Revisit if a future card variant adds more text.
+- **The Home header's "LV. 7" chip is sample gamification data.** It renders `VIEWER_LEVEL` from the demo cohorts module (`src/lib/demo-data/cohorts.ts`), not a computed level; real leveling logic is part of the Phase 6 cohorts build.
+- **The Data "How you compare" percentile scale footer (0th/50th/100th) is offset by the icon column (`pl-12`) but not the right ordinal column (`w-12`).** The "50th" label sits slightly left of the bars' true midpoint tick as a result (cosmetic).
 
 ## Infrastructure (2026-07-15)
 
@@ -23,9 +35,8 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 
 ## Technical (2026-07-15)
 
-- **Chart texture:** the demo actual line is visually smooth because near-term obligations decline roughly in step with liquid between paydays. Honest but less "market-like" than the mockups; consider modeling more spending variance when tuning demo profiles.
+- **Chart texture is jagged-er but still subtler than the mockup art** even after the widened demo spending variance (2026-07-15): the mockups are illustrative; further tuning is bounded by the demo tests' solvency/arc constraints.
 - **Bottom nav on desktop:** tab bar persists at all viewports. Acceptable for prototype; consider a rail/top nav at `lg+` later.
-- **Chart markers** are simple dots on the line (direction-colored); the mockups show labeled stems below the axis. Revisit during Phase 1 polish.
 - **`% Today`** is the day-over-day change of the index level, which reads large when the index level is far from its scale; consider switching to index-point change display.
 - **No Playwright yet;** browser verification is manual/screenshot-based.
 - **No PWA manifest yet.**

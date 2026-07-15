@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCompany, getDashboardData, getProfile } from "@/lib/data/queries";
+import { VIEWER_LEVEL } from "@/lib/demo-data/cohorts";
 import { HomeDashboard } from "@/components/dashboard/HomeDashboard";
 import { EmptyDashboard } from "@/components/dashboard/EmptyDashboard";
 import { SignOutButton } from "@/components/nav/SignOutButton";
@@ -20,7 +21,7 @@ export default async function HomePage() {
         <EmptyDashboard companyName={company.name} />
       ) : (
         <HomeDashboard
-          profile={{ companyName: company.name, ticker: company.ticker, username: profile.username }}
+          profile={{ companyName: company.name, ticker: company.ticker, username: profile.username, level: VIEWER_LEVEL }}
           snapshots={snapshots}
           events={events}
         />

@@ -179,16 +179,17 @@ export function generateKoaHoldings(): DemoDataset {
       }
     }
 
-    const essentials = ESSENTIAL_DAILY + Math.round((rand() - 0.5) * 30);
+    const essentials = ESSENTIAL_DAILY + Math.round((rand() - 0.5) * 100);
     checking -= essentials;
     pushTxn(day, CHK, essentials, "outflow", "Groceries & essentials", { category: "groceries", essential: true });
 
-    const cardSpend = Math.round(13 + rand() * 16);
+    // Mean stays ~$20/day (~$600/mo), just under the $640 CC payment
+    const cardSpend = Math.round(4 + rand() * 32);
     card += cardSpend;
     pushTxn(day, CARD, cardSpend, "outflow", "Card purchases", { category: "discretionary", essential: false });
 
-    if (rand() < 0.024) {
-      const amount = Math.round(250 + rand() * 450);
+    if (rand() < 0.05) {
+      const amount = Math.round(150 + rand() * 300);
       checking -= amount;
       pushTxn(day, CHK, amount, "outflow", "Large purchase", { category: "shopping", essential: false });
       pushEvent(day, "large_purchase", "Large Purchase", amount, "outflow");
