@@ -12,7 +12,7 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 ## Visual parity slice (2026-07-15)
 
 - **Rankings and Data run on sample cohort data**, not a real cohort pipeline — league tabs, leaderboard, percentile compares, and benchmark metrics all read from the deterministic mock module `src/lib/demo-data/cohorts.ts` until Phase 6 builds anonymized cohorts with real minimum-size/suppression rules.
-- **Rankings league tabs and quarterly challenges are static samples.** Switching Age/Income/Region/Overall doesn't change the underlying data, and challenge cards aren't wired to real progress; both are placeholders for Phase 6.
+- **Rankings leagues and quarterly challenges are samples.** The Age/Income/Region/Overall tabs switch between four distinct but hand-authored sample leagues (no real cohort computation behind them), and challenge cards aren't wired to real progress; both are placeholders for Phase 6.
 - **Chart stem chips (paycheck/mortgage/bonus markers below the axis) are approximate-positioned**, driven by plot-inset constants in `FinancialChart`/`src/lib/ui/math.ts` rather than exact plot geometry, and are hidden entirely on ranges longer than 45 days to avoid crowding.
 - **Leaderboard row chevrons imply tappable rows that aren't tappable yet.** Rows read as links (mockup-mandated affordance) but don't navigate; they become real profile links once Phase 6 ships other cohort profiles.
 - **`eventIcons` lives in `WhatMovedYourLine`** (`src/components/dashboard/WhatMovedYourLine.tsx`) but is imported by the chart layer (`src/components/chart/FinancialChart.tsx`), an inverted dependency (chart importing from dashboard). Extraction to a shared module is a candidate cleanup once a third consumer appears.
