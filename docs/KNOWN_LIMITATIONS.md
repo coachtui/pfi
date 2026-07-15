@@ -17,6 +17,9 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **Leaderboard row chevrons imply tappable rows that aren't tappable yet.** Rows read as links (mockup-mandated affordance) but don't navigate; they become real profile links once Phase 6 ships other cohort profiles.
 - **`eventIcons` lives in `WhatMovedYourLine`** (`src/components/dashboard/WhatMovedYourLine.tsx`) but is imported by the chart layer (`src/components/chart/FinancialChart.tsx`), an inverted dependency (chart importing from dashboard). Extraction to a shared module is a candidate cleanup once a third consumer appears.
 - **`railPositions`'s docstring overstates its overlap guarantee.** It says labels "never overlap," but when the label span can't fit within 0–100%, the overflow-compression step (`src/lib/ui/math.ts`) can push gaps below `minGapPct`, including down to a 0.01 floor — so labels can end up arbitrarily close, just not literally coincident.
+- **3-up mobile grids (Data "Cohort trends", Rankings "Quarterly Challenges") stay `grid grid-cols-3` down to 390px** rather than switching to a horizontal-scroll row. Verified live at 390×844: card titles wrap to at most 2 lines and no stat/value is clipped, so the narrower columns read as compact-but-readable; kept as-is rather than adding scroll-row complexity for a marginal gain. Revisit if a future card variant adds more text.
+- **The Home header's "LV. 7" chip is sample gamification data.** It renders `VIEWER_LEVEL` from the demo cohorts module (`src/lib/demo-data/cohorts.ts`), not a computed level; real leveling logic is part of the Phase 6 cohorts build.
+- **The Data "How you compare" percentile scale footer (0th/50th/100th) is offset by the icon column (`pl-12`) but not the right ordinal column (`w-12`).** The "50th" label sits slightly left of the bars' true midpoint tick as a result (cosmetic).
 
 ## Infrastructure (2026-07-15)
 
