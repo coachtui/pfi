@@ -28,8 +28,12 @@ export function CompanyHeader({ companyName, ticker, username, level }: CompanyH
         </div>
       </div>
       {level !== undefined && (
-        <span className="rounded-full border border-border-subtle bg-elevated px-3 py-1 text-xs font-medium text-secondary">
-          LV. {level}
+        <span className="relative flex size-12 items-center justify-center rounded-full bg-gradient-to-br from-positive/30 via-elevated-2 to-[color:var(--chart-waterline)]/20 text-positive">
+          <TreePalm size={22} aria-hidden />
+          <span className="absolute -bottom-1 rounded-full border border-border-subtle bg-elevated px-1.5 text-[9px] font-semibold text-secondary">
+            LV. {level}
+          </span>
+          <span className="sr-only">Level {level}</span>
         </span>
       )}
     </header>

@@ -214,6 +214,18 @@ function selectStems(
   return stems.sort((a, b) => a.pointIndex - b.pointIndex);
 }
 
+function MomentumBars({ direction }: { direction: Momentum["direction"] }) {
+  const heights = direction === "improving" ? [5, 8, 11, 14] : direction === "declining" ? [14, 11, 8, 5] : [9, 9, 9, 9];
+  const fill = direction === "improving" ? "var(--positive)" : direction === "declining" ? "var(--warning)" : "var(--neutral)";
+  return (
+    <svg viewBox="0 0 30 16" className="h-4 w-8" aria-hidden focusable="false">
+      {heights.map((h, i) => (
+        <rect key={i} x={i * 8} y={16 - h} width={5} height={h} rx={1.5} fill={fill} opacity={0.4 + i * 0.2} />
+      ))}
+    </svg>
+  );
+}
+
 function MomentumCard({ momentum }: { momentum: Momentum }) {
   const config: Record<
     Momentum["direction"],
@@ -230,11 +242,12 @@ function MomentumCard({ momentum }: { momentum: Momentum }) {
       value={label}
       tone={tone}
       footer={
-        <p className="mt-2 flex items-center gap-1 text-xs text-secondary">
+        <p className="mt-2 flex items-center gap-2 text-xs text-secondary">
           <Icon size={14} aria-hidden />
+          <MomentumBars direction={momentum.direction} />
           <span className="tabular">
             {momentum.delta >= 0 ? "+" : ""}
-            {momentum.delta.toFixed(1)} pts vs prior {momentum.windowDays}d
+            {momentum.delta.toFixed(1)} pts
           </span>
         </p>
       }
