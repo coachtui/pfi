@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { enumeratePeriods, latestCompletePeriod } from "./report";
 import type { DailySnapshot } from "./types";
+import { computePeriodStatement } from "./report";
+import type { FinancialEvent, IndexPoint } from "./types";
+import type { TransactionInput } from "./snapshot-builder";
 
 const snap = (date: string): DailySnapshot => ({
   date, liquidAssets: 0, revolvingBalances: 0, nearTermObligations: 0,
@@ -70,5 +73,93 @@ describe("latestCompletePeriod", () => {
   it("returns null for empty input", () => {
     expect(latestCompletePeriod([])).toBeNull();
     expect(enumeratePeriods([], "monthly")).toEqual([]);
+  });
+});
+
+const txn = (
+  postedDate: string, amount: number, direction: "inflow" | "outflow",
+  opts: Partial<TransactionInput> = {},
+): TransactionInput => ({
+  id: `${postedDate}-${amount}-${direction}`, accountId: "chk", postedDate, amount, direction,
+  category: null, essential: null, isTransfer: false, transferPairId: null, ...opts,
+});
+
+// A tiny hand-computed June with a May-31 prev snapshot for exact deltas.
+const stmtSnapshots: DailySnapshot[] = [
+  { date: "2026-05-31", liquidAssets: 10000, revolvingBalances: 2000, nearTermObligations: 0, essentialObligations: 0, safetyBuffer: 0, netWorth: 100000 },
+  { date: "2026-06-30", liquidAssets: 11200, revolvingBalances: 1800, nearTermObligations: 0, essentialObligations: 0, safetyBuffer: 0, netWorth: 101900 },
+];
+// Flows in June: income 6400 (two paychecks), spending 4500 (non-transfer outflows),
+// an investment transfer 500 (isTransfer, excluded from opex), a card payment transfer 300 (excluded).
+const stmtTxns: TransactionInput[] = [
+  txn("2026-06-01", 3200, "inflow", { category: "income" }),
+  txn("2026-06-15", 3200, "inflow", { category: "income" }),
+  txn("2026-06-05", 2850, "outflow", { category: "housing", essential: true }),
+  txn("2026-06-20", 1650, "outflow", { category: "discretionary" }),
+  txn("2026-06-12", 500, "outflow", { isTransfer: true, transferPairId: "p1" }),
+  txn("2026-06-13", 300, "outflow", { isTransfer: true, transferPairId: "p2" }),
+  txn("2026-05-20", 9999, "inflow", { category: "income" }), // out of range
+];
+const stmtEvents: FinancialEvent[] = [
+  { id: "e1", date: "2026-06-12", type: "investment_contribution", label: "Investment", amount: 500, direction: "outflow" },
+  { id: "e2", date: "2026-05-12", type: "investment_contribution", label: "Investment", amount: 500, direction: "outflow" },
+];
+const stmtIndex: IndexPoint[] = [
+  { date: "2026-05-31", actual: 110, baseline: 108, waterline: 90 },
+  { date: "2026-06-30", actual: 118.4, baseline: 112, waterline: 91 },
+];
+const junePeriod = { key: "2026-M06", label: "June 2026", start: "2026-06-01", end: "2026-06-30", complete: true };
+
+describe("computePeriodStatement", () => {
+  const s = computePeriodStatement(stmtSnapshots, stmtTxns, stmtEvents, stmtIndex, junePeriod);
+
+  it("sums revenue from in-range income inflows only", () => {
+    expect(s.revenue).toBe(6400);
+  });
+
+  it("sums operating expenses from in-range non-transfer outflows only", () => {
+    expect(s.operatingExpenses).toBe(4500); // 2850 + 1650; transfers excluded
+  });
+
+  it("computes free cash flow", () => {
+    expect(s.freeCashFlow).toBe(1900);
+  });
+
+  it("reads savings and debt reduction from snapshot deltas", () => {
+    expect(s.savings).toBe(1200); // 11200 - 10000
+    expect(s.debtReduction).toBe(200); // 2000 - 1800
+  });
+
+  it("reads investments from in-range investment_contribution events", () => {
+    expect(s.investments).toBe(500);
+  });
+
+  it("owner-created equity is savings + investments + debt reduction", () => {
+    expect(s.ownerCreatedEquity).toBe(1900);
+    expect(s.marketAppreciation).toBe(0);
+  });
+
+  it("reconciles: free cash flow equals owner-created equity (demo identity)", () => {
+    expect(s.ownerCreatedEquity).toBeCloseTo(s.freeCashFlow, 2);
+  });
+
+  it("computes index movement over the period", () => {
+    expect(s.indexStart).toBe(110);
+    expect(s.indexEnd).toBe(118.4);
+    expect(s.indexChange).toBeCloseTo(8.4, 2);
+  });
+
+  it("computes savings rate as a percent of revenue", () => {
+    expect(s.savingsRatePct).toBeCloseTo(18.75, 2); // 1200 / 6400
+  });
+
+  it("returns zeroes without NaN for a period with no data", () => {
+    const empty = computePeriodStatement(
+      stmtSnapshots, [], [], stmtIndex,
+      { key: "2026-M01", label: "January 2026", start: "2026-01-01", end: "2026-01-31", complete: false },
+    );
+    expect(empty.revenue).toBe(0);
+    expect(empty.savingsRatePct).toBe(0);
+    expect(Number.isNaN(empty.ownerCreatedEquity)).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
-import type { DailySnapshot, ISODate } from "./types";
+import type { DailySnapshot, FinancialEvent, IndexPoint, ISODate } from "./types";
+import type { TransactionInput } from "./snapshot-builder";
 
 export type ReportGranularity = "monthly" | "quarterly";
 
@@ -84,4 +85,94 @@ export function latestCompletePeriod(periods: ReportPeriod[]): ReportPeriod | nu
     if (periods[i].complete) return periods[i];
   }
   return periods[periods.length - 1] ?? null;
+}
+
+export interface PeriodStatement {
+  period: ReportPeriod;
+  revenue: number;
+  operatingExpenses: number;
+  freeCashFlow: number;
+  savings: number;
+  investments: number;
+  debtReduction: number;
+  ownerCreatedEquity: number;
+  marketAppreciation: number;
+  indexStart: number;
+  indexEnd: number;
+  indexChange: number;
+  savingsRatePct: number;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function inRange(date: ISODate, start: ISODate, end: ISODate): boolean {
+  return date >= start && date <= end;
+}
+
+function lastWhere<T>(arr: T[], pred: (x: T) => boolean): T | undefined {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (pred(arr[i])) return arr[i];
+  }
+  return undefined;
+}
+
+/**
+ * Deterministic shareholder-style statement for a period. Every figure traces
+ * to transactions (revenue, operating expenses), investment_contribution events
+ * (investments), or snapshot/index deltas (savings, debt reduction, index).
+ * The identity freeCashFlow === ownerCreatedEquity holds exactly for the demo
+ * dataset (zero market drift, static mortgage/property) — see the design spec.
+ */
+export function computePeriodStatement(
+  snapshots: DailySnapshot[],
+  transactions: TransactionInput[],
+  events: FinancialEvent[],
+  indexPoints: IndexPoint[],
+  period: ReportPeriod,
+): PeriodStatement {
+  const { start, end } = period;
+
+  let revenue = 0;
+  let operatingExpenses = 0;
+  for (const t of transactions) {
+    if (!inRange(t.postedDate, start, end)) continue;
+    if (t.direction === "inflow" && !t.isTransfer && t.category === "income") revenue += t.amount;
+    if (t.direction === "outflow" && !t.isTransfer) operatingExpenses += t.amount;
+  }
+
+  let investments = 0;
+  for (const e of events) {
+    if (inRange(e.date, start, end) && e.type === "investment_contribution") investments += e.amount;
+  }
+
+  const prevSnap = lastWhere(snapshots, (s) => s.date < start) ?? snapshots[0];
+  const endSnap = lastWhere(snapshots, (s) => s.date <= end) ?? snapshots[snapshots.length - 1];
+  const savings = prevSnap && endSnap ? endSnap.liquidAssets - prevSnap.liquidAssets : 0;
+  const debtReduction = prevSnap && endSnap ? prevSnap.revolvingBalances - endSnap.revolvingBalances : 0;
+  const ownerCreatedEquity = savings + investments + debtReduction;
+
+  const indexByDate = new Map(indexPoints.map((p) => [p.date, p.actual]));
+  const indexStart = prevSnap ? (indexByDate.get(prevSnap.date) ?? 100) : 100;
+  const indexEnd = endSnap ? (indexByDate.get(endSnap.date) ?? indexStart) : indexStart;
+
+  const freeCashFlow = revenue - operatingExpenses;
+  const savingsRatePct = revenue > 0 ? round2((savings / revenue) * 100) : 0;
+
+  return {
+    period,
+    revenue: round2(revenue),
+    operatingExpenses: round2(operatingExpenses),
+    freeCashFlow: round2(freeCashFlow),
+    savings: round2(savings),
+    investments: round2(investments),
+    debtReduction: round2(debtReduction),
+    ownerCreatedEquity: round2(ownerCreatedEquity),
+    marketAppreciation: 0,
+    indexStart: round2(indexStart),
+    indexEnd: round2(indexEnd),
+    indexChange: round2(indexEnd - indexStart),
+    savingsRatePct,
+  };
 }
