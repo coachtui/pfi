@@ -1,11 +1,10 @@
 import { HomeDashboard } from "@/components/dashboard/HomeDashboard";
+import { buildDailySnapshots } from "@/lib/financial-engine";
 import { generateKoaHoldings } from "@/lib/demo-data/koa-holdings";
 
-/**
- * Home dashboard. Phase 1 renders the deterministic Koa Holdings demo
- * dataset; real user data replaces this in Phase 3 (manual data + CSV).
- */
+// Temporary: still in-memory. Task 12 swaps this for Supabase queries.
 export default function HomePage() {
-  const { profile, snapshots, events } = generateKoaHoldings();
+  const { profile, accounts, transactions, events, config } = generateKoaHoldings();
+  const snapshots = buildDailySnapshots(accounts, transactions, config);
   return <HomeDashboard profile={profile} snapshots={snapshots} events={events} />;
 }

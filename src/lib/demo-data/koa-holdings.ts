@@ -1,4 +1,9 @@
-import type { DailySnapshot, FinancialEvent, ISODate } from "../financial-engine/types";
+import type { FinancialEvent, ISODate } from "../financial-engine/types";
+import type {
+  AccountInput,
+  SnapshotBuilderConfig,
+  TransactionInput,
+} from "../financial-engine/snapshot-builder";
 import { mulberry32 } from "./prng";
 
 /**
@@ -62,139 +67,147 @@ function enumerateDays(end: ISODate, count: number): Day[] {
 
 const BONUS_MONTHS = new Set([2, 5, 8, 11]);
 
-/** Scheduled cash outflows for a given calendar day (excluding daily run-rate). */
-function scheduledOutflows(day: Day): Array<{ amount: number; essential: boolean }> {
-  const out: Array<{ amount: number; essential: boolean }> = [];
-  if (day.d === 1) out.push({ amount: MORTGAGE, essential: true });
-  if (day.d === 5) out.push({ amount: UTILITIES, essential: true });
-  if (day.d === 10) out.push({ amount: INSURANCE, essential: true });
-  if (day.d === 12) out.push({ amount: INVESTMENT, essential: false });
-  if (day.d === 13) out.push({ amount: CC_PAYMENT, essential: false });
-  return out;
+export interface DemoAccount extends AccountInput {
+  provider: "demo";
+  displayName: string;
+  institution: string;
+  subtype: string | null;
+  mask: string;
 }
 
-/** Days until the next semi-monthly paycheck (1st or 15th), at least 1. */
-function daysToNextPaycheck(day: Day): number {
-  if (day.d < 15) return 15 - day.d;
-  const daysInMonth = new Date(Date.UTC(day.y, day.m, 0)).getUTCDate();
-  return daysInMonth - day.d + 1;
+export interface DemoTransaction extends TransactionInput {
+  description: string;
 }
 
 export interface DemoDataset {
   profile: typeof koaProfile;
-  snapshots: DailySnapshot[];
+  accounts: DemoAccount[];
+  transactions: DemoTransaction[];
   events: FinancialEvent[];
+  config: SnapshotBuilderConfig;
 }
+
+const CHK = "koa-checking";
+const CARD = "koa-card";
+const BRK = "koa-brokerage";
+const PROP = "koa-property";
+const MTG = "koa-mortgage";
 
 export function generateKoaHoldings(): DemoDataset {
   const rand = mulberry32(SEED);
   const days = enumerateDays(END_DATE, HISTORY_DAYS);
 
-  let liquid = 14_000;
-  let revolving = 2_400;
-  let investments = 88_000;
-  let mortgageBalance = 412_000;
-  const homeValue = 640_000;
+  let checking = 14_000;
+  let card = 2_400;
+  let brokerage = 88_000;
 
-  const snapshots: DailySnapshot[] = [];
+  const transactions: DemoTransaction[] = [];
   const events: FinancialEvent[] = [];
-  let eventSeq = 0;
+  let tSeq = 0;
+  let eSeq = 0;
+
+  const pushTxn = (
+    day: Day,
+    accountId: string,
+    amount: number,
+    direction: "inflow" | "outflow",
+    description: string,
+    opts: { category?: string; essential?: boolean; isTransfer?: boolean; transferPairId?: string | null } = {},
+  ): string => {
+    const id = `koa-t-${tSeq++}`;
+    transactions.push({
+      id, accountId, postedDate: day.date, amount: Math.round(amount * 100) / 100, direction,
+      description, category: opts.category ?? null, essential: opts.essential ?? null,
+      isTransfer: opts.isTransfer ?? false, transferPairId: opts.transferPairId ?? null,
+    });
+    return id;
+  };
 
   const pushEvent = (
-    day: Day,
-    type: FinancialEvent["type"],
-    label: string,
-    amount: number,
+    day: Day, type: FinancialEvent["type"], label: string, amount: number,
     direction: FinancialEvent["direction"],
   ) => {
-    events.push({ id: `koa-${eventSeq++}`, date: day.date, type, label, amount, direction });
+    events.push({ id: `koa-${eSeq++}`, date: day.date, type, label, amount, direction });
+  };
+
+  const transfer = (day: Day, fromId: string, toId: string, amount: number, description: string) => {
+    const outId = `koa-t-${tSeq}`;
+    const inId = `koa-t-${tSeq + 1}`;
+    pushTxn(day, fromId, amount, "outflow", description, { isTransfer: true, transferPairId: inId });
+    pushTxn(day, toId, amount, "inflow", description, { isTransfer: true, transferPairId: outId });
   };
 
   for (const day of days) {
-    // Income. A modest raise lands in Jan 2026 to support the improving-liquidity arc.
     const pay = day.y >= 2026 ? PAYCHECK + 250 : PAYCHECK;
     if (day.d === 1 || day.d === 15) {
-      liquid += pay;
+      checking += pay;
+      pushTxn(day, CHK, pay, "inflow", "Employer payroll", { category: "income" });
       pushEvent(day, "paycheck", "Paycheck", pay, "inflow");
     }
     if (day.d === 20 && BONUS_MONTHS.has(day.m)) {
-      liquid += BONUS;
+      checking += BONUS;
+      pushTxn(day, CHK, BONUS, "inflow", "Quarterly bonus", { category: "income" });
       pushEvent(day, "bonus", "Bonus", BONUS, "inflow");
     }
-
-    // Scheduled outflows.
     if (day.d === 1) {
-      liquid -= MORTGAGE;
-      mortgageBalance -= 620; // principal portion
+      checking -= MORTGAGE;
+      pushTxn(day, CHK, MORTGAGE, "outflow", "Mortgage payment", { category: "housing", essential: true });
       pushEvent(day, "mortgage_payment", "Mortgage", MORTGAGE, "outflow");
     }
     if (day.d === 5) {
-      liquid -= UTILITIES;
-      pushEvent(day, "unexpected_expense", "Utilities", UTILITIES, "outflow");
+      checking -= UTILITIES;
+      pushTxn(day, CHK, UTILITIES, "outflow", "Utilities", { category: "utilities", essential: true });
     }
     if (day.d === 10) {
-      liquid -= INSURANCE;
+      checking -= INSURANCE;
+      pushTxn(day, CHK, INSURANCE, "outflow", "Auto insurance", { category: "insurance", essential: true });
       pushEvent(day, "insurance_payment", "Auto Insurance", INSURANCE, "outflow");
     }
     if (day.d === 12) {
-      liquid -= INVESTMENT;
-      investments += INVESTMENT;
+      checking -= INVESTMENT;
+      brokerage += INVESTMENT;
+      transfer(day, CHK, BRK, INVESTMENT, "Brokerage contribution");
       pushEvent(day, "investment_contribution", "Investment", INVESTMENT, "outflow");
     }
     if (day.d === 13) {
-      const payment = Math.min(CC_PAYMENT, revolving);
-      liquid -= payment;
-      revolving -= payment;
-      if (payment > 0) pushEvent(day, "debt_payment", "Credit Card", payment, "outflow");
-    }
-
-    // Daily behavior: essentials from cash, discretionary on the card.
-    // Card spend (~$630/mo) sits just under the $640 payment so revolving
-    // debt slowly declines — part of the improving-liquidity narrative.
-    liquid -= ESSENTIAL_DAILY + Math.round((rand() - 0.5) * 30);
-    revolving += Math.round(13 + rand() * 16);
-
-    // Occasional larger one-offs (~ every 6 weeks).
-    if (rand() < 0.024) {
-      const amount = Math.round(250 + rand() * 450);
-      liquid -= amount;
-      pushEvent(day, "large_purchase", "Large Purchase", amount, "outflow");
-    }
-
-    // Market drift on investments (deterministic noise, slight upward bias).
-    investments *= 1 + (rand() - 0.47) * 0.004;
-
-    // Near-term obligations: scheduled bills before the next paycheck plus
-    // the essential daily run-rate for those days.
-    const gap = daysToNextPaycheck(day);
-    let obligations = 0;
-    let essential = 0;
-    for (let ahead = 1; ahead <= gap; ahead++) {
-      const t = new Date(Date.UTC(day.y, day.m - 1, day.d + ahead));
-      const future: Day = {
-        date: t.toISOString().slice(0, 10),
-        y: t.getUTCFullYear(),
-        m: t.getUTCMonth() + 1,
-        d: t.getUTCDate(),
-      };
-      for (const o of scheduledOutflows(future)) {
-        obligations += o.amount;
-        if (o.essential) essential += o.amount;
+      const payment = Math.min(CC_PAYMENT, card);
+      if (payment > 0) {
+        checking -= payment;
+        card -= payment;
+        transfer(day, CHK, CARD, payment, "Credit card payment");
+        pushEvent(day, "debt_payment", "Credit Card", payment, "outflow");
       }
     }
-    obligations += gap * ESSENTIAL_DAILY;
-    essential += gap * ESSENTIAL_DAILY;
 
-    snapshots.push({
-      date: day.date,
-      liquidAssets: Math.round(liquid),
-      revolvingBalances: Math.round(revolving),
-      nearTermObligations: Math.round(obligations),
-      essentialObligations: Math.round(essential),
-      safetyBuffer: SAFETY_BUFFER,
-      netWorth: Math.round(liquid + investments + homeValue - revolving - mortgageBalance),
-    });
+    const essentials = ESSENTIAL_DAILY + Math.round((rand() - 0.5) * 30);
+    checking -= essentials;
+    pushTxn(day, CHK, essentials, "outflow", "Groceries & essentials", { category: "groceries", essential: true });
+
+    const cardSpend = Math.round(13 + rand() * 16);
+    card += cardSpend;
+    pushTxn(day, CARD, cardSpend, "outflow", "Card purchases", { category: "discretionary", essential: false });
+
+    if (rand() < 0.024) {
+      const amount = Math.round(250 + rand() * 450);
+      checking -= amount;
+      pushTxn(day, CHK, amount, "outflow", "Large purchase", { category: "shopping", essential: false });
+      pushEvent(day, "large_purchase", "Large Purchase", amount, "outflow");
+    }
   }
 
-  return { profile: koaProfile, snapshots, events };
+  const accounts: DemoAccount[] = [
+    { id: CHK, type: "checking", currentBalance: Math.round(checking), includeInCalculations: true, provider: "demo", displayName: "Everyday Checking", institution: "Pacific Bank", subtype: null, mask: "4821" },
+    { id: CARD, type: "credit_card", currentBalance: Math.round(card), includeInCalculations: true, provider: "demo", displayName: "Rewards Card", institution: "Pacific Bank", subtype: null, mask: "7710" },
+    { id: BRK, type: "brokerage", currentBalance: Math.round(brokerage), includeInCalculations: true, provider: "demo", displayName: "Brokerage", institution: "Island Invest", subtype: null, mask: "0093" },
+    { id: PROP, type: "property", currentBalance: 640_000, includeInCalculations: true, provider: "demo", displayName: "Primary Residence", institution: "—", subtype: "primary_residence", mask: "0001" },
+    { id: MTG, type: "mortgage", currentBalance: 412_000, includeInCalculations: true, provider: "demo", displayName: "Home Mortgage", institution: "Pacific Bank", subtype: null, mask: "5540" },
+  ];
+
+  return {
+    profile: koaProfile,
+    accounts,
+    transactions,
+    events,
+    config: { startDate: days[0].date, endDate: END_DATE, safetyBuffer: SAFETY_BUFFER },
+  };
 }
