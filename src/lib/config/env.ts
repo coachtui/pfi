@@ -14,7 +14,19 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
-export function validateEnv(source: NodeJS.ProcessEnv = process.env): Env {
+// Next.js's bundler statically inlines `process.env.NEXT_PUBLIC_*` for the
+// client bundle only when the property access is written literally — passing
+// `process.env` through as a whole object (the previous default) opts the
+// client build out of inlining, so NEXT_PUBLIC_* is always undefined in the
+// browser. Building the default source object from literal accesses keeps
+// this module safe to import from client components.
+const defaultSource = {
+  NODE_ENV: process.env.NODE_ENV,
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+} as NodeJS.ProcessEnv;
+
+export function validateEnv(source: NodeJS.ProcessEnv = defaultSource): Env {
   const parsed = envSchema.safeParse(source);
   if (!parsed.success) {
     const issues = parsed.error.issues
