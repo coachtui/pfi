@@ -5,6 +5,9 @@ import { computePeriodStatement } from "./report";
 import type { FinancialEvent, IndexPoint } from "./types";
 import type { TransactionInput } from "./snapshot-builder";
 import type { PeriodStatement } from "./report";
+import { buildDailySnapshots } from "./snapshot-builder";
+import { buildIndexSeries } from "./indexing";
+import { generateKoaHoldings } from "../demo-data/koa-holdings";
 
 const snap = (date: string): DailySnapshot => ({
   date, liquidAssets: 0, revolvingBalances: 0, nearTermObligations: 0,
@@ -232,4 +235,87 @@ describe("buildManagementCommentary", () => {
     // Should NOT contain a double-negative (minus sign immediately after "reducing")
     expect(commentary).not.toMatch(/reducing\s+−/);
   });
+
+  it('uses "shortfall" instead of "surplus" when free cash flow is negative', () => {
+    const negativeFcfStatement: PeriodStatement = {
+      period: junePeriod,
+      revenue: 3000,
+      operatingExpenses: 5000,
+      freeCashFlow: -2000,
+      savings: -1500,
+      investments: 0,
+      debtReduction: -500,
+      ownerCreatedEquity: -2000,
+      marketAppreciation: 0,
+      indexStart: 100,
+      indexEnd: 98,
+      indexChange: -2,
+      savingsRatePct: 0,
+    };
+    const commentary = buildManagementCommentary(negativeFcfStatement, "Test Corp").join(" ");
+
+    expect(commentary).toContain("shortfall");
+    expect(commentary).not.toContain("surplus");
+  });
+
+  it('uses "surplus" (not "shortfall") when free cash flow is positive', () => {
+    const positiveFcfStatement: PeriodStatement = {
+      period: junePeriod,
+      revenue: 6400,
+      operatingExpenses: 4500,
+      freeCashFlow: 1900,
+      savings: 1200,
+      investments: 500,
+      debtReduction: 200,
+      ownerCreatedEquity: 1900,
+      marketAppreciation: 0,
+      indexStart: 110,
+      indexEnd: 118.4,
+      indexChange: 8.4,
+      savingsRatePct: 18.75,
+    };
+    const commentary = buildManagementCommentary(positiveFcfStatement, "Test Corp").join(" ");
+
+    expect(commentary).toContain("surplus");
+    expect(commentary).not.toContain("shortfall");
+  });
+});
+
+describe("computePeriodStatement — real pipeline", () => {
+  // End-to-end reconciliation against the actual demo data pipeline (not
+  // just hand-built fixtures). Regression coverage for a real bug: a
+  // "leading partial" period — one whose nominal start predates the
+  // earliest snapshot but that genuinely overlaps real data — used to
+  // fabricate a savings/debt-reduction delta of zero (or, after a first
+  // fix attempt, double count the earliest data day's transactions and
+  // events), breaking freeCashFlow === ownerCreatedEquity by hundreds of
+  // dollars. This asserts the identity holds for every period the real
+  // Koa Holdings dataset produces, at both granularities.
+  const dataset = generateKoaHoldings();
+  const snapshots = buildDailySnapshots(dataset.accounts, dataset.transactions, dataset.config);
+  const { points: indexPoints } = buildIndexSeries(snapshots);
+
+  it("has real snapshot data to exercise (sanity check)", () => {
+    expect(snapshots.length).toBeGreaterThan(300);
+  });
+
+  it.each(["monthly", "quarterly"] as const)(
+    "reconciles freeCashFlow === ownerCreatedEquity for every %s period",
+    (granularity) => {
+      const periods = enumeratePeriods(snapshots, granularity);
+      expect(periods.length).toBeGreaterThan(0);
+
+      for (const period of periods) {
+        const s = computePeriodStatement(
+          snapshots, dataset.transactions, dataset.events, indexPoints, period,
+        );
+        expect(
+          Math.abs(s.freeCashFlow - s.ownerCreatedEquity),
+          `${granularity} period ${period.key} (${period.label}): freeCashFlow=${s.freeCashFlow} ` +
+          `ownerCreatedEquity=${s.ownerCreatedEquity} diverge by ` +
+          `${Math.abs(s.freeCashFlow - s.ownerCreatedEquity)}`,
+        ).toBeLessThan(0.01);
+      }
+    },
+  );
 });

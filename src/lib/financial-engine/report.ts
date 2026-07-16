@@ -108,10 +108,6 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function inRange(date: ISODate, start: ISODate, end: ISODate): boolean {
-  return date >= start && date <= end;
-}
-
 function lastWhere<T>(arr: T[], pred: (x: T) => boolean): T | undefined {
   for (let i = arr.length - 1; i >= 0; i--) {
     if (pred(arr[i])) return arr[i];
@@ -135,21 +131,38 @@ export function computePeriodStatement(
 ): PeriodStatement {
   const { start, end } = period;
 
+  const endSnap = lastWhere(snapshots, (s) => s.date <= end) ?? snapshots[0];
+  const prevSnap = lastWhere(snapshots, (s) => s.date < start) ?? snapshots[0];
+
+  // Transactions and events are windowed to (prevSnap.date, endSnap.date] —
+  // the exact interval the snapshot delta below measures — rather than the
+  // period's nominal [start, end]. For a normal period these coincide
+  // (prevSnap sits on start-1, endSnap on end). For a "leading partial"
+  // period (period.start predates the earliest snapshot), prevSnap falls
+  // back to the earliest snapshot itself; that snapshot's balance already
+  // reflects its own day's flows, so re-including that day's transactions
+  // and events in the sums below would double count it against the
+  // snapshot delta and break the freeCashFlow === ownerCreatedEquity
+  // identity. Same logic applies symmetrically at the trailing edge, though
+  // in practice no transactions exist past the last snapshot anyway.
+  const windowStart = prevSnap?.date;
+  const windowEnd = endSnap?.date;
+  const inWindow = (date: ISODate): boolean =>
+    windowStart !== undefined && windowEnd !== undefined && date > windowStart && date <= windowEnd;
+
   let revenue = 0;
   let operatingExpenses = 0;
   for (const t of transactions) {
-    if (!inRange(t.postedDate, start, end)) continue;
+    if (!inWindow(t.postedDate)) continue;
     if (t.direction === "inflow" && !t.isTransfer && t.category === "income") revenue += t.amount;
     if (t.direction === "outflow" && !t.isTransfer) operatingExpenses += t.amount;
   }
 
   let investments = 0;
   for (const e of events) {
-    if (inRange(e.date, start, end) && e.type === "investment_contribution") investments += e.amount;
+    if (inWindow(e.date) && e.type === "investment_contribution") investments += e.amount;
   }
 
-  const endSnap = lastWhere(snapshots, (s) => s.date <= end) ?? snapshots[0];
-  const prevSnap = lastWhere(snapshots, (s) => s.date < start) ?? endSnap;
   const savings = prevSnap && endSnap ? endSnap.liquidAssets - prevSnap.liquidAssets : 0;
   const debtReduction = prevSnap && endSnap ? prevSnap.revolvingBalances - endSnap.revolvingBalances : 0;
   const ownerCreatedEquity = savings + investments + debtReduction;
@@ -186,6 +199,7 @@ export function computePeriodStatement(
 export function buildManagementCommentary(statement: PeriodStatement, companyName: string): string[] {
   const s = statement;
   const fcfVerb = s.freeCashFlow >= 0 ? "produced" : "posted";
+  const flowNoun = s.freeCashFlow >= 0 ? "surplus" : "shortfall";
   const equityVerb = s.ownerCreatedEquity >= 0
     ? `building ${formatDollars(s.ownerCreatedEquity)} of owner-created equity`
     : `reducing owner-created equity by ${formatDollars(Math.abs(s.ownerCreatedEquity))}`;
@@ -196,7 +210,7 @@ export function buildManagementCommentary(statement: PeriodStatement, companyNam
 
   return [
     `During ${s.period.label}, ${companyName} recorded ${formatDollars(s.revenue)} of revenue against ${formatDollars(s.operatingExpenses)} of operating expenses, and ${fcfVerb} ${formatSignedDollars(s.freeCashFlow)} of free cash flow.`,
-    `That surplus was allocated across ${formatDollars(s.savings)} of retained cash, ${formatDollars(s.investments)} of investment contributions, and ${formatSignedDollars(s.debtReduction)} of debt reduction — ${equityVerb}, with no market appreciation recorded this period.`,
+    `That ${flowNoun} was allocated across ${formatDollars(s.savings)} of retained cash, ${formatDollars(s.investments)} of investment contributions, and ${formatSignedDollars(s.debtReduction)} of debt reduction — ${equityVerb}, with no market appreciation recorded this period.`,
     `The personal index ${indexPhrase} over the period, ending at ${s.indexEnd.toFixed(1)}.`,
     `The household retained ${s.savingsRatePct.toFixed(1)}% of revenue as cash this period.`,
   ];
