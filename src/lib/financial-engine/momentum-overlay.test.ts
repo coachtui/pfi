@@ -10,6 +10,9 @@ describe("computeMomentum", () => {
     [660, 680, 700, "deteriorating"],      // both segments −20
     [685, 700, 702, "weakening"],          // recent −15, earlier flat
     [700, 702, 699, "stable"],             // both inside ±9
+    [709, 700, 700, "stable"],             // d1 = +9 exactly — 9 is NOT > 9
+    [691, 700, 700, "stable"],             // d1 = −9 exactly — −9 is NOT < −9
+    [718, 709, 700, "stable"],             // d1 = +9, d2 = +9 — both at threshold
   ])("(%s, %s, %s) → %s", (current, prior30, prior60, expected) => {
     expect(computeMomentum({ current, prior30, prior60 })).toBe(expected);
   });
@@ -17,6 +20,7 @@ describe("computeMomentum", () => {
   it("returns insufficient_history when any point is missing", () => {
     expect(computeMomentum({ current: 700, prior30: 690, prior60: null })).toBe("insufficient_history");
     expect(computeMomentum({ current: null, prior30: 690, prior60: 680 })).toBe("insufficient_history");
+    expect(computeMomentum({ current: 700, prior30: null, prior60: 680 })).toBe("insufficient_history");
   });
 
   it("uses the documented threshold", () => {
