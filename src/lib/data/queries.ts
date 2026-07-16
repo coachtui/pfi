@@ -2,7 +2,13 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DailySnapshot, FinancialEvent } from "@/lib/financial-engine/types";
 import type { TransactionInput } from "@/lib/financial-engine/snapshot-builder";
-import { applyOverride, parseOverride } from "@/lib/financial-engine";
+import {
+  applyOverride, parseOverride,
+  buildMetricInputs, computeMetrics, computeConfidence, computeScore,
+  computeScoreDelta, computeScoreMomentum, addDays,
+  type MomentumState, type OverallState, type ScoreBreakdown, type ScoreDelta,
+  type ScoreAccountInput, type ScoreTransactionInput,
+} from "@/lib/financial-engine";
 import {
   rowToSnapshot, rowToEvent, rowToTransactionListItem,
   rowToAccountSummary, type SnapshotRow, type EventRow, type TransactionRow,
@@ -71,11 +77,15 @@ export async function getTransactionsData(
 
 export async function getDashboardData(
   supabase: SupabaseClient,
-): Promise<{ snapshots: DailySnapshot[]; events: FinancialEvent[]; staleIndex: boolean }> {
-  const [snapRes, eventRes, latestTxnRes] = await Promise.all([
+): Promise<{
+  snapshots: DailySnapshot[]; events: FinancialEvent[]; staleIndex: boolean;
+  scoreSummary: ScoreSummary;
+}> {
+  const [snapRes, eventRes, latestTxnRes, scoreSummary] = await Promise.all([
     supabase.from("daily_snapshots").select("*").order("date", { ascending: true }),
     supabase.from("financial_events").select("*").order("date", { ascending: true }),
     supabase.from("transactions").select("posted_date").order("posted_date", { ascending: false }).limit(1),
+    getScoreSummary(supabase),
   ]);
   if (snapRes.error) throw snapRes.error;
   if (eventRes.error) throw eventRes.error;
@@ -93,6 +103,7 @@ export async function getDashboardData(
     snapshots,
     events: (eventRes.data as Array<EventRow & { id: string }>).map(rowToEvent),
     staleIndex,
+    scoreSummary,
   };
 }
 
@@ -128,5 +139,129 @@ export async function getReportData(supabase: SupabaseClient): Promise<{
       };
     }),
     events: (eventRes.data as Array<EventRow & { id: string }>).map(rowToEvent),
+  };
+}
+
+export type ScoreRange = "30d" | "90d" | "1y" | "all";
+
+export interface ScoreSummary {
+  state: OverallState;
+  overall: number | null;
+  band: string | null;
+  momentum: MomentumState;
+  confidence: ScoreBreakdown["overallConfidence"];
+}
+
+export interface ScoreData {
+  breakdown: ScoreBreakdown;
+  delta: ScoreDelta;
+  momentum: MomentumState;
+  improvements: string[];
+  range: ScoreRange;
+}
+
+interface ScoreSourceRows {
+  snapshots: DailySnapshot[];
+  transactions: ScoreTransactionInput[];
+  accounts: ScoreAccountInput[];
+}
+
+async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceRows> {
+  const [snapRes, txnRes, acctRes] = await Promise.all([
+    supabase.from("daily_snapshots").select("*").order("date", { ascending: true }),
+    supabase
+      .from("transactions")
+      .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, user_override")
+      .order("posted_date", { ascending: true }),
+    supabase
+      .from("financial_accounts")
+      .select("id, type, institution, provider, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at"),
+  ]);
+  if (snapRes.error) throw snapRes.error;
+  if (txnRes.error) throw txnRes.error;
+  if (acctRes.error) throw acctRes.error;
+
+  return {
+    snapshots: (snapRes.data as SnapshotRow[]).map(rowToSnapshot),
+    transactions: (txnRes.data as Array<TransactionRow & { description: string; user_override: unknown }>).map((row) => {
+      const effective = applyOverride({
+        id: row.id, accountId: row.account_id, postedDate: row.posted_date,
+        amount: Number(row.amount), direction: row.direction as "inflow" | "outflow",
+        description: row.description, category: row.category, essential: row.essential,
+        isTransfer: row.is_transfer, transferPairId: row.transfer_pair_id,
+        userOverride: parseOverride(row.user_override),
+      });
+      return {
+        id: effective.id, accountId: effective.accountId, postedDate: effective.postedDate,
+        amount: effective.amount, direction: effective.direction, category: effective.category,
+        essential: effective.essential, isTransfer: effective.isTransfer,
+        transferPairId: effective.transferPairId, description: effective.description,
+      };
+    }),
+    accounts: (acctRes.data as Array<{
+      id: string; type: string; institution: string | null; provider: string;
+      current_balance: number | string; credit_limit: number | string | null;
+      interest_rate: number | string | null; include_in_calculations: boolean;
+      archived_at: string | null;
+    }>)
+      .filter((row) => row.archived_at === null)
+      .map((row) => ({
+        id: row.id,
+        type: row.type as ScoreAccountInput["type"],
+        institution: row.institution,
+        currentBalance: Number(row.current_balance),
+        creditLimit: row.credit_limit === null ? null : Number(row.credit_limit),
+        interestRate: row.interest_rate === null ? null : Number(row.interest_rate),
+        includeInCalculations: row.include_in_calculations,
+        provider: row.provider,
+      })),
+  };
+}
+
+function breakdownAt(sources: ScoreSourceRows, asOf: string): ScoreBreakdown {
+  const inputs = buildMetricInputs(sources.snapshots, sources.transactions, sources.accounts, asOf);
+  const results = computeMetrics(inputs);
+  const confidence = computeConfidence(inputs, results);
+  return computeScore(results, confidence.byDimension, asOf);
+}
+
+function improvementsAt(sources: ScoreSourceRows, asOf: string): string[] {
+  const inputs = buildMetricInputs(sources.snapshots, sources.transactions, sources.accounts, asOf);
+  return computeConfidence(inputs, computeMetrics(inputs)).improvements;
+}
+
+const RANGE_DAYS: Record<Exclude<ScoreRange, "all">, number> = { "30d": 30, "90d": 90, "1y": 365 };
+
+export async function getScoreData(supabase: SupabaseClient, range: ScoreRange): Promise<ScoreData> {
+  const sources = await fetchScoreSources(supabase);
+  const asOf = sources.snapshots.at(-1)?.date ?? new Date().toISOString().slice(0, 10);
+  const breakdown = breakdownAt(sources, asOf);
+
+  const firstDate = sources.snapshots[0]?.date ?? asOf;
+  const rangeStart = range === "all" ? firstDate : addDays(asOf, -RANGE_DAYS[range]);
+  const previous = rangeStart < asOf && rangeStart >= firstDate ? breakdownAt(sources, rangeStart) : null;
+  const delta = computeScoreDelta(breakdown, previous);
+
+  const momentum = computeScoreMomentum({
+    current: breakdown.overall,
+    prior30: breakdownAt(sources, addDays(asOf, -30)).overall,
+    prior60: breakdownAt(sources, addDays(asOf, -60)).overall,
+  });
+
+  return { breakdown, delta, momentum, improvements: improvementsAt(sources, asOf), range };
+}
+
+export async function getScoreSummary(supabase: SupabaseClient): Promise<ScoreSummary> {
+  const sources = await fetchScoreSources(supabase);
+  const asOf = sources.snapshots.at(-1)?.date ?? new Date().toISOString().slice(0, 10);
+  const breakdown = breakdownAt(sources, asOf);
+  const momentum = computeScoreMomentum({
+    current: breakdown.overall,
+    prior30: breakdownAt(sources, addDays(asOf, -30)).overall,
+    prior60: breakdownAt(sources, addDays(asOf, -60)).overall,
+  });
+  return {
+    state: breakdown.state, overall: breakdown.overall, band: breakdown.band,
+    momentum, confidence: breakdown.overallConfidence,
   };
 }
