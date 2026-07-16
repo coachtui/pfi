@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCompany, getDashboardData, getProfile } from "@/lib/data/queries";
+import { rebuildSnapshots } from "@/lib/data/rebuild-snapshots";
 import { VIEWER_LEVEL } from "@/lib/demo-data/cohorts";
 import { HomeDashboard } from "@/components/dashboard/HomeDashboard";
 import { EmptyDashboard } from "@/components/dashboard/EmptyDashboard";
@@ -13,7 +14,14 @@ export default async function HomePage() {
   const company = await getCompany(supabase);
   if (!company) redirect("/onboarding");
 
-  const { snapshots, events } = await getDashboardData(supabase);
+  let data = await getDashboardData(supabase);
+  if (data.staleIndex) {
+    // Idempotent reconciliation: a prior rebuild failed or was skipped. Safe in
+    // a GET — rebuildSnapshots never calls revalidatePath and always converges.
+    await rebuildSnapshots(supabase);
+    data = await getDashboardData(supabase);
+  }
+  const { snapshots, events, staleIndex } = data;
 
   return (
     <div className="flex flex-col gap-6">
@@ -24,6 +32,7 @@ export default async function HomePage() {
           profile={{ companyName: company.name, ticker: company.ticker, username: profile.username, level: VIEWER_LEVEL }}
           snapshots={snapshots}
           events={events}
+          staleIndex={staleIndex}
         />
       )}
       <div className="flex justify-end">

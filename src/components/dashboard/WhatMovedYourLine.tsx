@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Banknote,
   CreditCard,
@@ -49,25 +50,31 @@ export function WhatMovedYourLine({ drivers }: { drivers: Driver[] }) {
         const positive = display.tone === "positive";
         return (
           <li key={event.id}>
-            <Card className="flex h-full flex-col gap-2 p-4">
-              <span
-                aria-hidden
-                className={`flex size-9 items-center justify-center rounded-full ${
-                  positive ? "bg-positive-muted text-positive" : "bg-negative-muted text-negative"
-                }`}
-              >
-                {display.buildsEquity ? <PiggyBank size={18} /> : <Icon size={18} />}
-              </span>
-              <p className="text-sm font-medium text-primary">{event.label}</p>
-              <p
-                className={`tabular text-sm font-semibold ${
-                  positive ? "text-positive" : "text-negative"
-                }`}
-              >
-                {formatSignedDollars(display.displayAmount)}
-              </p>
-              <p className="text-xs text-tertiary">{formatShortDate(event.date)}</p>
-            </Card>
+            <Link
+              href={`/transactions?from=${event.date}&to=${event.date}&label=${encodeURIComponent(event.label)}`}
+              aria-label={`${event.label}, ${formatSignedDollars(display.displayAmount)} on ${formatShortDate(event.date)}. View transactions`}
+              className="block h-full"
+            >
+              <Card className="flex h-full flex-col gap-2 p-4 transition-colors hover:border-border-strong">
+                <span
+                  aria-hidden
+                  className={`flex size-9 items-center justify-center rounded-full ${
+                    positive ? "bg-positive-muted text-positive" : "bg-negative-muted text-negative"
+                  }`}
+                >
+                  {display.buildsEquity ? <PiggyBank size={18} /> : <Icon size={18} />}
+                </span>
+                <p className="text-sm font-medium text-primary">{event.label}</p>
+                <p
+                  className={`tabular text-sm font-semibold ${
+                    positive ? "text-positive" : "text-negative"
+                  }`}
+                >
+                  {formatSignedDollars(display.displayAmount)}
+                </p>
+                <p className="text-xs text-tertiary">{formatShortDate(event.date)}</p>
+              </Card>
+            </Link>
           </li>
         );
       })}

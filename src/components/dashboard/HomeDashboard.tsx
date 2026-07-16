@@ -53,9 +53,11 @@ interface HomeDashboardProps {
   profile: DashboardIdentity;
   snapshots: DailySnapshot[];
   events: FinancialEvent[];
+  /** True when a snapshot rebuild is pending/failed and the chart may lag recent edits. */
+  staleIndex?: boolean;
 }
 
-export function HomeDashboard({ profile, snapshots, events }: HomeDashboardProps) {
+export function HomeDashboard({ profile, snapshots, events, staleIndex }: HomeDashboardProps) {
   const [range, setRange] = useState<RangeKey>("30D");
 
   // The index is anchored on full history once; ranges only slice the view.
@@ -133,6 +135,12 @@ export function HomeDashboard({ profile, snapshots, events }: HomeDashboardProps
         </div>
       </Card>
 
+      {staleIndex && (
+        <p role="status" className="rounded-card border border-border-subtle bg-elevated p-3 text-sm text-warning">
+          ⚠ Index recalculation pending — recent data changes aren’t reflected in the chart yet. They’ll be picked up automatically.
+        </p>
+      )}
+
       {/* Key metrics */}
       <section aria-label="Key metrics" className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <MetricCard
@@ -141,6 +149,7 @@ export function HomeDashboard({ profile, snapshots, events }: HomeDashboardProps
           tone="neutral"
           trend={trendOf(availablePosition)}
           trendDescription="Available capital over the last 14 days"
+          href="/accounts"
         />
         <MetricCard
           label="Obligations"
