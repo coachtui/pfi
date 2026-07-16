@@ -87,3 +87,10 @@ Format: date, decision, context, alternatives, reasoning, consequences. Do not m
 **Alternatives:** fifth nav item ("Accounts"); accounts section behind profile/settings.
 **Reasoning:** the mockups define a four-tab nav (Home/Rankings/Data/Report) with no transactions surface, and the product addendum's UX hierarchy requires the diagnosis (score, drivers, actions) above dense transaction lists — a drill-down keeps detail beneath the diagnosis instead of promoting it to a peer destination.
 **Consequences:** Phase 3's plan should design the drill-down entry points and routes (likely `/accounts` or `/transactions` reachable from dashboard cards); bottom nav stays four tabs; deep-linking to a specific transaction remains possible via route, just not via nav.
+
+## 13. 2026-07-16 — Uniform override edit model; archive-not-delete accounts; manual txns only on manual accounts
+
+**Decision:** all transaction edits — demo or manual — write `user_override` (category/description) or the mutable `notes` column; amount/date mistakes on manual transactions are fixed by delete + re-add. Accounts are archived (`archived_at`), never deleted. Manual transactions may only be created in `provider='manual'` accounts; imported (demo/csv) transactions can never be deleted. Snapshot rebuilds read source columns only, so overrides never move the index.
+**Alternatives:** relaxing the 0002 immutability trigger for manual rows; hard-deleting accounts; allowing manual txns in demo accounts.
+**Reasoning:** one provenance rule for every provider keeps the trigger untouched and the audit trail complete; account.provider stays the single source of a transaction's origin; archived accounts preserve history for past snapshots.
+**Consequences:** recategorizing to/from `income` changes report groupings but not obligations or the index (v1 — revisit with the Phase 2 metric registry); manual edit UX for amount/date is delete + re-add.

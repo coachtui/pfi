@@ -1,10 +1,24 @@
 # Current Phase
 
-_Last updated: 2026-07-15 (report-screen slice — Task 6, docs + final verification)._
+_Last updated: 2026-07-16 (transactions/accounts slice)._
 
-**Phase:** 0 complete, 1.5 (infrastructure) complete, visual-parity slice (Home polish, Rankings, Data) complete, report screen complete → Phase 1 (visual prototype) continues.
+**Phase:** 0 complete, 1.5 (infrastructure) complete, visual-parity slice (Home polish, Rankings, Data) complete, report screen complete → Phase 1 (visual prototype) continues. Phase 3's manual accounts/transactions CRUD slice has also landed ahead of full Phase 1 completion (CSV import remains, see ROADMAP.md Phase 3).
 
-## Completed (this phase — report screen, Tasks 1–6)
+## Completed (this phase — transactions/accounts CRUD slice, Tasks 1–14)
+
+- **Migration `0003_manual_data`.** `financial_accounts.archived_at timestamptz` — accounts are archived, never deleted, so past snapshots built from an archived account's history stay valid.
+- **Engine additions.** `src/lib/financial-engine/overrides.ts` (`parseOverride`/`applyOverride`, defensive `user_override` jsonb parsing, `CorrectableTransaction`/`EffectiveTransaction`) and `rebuild.ts` (`deriveRebuildConfig`, pure) — both framework-free and tested, no React/Next imports.
+- **Category/validation config.** `src/lib/config/categories.ts` (`CATEGORIES`/`CATEGORY_LABELS`) and `src/lib/validation/transactions.ts` (Zod schemas, `TransactionFilters`, `parseTransactionFilters`, `MutationResult`, `ACCOUNT_TYPES`).
+- **Mappers + queries.** `TransactionListRow→TransactionListItem` and `AccountRow→AccountSummary` mappers; `getTransactionsData`, `getAccountsData`; a `staleIndex` flag on `getDashboardData`; override-aware effective categories in `getReportData`.
+- **Shared snapshot-rebuild pipeline.** `insertChunked` extracted from the demo generator into `src/lib/data/insert-chunked.ts`; `rebuildSnapshots(supabase)` (fetch → derive config → `buildDailySnapshots` → replace rows) and `finishWithRebuild(supabase)` (shared rebuild + revalidate tail) used by every balance-affecting server action, including demo seed/clear, so manual accounts survive demo reseeds.
+- **Server actions.** `src/app/actions/transactions.ts` (`createTransaction`, `deleteTransaction`, `overrideTransaction`) and `src/app/actions/accounts.ts` (`createAccount`, `updateAccount`, `setAccountIncluded`, `setAccountArchived`) — all return `{ error }`/`""` on success behind RLS-bound queries.
+- **`/transactions` drill-down.** Filterable list (account/category/direction, month-grouped, client-side), a manual-only add sheet, a detail sheet supporting recategorize/description/notes corrections (with a visible "corrected" indicator and reset-to-original) and manual-only delete (two-step in-app confirm, no native `window.confirm`). Imported (demo) transactions show the correction UI but no delete action.
+- **`/accounts` management screen.** Grouped by account type; add/edit (manual accounts only), include/exclude toggle, and archive/unarchive for every account, each with visible explanatory copy (no color-only signaling).
+- **Dashboard drill-down wiring.** "Available Capital" metric card links to `/accounts`; "What moved your line" driver rows link to `/transactions` pre-filtered by date/label with a context banner ("tapped from …"); a stale-index self-heal triggers a rebuild on home-page load when `staleIndex` is set.
+- **RLS isolation extension.** `scripts/test-rls.mts` grew from 9 to 15 checks: manual-account transaction insert, frozen-source-column immutability, own/foreign `user_override` writes, cross-user override/delete/archive denial — 15/15 passing live against the real Supabase project.
+- **Live browser QA.** `/`, `/transactions`, `/accounts` verified in a real headless browser (gstack `browse`) at 390×844 and 1280×900 against a fresh onboarded user with demo data loaded: onboarding → dashboard, driver-row and Available Capital drill-down links, recategorize with "corrected" badge, add/delete a manual transaction (delete only offered on manual rows, two-step confirm), add/edit/exclude/archive a manual and a demo account (index numbers visibly recomputed after exclude), and the "no transactions match" empty-filter state — console clean on all three routes throughout. Loading skeletons and a genuine error boundary were not forced (no reliable local way to inject a query failure or throttle this session); everything else in the brief's checklist was exercised live, not just read from source.
+
+## Completed (previous phase — report screen, Tasks 1–6)
 
 - **Report data + mapper.** `getReportData` query and a transaction mapper feed the report engine from the real (demo) persistence pipeline.
 - **`report.ts` engine module.** Period enumeration (Monthly/Quarterly), a reconciling period statement (`computePeriodStatement`), and deterministic management commentary — no AI, no hard-coded numbers.
@@ -34,11 +48,11 @@ _Last updated: 2026-07-15 (report-screen slice — Task 6, docs + final verifica
 
 ## In progress
 
-- Nothing mid-flight; clean stopping point at the end of the report-screen slice.
+- Nothing mid-flight; clean stopping point at the end of the transactions/accounts CRUD slice.
 
 ## Next three priorities
 
-1. **Manual accounts/transactions CRUD** — the transactions drill-down per DECISIONS.md #12, the first non-demo data path, built on the persistence/RLS layer that now exists (Phase 3 scope).
+1. **CSV import** — column mapping, preview, dedupe, transfer detection, import summary (Phase 3 remainder; see ROADMAP.md Phase 3).
 2. **Remaining demo profiles + demo-profile switcher** — Blue Reef Partners, North Shore Capital.
 3. **PWA manifest + Playwright smoke test** — installability and automated browser verification.
 
@@ -54,7 +68,7 @@ _Last updated: 2026-07-15 (report-screen slice — Task 6, docs + final verifica
 
 ## Test status
 
-`pnpm check` (lint + typecheck + test + build): green, 94 tests passing (11 test files). `pnpm test:rls`: 9/9 passing against the live Supabase project.
+`pnpm check` (lint + typecheck + test + build): green, 126 tests passing (14 test files). `pnpm test:rls`: 15/15 passing against the live Supabase project.
 
 ## Deployment status
 

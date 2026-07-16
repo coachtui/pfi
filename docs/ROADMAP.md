@@ -26,9 +26,9 @@ Pulled forward ahead of the remaining Phase 1 screens (DECISIONS.md #7): Supabas
 
 Metric registry (savings margin, FCF margin, debt-service ratio, fixed-cost ratio, utilization, liquid runway, volatility, income consistency, drawdown, owner-created equity, contribution consistency, momentum); 0–900 health score with versioning + deterministic score-delta explanations; confidence/data-coverage model; methodology docs. Exit: no displayed metric is hard-coded; everything tested and explainable; partial data handled.
 
-## Phase 3 — Manual data & CSV import (persistence already live)
+## Phase 3 — Manual data & CSV import (persistence live; manual CRUD slice landed 2026-07-16)
 
-Auth, schema, RLS, tenant isolation, and the snapshot builder landed in Phase 1.5 — this phase is now scoped to manual accounts/transactions CRUD, CSV import (column mapping, preview, dedupe, transfer detection, import summary), recurring detection (replacing the obligations proxy — see KNOWN_LIMITATIONS), and a correction workflow with audit trail (`transactions.user_override`, already the intended path per migration 0002's immutability trigger). Exit: a user can replace demo data with their own; errors recoverable; data isolated per user.
+Auth, schema, RLS, tenant isolation, and the snapshot builder landed in Phase 1.5. Manual accounts/transactions CRUD and the correction workflow with audit trail (`transactions.user_override`, per migration 0002's immutability trigger) landed 2026-07-16 (DECISIONS.md #13): a `/transactions` drill-down (filterable list, add/detail sheet, recategorize, manual-only delete) and an `/accounts` management screen (add/edit/include/archive), wired into dashboard drill-down links and a stale-index self-heal. Remaining scope: CSV import (column mapping, preview, dedupe, transfer detection, import summary) and recurring detection (replacing the obligations proxy — see KNOWN_LIMITATIONS). Exit: a user can replace demo data with their own; errors recoverable; data isolated per user.
 
 ## Phase 4 — AI financial interpreter
 

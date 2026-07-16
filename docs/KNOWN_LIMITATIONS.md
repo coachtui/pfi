@@ -28,6 +28,15 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **The full transactions set is sent to the client for the report screen.** Fine at demo scale; revisit pagination/server-side aggregation for real data volumes.
 - **The period chart passes no event markers, even when events fall within the window.** Carried from Task 5's review; noted as a possible future enhancement, not a defect.
 
+## Manual data (transactions/accounts slice)
+
+- **Amount/date corrections are delete + re-add** on manual transactions (source columns are frozen by design). Revisit if users hit it often.
+- **Overrides never move the index (v1).** Recategorizing a transaction to/from `income` changes list/report groupings but not obligation windows or snapshots. The Phase 2 metric registry should decide whether corrections feed calculations.
+- **Manual `current_balance` is authoritative.** Adding transactions reshapes history backward from the entered balance; it never changes today's balance — balance updates are an explicit account edit.
+- **Snapshot rebuild is full-history and non-transactional** (delete + reinsert, O(days)). Fine at household volume; the stale-index notice plus rebuild-on-dashboard-load covers the failure window. The staleness proxy only detects transactions newer than the newest snapshot; older divergence is healed on the next mutation or dashboard load.
+- **`snapshotToRow` still stamps `data_coverage_confidence: "demo"`** even for rebuilt mixed/manual data — confidence modeling is Phase 2.
+- **Transaction list loads the full filtered window** (no DB pagination yet); month grouping is client-side.
+
 ## Infrastructure (2026-07-15)
 
 - **Obligations v1 uses actual forward transactions, not detected recurrence.** The snapshot builder's obligation windows (FINANCIAL_INDEX_METHODOLOGY.md "Snapshot derivation") sum real transactions in a window and fall back to a fixed 28-day previous-cycle proxy near the end of known history; that proxy can still land a window past `endDate` when the actual income gap exceeds 28 days. Real recurrence detection arrives with real (non-demo) imports.
