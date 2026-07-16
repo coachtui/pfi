@@ -29,10 +29,10 @@ Six weighted dimensions. Weights total 100%.
 
 - **Income** = inflows with effective category `income` (override-aware), transfers excluded. Includes one-time/bonus income; irregularity is captured by Stability metrics and flagged in explanations, never silently smoothed.
 - **Outflows** = all outflows excluding transfers (`is_transfer`) and investment contributions. Investment contributions are savings (Growth), not spending. Debt payments are outflows (they are real obligations).
-- **Refunds/reimbursements** = non-income inflows net against outflows in the same window.
-- **Transfers** are always excluded from both sides.
+- **Refunds/reimbursements** = non-income, non-transfer inflows net against outflows in the same window.
+- **Transfers** are excluded from income and spending, with two purposeful exceptions detected from the receiving account: **investment contributions** = transfer inflows into `brokerage`/`retirement` accounts plus non-transfer outflows with effective category `savings`; **debt payments** = transfer inflows into liability accounts (`credit_card`, `mortgage`, `auto_loan`, `student_loan`, `personal_loan`, `other_liability`) plus non-transfer outflows with effective category `debt_payment`. Housing/mortgage outflows categorized `housing` are owned by fixed-cost ratio (Cash Flow) and excluded from the debt-service ratio to avoid double counting — v1 DSR measures non-housing debt service; documented limitation.
 - **Business and shared-household expenses**: no supporting data in v1 — treated as ordinary household flows; documented limitation.
-- **Windows**: metrics use a trailing 90-day window ending at the as-of date; monthly series are the 3 calendar months in that window. Volatility/consistency metrics require ≥3 monthly observations, else the metric is unavailable (`null`).
+- **Windows**: metrics use a trailing 90-day window ending at the as-of date; the "monthly" series is three consecutive 30-day buckets ending at the as-of date (deterministic regardless of calendar alignment). Volatility/consistency metrics require the full 90 days of history (3 complete buckets), else the metric is unavailable (`null`).
 - **Eligible liquid assets** = balances in `checking`, `savings`, `money_market` accounts with `include_in_calculations`. Retirement, brokerage, property, and other illiquid or penalty-encumbered assets are **never** auto-treated as liquid.
 - **Guards**: income ≤ 0 in the window makes income-denominated metrics unavailable (never ±Infinity). Ratio inputs are clamped to [−100%, +100%] before curving (outlier handling); curve outputs clamp to [0, 100].
 
@@ -44,12 +44,11 @@ Every metric entry carries: internal id, plain-language name, technical definiti
 
 | Metric | Formula | Curve anchor points (input → 0–100) |
 |---|---|---|
-| Net cash-flow margin (`net_cash_flow_margin`) | (income − outflows) / income | −10%→0 · 0%→35 · 5%→55 · 10%→70 · 20%→90 · ≥30%→100 |
-| Savings rate (`savings_rate`) | (income − outflows + investment contributions) / income | 0%→20 · 5%→45 · 10%→65 · 20%→85 · ≥30%→100 |
+| Net cash-flow margin (`net_cash_flow_margin`) | (income − spending outflows) / income — spending excludes transfers and investment contributions per the inclusion policy, so the margin is the monthly surplus share | −10%→0 · 0%→35 · 5%→55 · 10%→70 · 20%→90 · ≥30%→100 |
 | Fixed-cost ratio (`fixed_cost_ratio`) | essential outflows / income | ≤30%→100 · 40%→85 · 50%→65 · 60%→45 · 75%→20 · ≥90%→0 |
-| Expense volatility (`expense_volatility`) | CV of monthly outflows | ≤0.10→100 · 0.20→80 · 0.35→55 · 0.50→30 · ≥0.75→0 |
+| Expense volatility (`expense_volatility`) | CV of monthly spending outflows | ≤0.10→100 · 0.20→80 · 0.35→55 · 0.50→30 · ≥0.75→0 |
 
-Explanation-only: recurring monthly surplus/deficit (median monthly net), discretionary spending trend, essential vs nonessential burden.
+Explanation-only: savings rate (contributions / income — **owned by Growth as `contribution_rate`; shown here as context, scored exactly once**), recurring monthly surplus/deficit (median monthly net), discretionary spending trend, essential vs nonessential burden. (Double-counting audit note: a separately-scored savings rate would duplicate `net_cash_flow_margin` at the level dimension and `contribution_rate` in Growth once spending excludes contributions, so it is not a scored metric.)
 
 **Required core metric:** `net_cash_flow_margin`. If unavailable (e.g. no income in window), the dimension is ineligible.
 
@@ -97,7 +96,7 @@ Not all debt is equal: utilization and interest drag weight high-interest revolv
 | Metric | Formula | Curve anchor points |
 |---|---|---|
 | Contribution rate (`contribution_rate`) | investment contributions / income | 0%→10 · 5%→55 · 10%→75 · 15%→90 · ≥20%→100 |
-| Contribution consistency (`contribution_consistency`) | months with ≥1 contribution / months in window | 0→0 · 1/3→35 · 2/3→70 · 3/3→100 |
+| Contribution consistency (`contribution_consistency`) | 30-day buckets with ≥1 contribution / 3 | 0→0 · 1/3→35 · 2/3→70 · 3/3→100 |
 
 Explanation-only: net-worth growth decomposition — **user-driven growth (net contributions + debt principal reduction) is always reported separately from market appreciation and one-time windfalls** (binding product rule). Market movement never directly moves the Growth score in v1: only contribution behavior is scored. Debt-principal reduction: explanation-only until principal/interest splits exist. Goal progress: future (`financial_goals` not implemented).
 
@@ -108,9 +107,9 @@ Explanation-only: net-worth growth decomposition — **user-driven growth (net c
 | Metric | Formula | Curve anchor points |
 |---|---|---|
 | Institution concentration (`institution_concentration`) | largest share of total balances at one institution | ≤35%→100 · 50%→80 · 75%→45 · 100%→20 |
-| Income-source concentration (`income_source_concentration`) | share of income from top source (normalized description match) | ≤60%→100 · 80%→75 · 100% recurring→60 · 100% non-recurring→30 |
+| Income-source concentration (`income_source_concentration`) | share of income from top source (normalized description match) | ≤60%→100 · 80%→75 · 100%→55 |
 
-A single stable income source (one salaried job) is normal and scored gently; all income from one *irregular* source scores lower. Single-asset, employer-stock, sector, and variable-rate concentration: future — require investment holdings/loan-terms data that doesn't exist yet. **Never auto-recommend specific securities trades.**
+A single income source (one salaried job) is normal and scored gently. Whether that income is *irregular* is owned by Stability (`irregular_income_reliance`) — the concentration curve deliberately does not re-penalize irregularity (anti-double-counting). Single-asset, employer-stock, sector, and variable-rate concentration: future — require investment holdings/loan-terms data that doesn't exist yet. **Never auto-recommend specific securities trades.**
 
 **Eligibility rule:** requires ≥1 month of income data and ≥2 accounts; otherwise `insufficient_data` with reason (e.g. "Investment account data unavailable") — never a definitive score from thin data.
 
@@ -121,7 +120,8 @@ The same underlying condition never affects two dimensions' scores unless explic
 | Metric | Primary (scored) dimension | Secondary contextual use | Scored twice? |
 |---|---|---|---|
 | Fixed-cost ratio | Cash Flow Health | Stability explanation (obligation predictability) | No |
-| Savings rate / net cash-flow margin | Cash Flow Health | Growth explanation | No (both scored in Cash Flow only — they overlap intentionally within one dimension as level + savings-inclusive views; documented) |
+| Net cash-flow margin | Cash Flow Health | Growth explanation | No |
+| Savings rate (= contribution rate) | Growth (`contribution_rate`) | Cash Flow explanation | No — explanation-only outside Growth |
 | Emergency runway | Liquidity | Protection future input | No (emergency-fund coverage is explanation-only restatement) |
 | Credit dependence / revolving trend | Debt Health | Liquidity explanation | No |
 | Interest drag | Debt Health | High-interest exposure is explanation-only | No |
