@@ -5,7 +5,6 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 ## Product (2026-07-15)
 
 - **Demo data is the only data source.** Auth and persistence are live, but the only data flowing through the pipeline is Koa Holdings' seeded dataset, loaded via `loadDemoData()` through the real insert/snapshot pipeline (fixed "today" of 2026-07-15). No manual entry or CSV import yet (ROADMAP Phase 3).
-- **Report is a stub** with a Coming Soon state; a demo-data-computed version is the next Phase 1 slice.
 - **Performance brief is template text** assembled from calculated metrics — clearly labeled; real AI narration is Phase 4.
 - **Financial-health score not yet implemented** (spec in FINANCIAL_HEALTH_SCORE.md).
 
@@ -20,6 +19,14 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **3-up mobile grids (Data "Cohort trends", Rankings "Quarterly Challenges") stay `grid grid-cols-3` down to 390px** rather than switching to a horizontal-scroll row. Verified live at 390×844: card titles wrap to at most 2 lines and no stat/value is clipped, so the narrower columns read as compact-but-readable; kept as-is rather than adding scroll-row complexity for a marginal gain. Revisit if a future card variant adds more text.
 - **The Home header's "LV. 7" chip is sample gamification data.** It renders `VIEWER_LEVEL` from the demo cohorts module (`src/lib/demo-data/cohorts.ts`), not a computed level; real leveling logic is part of the Phase 6 cohorts build.
 - **The Data "How you compare" percentile scale footer (0th/50th/100th) is offset by the icon column (`pl-12`) but not the right ordinal column (`w-12`).** The "50th" label sits slightly left of the bars' true midpoint tick as a result (cosmetic).
+
+## Report screen slice (2026-07-15)
+
+- **`investments` is sourced from `investment_contribution` events, not transaction-level investment transfers.** This is the reliable signal in the current data model and is numerically identical to a transaction-level sum for the demo dataset; a documented refinement, not a defect.
+- **The `FCF === owner-created equity` reconciliation identity is now verified end-to-end against the real demo pipeline** (`generateKoaHoldings()` → `buildDailySnapshots()` → `enumeratePeriods()` → `computePeriodStatement()`) for every enumerated period, at both monthly and quarterly granularity — see `report.test.ts`'s "computePeriodStatement — real pipeline" suite. That guarantee depends on the current demo transaction model, where every liquid-account flow is one of: income, non-transfer operating expense, or one side of the two coupled transfer types (investment contribution, revolving-debt payment). It will also need a market-appreciation term once real (non-demo) investment/property holdings arrive with actual price drift. A future manual-entry/CSV-import data model may introduce transaction shapes this model doesn't anticipate — e.g. non-income liquid inflows (refunds, gifts, transfers from external accounts), or transfers to non-revolving liabilities — which will need explicit handling in `computePeriodStatement` before the identity is guaranteed to still hold. This is now a documented data-model dependency, not an untested assumption.
+- **The period index chart is not re-anchored to the window.** Short periods (e.g. a single month) may not start near 100, since the index is computed against the full history's baseline rather than rebased at the period start.
+- **The full transactions set is sent to the client for the report screen.** Fine at demo scale; revisit pagination/server-side aggregation for real data volumes.
+- **The period chart passes no event markers, even when events fall within the window.** Carried from Task 5's review; noted as a possible future enhancement, not a defect.
 
 ## Infrastructure (2026-07-15)
 

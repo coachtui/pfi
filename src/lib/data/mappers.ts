@@ -1,6 +1,7 @@
 import type { DailySnapshot, FinancialEvent } from "@/lib/financial-engine/types";
 import { ENGINE_VERSION } from "@/lib/financial-engine";
 import type { DemoAccount, DemoTransaction } from "@/lib/demo-data/koa-holdings";
+import type { TransactionInput } from "@/lib/financial-engine/snapshot-builder";
 
 export interface SnapshotRow {
   user_id: string; date: string; liquid_assets: number; revolving_balances: number;
@@ -70,5 +71,25 @@ export function demoTransactionToRow(
     description: t.description, category: t.category, essential: t.essential,
     is_transfer: t.isTransfer,
     transfer_pair_id: t.transferPairId ? (txnIdMap.get(t.transferPairId) ?? null) : null,
+  };
+}
+
+export interface TransactionRow {
+  id: string; account_id: string; posted_date: string; amount: number;
+  direction: string; category: string | null; essential: boolean | null;
+  is_transfer: boolean; transfer_pair_id: string | null;
+}
+
+export function rowToTransactionInput(row: TransactionRow): TransactionInput {
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    postedDate: row.posted_date,
+    amount: Number(row.amount),
+    direction: row.direction as TransactionInput["direction"],
+    category: row.category,
+    essential: row.essential,
+    isTransfer: row.is_transfer,
+    transferPairId: row.transfer_pair_id,
   };
 }

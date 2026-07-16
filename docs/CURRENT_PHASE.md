@@ -1,10 +1,17 @@
 # Current Phase
 
-_Last updated: 2026-07-15 (visual-parity slice — Task 11, full verification + docs)._
+_Last updated: 2026-07-15 (report-screen slice — Task 6, docs + final verification)._
 
-**Phase:** 0 complete, 1.5 (infrastructure) complete, visual-parity slice (Home polish, Rankings, Data) complete → Phase 1 (visual prototype) continues.
+**Phase:** 0 complete, 1.5 (infrastructure) complete, visual-parity slice (Home polish, Rankings, Data) complete, report screen complete → Phase 1 (visual prototype) continues.
 
-## Completed (this phase — visual parity, Tasks 1–11)
+## Completed (this phase — report screen, Tasks 1–6)
+
+- **Report data + mapper.** `getReportData` query and a transaction mapper feed the report engine from the real (demo) persistence pipeline.
+- **`report.ts` engine module.** Period enumeration (Monthly/Quarterly), a reconciling period statement (`computePeriodStatement`), and deterministic management commentary — no AI, no hard-coded numbers.
+- **`/report` screen.** Monthly/Quarterly toggle, period index chart, reconciling statement, and commentary, replacing the prior stub.
+- **Live-verified reconciliation.** The `FCF === owner-created equity` identity holds across real periods, including a negative-savings edge case.
+
+## Completed (previous phase — visual parity, Tasks 1–11)
 
 - **Reusable UI extracted.** `Sparkline`, `Segmented`, `PercentileBar`, `TrendStatCard`, and pure positioning helpers (`railPositions`, `markerXFraction` in `src/lib/ui/math.ts`) pulled out of one-off usages for reuse across Home/Rankings/Data.
 - **Chart polish.** Inline actual/baseline/waterline line labels replace the old legend; labeled event stems (paycheck/mortgage/bonus) render beneath the chart on ranges ≤45 days; demo chart texture tuned to look less perfectly smooth.
@@ -13,7 +20,7 @@ _Last updated: 2026-07-15 (visual-parity slice — Task 11, full verification + 
 - **Data screen** (`/data`): household financial-conditions index + chart, cohort filter chips, four benchmark metric cards, percentile "how you compare" bars, cohort trend cards — same sample cohort data module.
 - **Full verification.** `pnpm check` green; Home/Rankings/Data checked live at 390×844 and 1280×900 against mockup references, console clean on all three routes (details: `.superpowers/sdd/vp-task-11-report.md`).
 
-## Completed (previous phase — Supabase infrastructure, Tasks 1–14)
+## Completed (earlier phase — Supabase infrastructure, Tasks 1–14)
 
 - **Env + deps.** `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` are required (not optional) in `src/lib/config/env.ts`; Supabase JS/SSR deps added.
 - **Schema + RLS.** Migration `0001_core`: six tables (`user_profiles`, `personal_companies`, `financial_accounts`, `transactions`, `financial_events`, `daily_snapshots`), default-deny RLS with owner-only policies on every table. Migration `0002_integrity`: transaction source-immutability trigger, account-ownership trigger, data-quality checks, an index.
@@ -27,13 +34,13 @@ _Last updated: 2026-07-15 (visual-parity slice — Task 11, full verification + 
 
 ## In progress
 
-- Nothing mid-flight; clean stopping point at the end of the visual-parity slice.
+- Nothing mid-flight; clean stopping point at the end of the report-screen slice.
 
 ## Next three priorities
 
-1. **Report screen, computed from demo data** — mock shareholder report populated from the demo dataset (not static text), rounding out Phase 1's screen set.
-2. **Manual accounts/transactions CRUD** — the first non-demo data path, built on the persistence/RLS layer that now exists (Phase 3 scope, narrowed by DECISIONS.md #7).
-3. **Remaining demo profiles + PWA manifest/Playwright** — Blue Reef Partners, North Shore Capital, and a demo-profile switcher; PWA manifest & installability; Playwright smoke test.
+1. **Manual accounts/transactions CRUD** — the transactions drill-down per DECISIONS.md #12, the first non-demo data path, built on the persistence/RLS layer that now exists (Phase 3 scope).
+2. **Remaining demo profiles + demo-profile switcher** — Blue Reef Partners, North Shore Capital.
+3. **PWA manifest + Playwright smoke test** — installability and automated browser verification.
 
 ## Known blockers
 
@@ -47,7 +54,7 @@ _Last updated: 2026-07-15 (visual-parity slice — Task 11, full verification + 
 
 ## Test status
 
-`pnpm check` (lint + typecheck + test + build): green. `pnpm test:rls`: 9/9 passing against the live Supabase project.
+`pnpm check` (lint + typecheck + test + build): green, 94 tests passing (11 test files). `pnpm test:rls`: 9/9 passing against the live Supabase project.
 
 ## Deployment status
 
