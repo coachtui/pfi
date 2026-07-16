@@ -34,6 +34,7 @@
 | `src/lib/data/queries.ts` (modify) | `getTransactionsData`, `getAccountsData`, stale flag in `getDashboardData`, effective categories in `getReportData` |
 | `src/lib/data/insert-chunked.ts` (create) | shared `insertChunked` (extracted from `demo.ts`) |
 | `src/lib/data/rebuild-snapshots.ts` (create) | `rebuildSnapshots(supabase)` — fetch → derive config → build → replace rows |
+| `src/lib/data/finish-mutation.ts` (create) | `finishWithRebuild(supabase)` — shared rebuild + revalidate tail for every balance-affecting action |
 | `src/app/actions/transactions.ts` (create) | `createTransaction`, `deleteTransaction`, `overrideTransaction` |
 | `src/app/actions/accounts.ts` (create) | `createAccount`, `updateAccount`, `setAccountIncluded`, `setAccountArchived` |
 | `src/app/actions/demo.ts` (modify) | seed/clear finish with `rebuildSnapshots` so manual accounts survive demo reseeds |
@@ -1088,38 +1089,39 @@ git commit -m "feat: snapshot rebuild from persisted data; demo pipeline folds i
 
 ---
 
-### Task 8: Transaction server actions
+### Task 8: Shared mutation helper + transaction server actions
 
 **Files:**
+- Create: `src/lib/data/finish-mutation.ts`
 - Create: `src/app/actions/transactions.ts`
 
 **Interfaces:**
-- Consumes: schemas + `MutationResult` from `@/lib/validation/transactions`; `rebuildSnapshots`; `createClient` from `@/lib/supabase/server`.
-- Produces (all async, all return `Promise<MutationResult>`):
+- Consumes: `rebuildSnapshots` from `./rebuild-snapshots`; `MutationResult` from `@/lib/validation/transactions`; `SupabaseClient` from `@supabase/supabase-js`; `createTransactionSchema`, `overrideTransactionSchema`, `OverrideFormValues`, `TransactionFormValues` from `@/lib/validation/transactions`; `createClient` from `@/lib/supabase/server`.
+- Produces:
+  - `finishWithRebuild(supabase: SupabaseClient): Promise<MutationResult>` — runs `rebuildSnapshots`, revalidates `/`, `/transactions`, `/accounts`, `/report`; returns a `warning` (not an `error`) when the rebuild itself fails, since the mutating write already succeeded. This is a plain async export from a **non**-`"use server"` module — Task 9's account actions import this same function rather than defining their own copy. (`"use server"` files may only export async functions themselves, but they can freely import async helpers from ordinary modules, so the helper belongs in `src/lib/data/`, not duplicated per action file.)
   - `createTransaction(values: TransactionFormValues)` — only into the caller's own **manual, non-archived** accounts
   - `deleteTransaction(id: string)` — only when the owning account's provider is `manual`
   - `overrideTransaction(values: OverrideFormValues)` — merges `user_override` (null clears a key; empty override stored as SQL `null`), writes `notes` directly (not a frozen column); **no rebuild** (overrides never move the index)
 
-- [ ] **Step 1: Implement `src/app/actions/transactions.ts`**
+- [ ] **Step 1: Implement `src/lib/data/finish-mutation.ts`**
 
 ```ts
-"use server";
-
+import "server-only";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
-import { rebuildSnapshots } from "@/lib/data/rebuild-snapshots";
-import {
-  createTransactionSchema, overrideTransactionSchema,
-  type MutationResult, type OverrideFormValues, type TransactionFormValues,
-} from "@/lib/validation/transactions";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { rebuildSnapshots } from "./rebuild-snapshots";
+import type { MutationResult } from "@/lib/validation/transactions";
 
 const REBUILD_WARNING =
   "Saved — but the index recalculation failed. It will retry on your next change or dashboard reload.";
 
-async function finishWithRebuild(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-): Promise<MutationResult> {
+/**
+ * Common tail for every balance-affecting mutation: rebuild snapshots, then
+ * revalidate every route that reads them. The write itself already
+ * succeeded by the time this runs, so a rebuild failure is a warning, not
+ * an error — the caller's data is safe either way.
+ */
+export async function finishWithRebuild(supabase: SupabaseClient): Promise<MutationResult> {
   const { error } = await rebuildSnapshots(supabase);
   revalidatePath("/");
   revalidatePath("/transactions");
@@ -1127,6 +1129,21 @@ async function finishWithRebuild(
   revalidatePath("/report");
   return error ? { error: "", warning: REBUILD_WARNING } : { error: "" };
 }
+```
+
+- [ ] **Step 2: Implement `src/app/actions/transactions.ts`**
+
+```ts
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+import { finishWithRebuild } from "@/lib/data/finish-mutation";
+import {
+  createTransactionSchema, overrideTransactionSchema,
+  type MutationResult, type OverrideFormValues, type TransactionFormValues,
+} from "@/lib/validation/transactions";
 
 export async function createTransaction(values: TransactionFormValues): Promise<MutationResult> {
   const supabase = await createClient();
@@ -1227,16 +1244,16 @@ export async function overrideTransaction(values: OverrideFormValues): Promise<M
 }
 ```
 
-- [ ] **Step 2: Verify**
+- [ ] **Step 3: Verify**
 
 Run: `pnpm typecheck && pnpm lint`
 Expected: green. (These actions are exercised by the RLS script in Task 13 and live verification in Task 14 — Supabase I/O isn't unit-tested, matching the existing actions.)
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/app/actions/transactions.ts
-git commit -m "feat: create/delete/override transaction server actions"
+git add src/lib/data/finish-mutation.ts src/app/actions/transactions.ts
+git commit -m "feat: shared rebuild helper; create/delete/override transaction actions"
 ```
 
 ---
@@ -1247,41 +1264,25 @@ git commit -m "feat: create/delete/override transaction server actions"
 - Create: `src/app/actions/accounts.ts`
 
 **Interfaces:**
-- Consumes: `accountSchema`, `updateAccountSchema`, `MutationResult` from `@/lib/validation/transactions`; `rebuildSnapshots`.
+- Consumes: `finishWithRebuild` from `@/lib/data/finish-mutation` (created in Task 8); `accountSchema`, `updateAccountSchema`, `MutationResult` from `@/lib/validation/transactions`; `createClient` from `@/lib/supabase/server`.
 - Produces (all async, `Promise<MutationResult>`):
   - `createAccount(values: AccountFormValues)` — always `provider: 'manual'`
   - `updateAccount(values: AccountFormValues & { id: string })` — **manual accounts only** (demo accounts reset via demo reseed)
   - `setAccountIncluded(id: string, included: boolean)` — any provider
   - `setAccountArchived(id: string, archived: boolean)` — any provider; sets/clears `archived_at`
-  - All four end with the same rebuild+revalidate helper as Task 8 (duplicated locally — `"use server"` files can't share non-async exports).
 
 - [ ] **Step 1: Implement `src/app/actions/accounts.ts`**
 
 ```ts
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { rebuildSnapshots } from "@/lib/data/rebuild-snapshots";
+import { finishWithRebuild } from "@/lib/data/finish-mutation";
 import {
   accountSchema, updateAccountSchema,
   type AccountFormValues, type MutationResult,
 } from "@/lib/validation/transactions";
-
-const REBUILD_WARNING =
-  "Saved — but the index recalculation failed. It will retry on your next change or dashboard reload.";
-
-async function finishWithRebuild(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-): Promise<MutationResult> {
-  const { error } = await rebuildSnapshots(supabase);
-  revalidatePath("/");
-  revalidatePath("/transactions");
-  revalidatePath("/accounts");
-  revalidatePath("/report");
-  return error ? { error: "", warning: REBUILD_WARNING } : { error: "" };
-}
 
 export async function createAccount(values: AccountFormValues): Promise<MutationResult> {
   const supabase = await createClient();
