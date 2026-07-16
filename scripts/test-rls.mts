@@ -109,6 +109,40 @@ try {
     !anonReadErr && (anonRead ?? []).length === 0,
     anonReadErr?.message ?? "",
   );
+
+  // ---- Manual-data slice: transaction mutation isolation ----
+  const { data: aTxn, error: aTxnErr } = await a.client
+    .from("transactions")
+    .insert({
+      account_id: acct!.id, user_id: a.id, posted_date: "2026-07-01",
+      amount: 50, direction: "outflow", description: "RLS manual txn",
+    })
+    .select("id")
+    .single();
+  check("A can insert a transaction into own manual account", !aTxnErr && !!aTxn, aTxnErr?.message);
+
+  const { error: aImmErr } = await a.client
+    .from("transactions").update({ amount: 60 }).eq("id", aTxn!.id);
+  check("A cannot edit frozen source columns (immutability trigger)", !!aImmErr);
+
+  const { error: aOvErr } = await a.client
+    .from("transactions").update({ user_override: { category: "other" } }).eq("id", aTxn!.id);
+  check("A can write own user_override", !aOvErr, aOvErr?.message);
+
+  const { data: bOv } = await b.client
+    .from("transactions").update({ user_override: { category: "income" } }).eq("id", aTxn!.id).select("id");
+  check("B cannot override A's transaction", (bOv ?? []).length === 0);
+
+  const { data: bDel } = await b.client
+    .from("transactions").delete().eq("id", aTxn!.id).select("id");
+  check("B cannot delete A's transaction", (bDel ?? []).length === 0);
+
+  const { data: bArch } = await b.client
+    .from("financial_accounts")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", acct!.id)
+    .select("id");
+  check("B cannot archive A's account", (bArch ?? []).length === 0);
 } finally {
   if (a) {
     try {
