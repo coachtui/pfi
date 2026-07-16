@@ -8,7 +8,7 @@ import type { MomentumState } from "./score-types";
 /** 1% of the 900-point scale. */
 export const MOMENTUM_THRESHOLD = 9;
 
-export function computeMomentum(points: {
+export function computeScoreMomentum(points: {
   current: number | null; prior30: number | null; prior60: number | null;
 }): MomentumState {
   const { current, prior30, prior60 } = points;

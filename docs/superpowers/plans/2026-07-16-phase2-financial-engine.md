@@ -1496,7 +1496,7 @@ git commit -m "feat(engine): deterministic per-dimension score confidence"
 
 **Interfaces:**
 - Consumes: `MomentumState` from `./score-types`.
-- Produces: `MOMENTUM_THRESHOLD = 9`, `computeMomentum(points: { current: number | null; prior30: number | null; prior60: number | null }): MomentumState`, `momentumLabel(state: MomentumState): string` (consumer copy: "Strongly improving", "Improving", "Stable", "Weakening", "Deteriorating", "Recovering", "Not enough history yet").
+- Produces: `MOMENTUM_THRESHOLD = 9`, `computeScoreMomentum(points: { current: number | null; prior30: number | null; prior60: number | null }): MomentumState`, `momentumLabel(state: MomentumState): string` (consumer copy: "Strongly improving", "Improving", "Stable", "Weakening", "Deteriorating", "Recovering", "Not enough history yet").
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1504,9 +1504,9 @@ git commit -m "feat(engine): deterministic per-dimension score confidence"
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { MOMENTUM_THRESHOLD, computeMomentum, momentumLabel } from "./momentum-overlay";
+import { MOMENTUM_THRESHOLD, computeScoreMomentum, momentumLabel } from "./momentum-overlay";
 
-describe("computeMomentum", () => {
+describe("computeScoreMomentum", () => {
   it.each([
     // [current, prior30, prior60, expected]
     [700, 680, 660, "strongly_improving"], // both segments +20 > 9
@@ -1516,12 +1516,12 @@ describe("computeMomentum", () => {
     [685, 700, 702, "weakening"],          // recent −15, earlier flat
     [700, 702, 699, "stable"],             // both inside ±9
   ])("(%s, %s, %s) → %s", (current, prior30, prior60, expected) => {
-    expect(computeMomentum({ current, prior30, prior60 })).toBe(expected);
+    expect(computeScoreMomentum({ current, prior30, prior60 })).toBe(expected);
   });
 
   it("returns insufficient_history when any point is missing", () => {
-    expect(computeMomentum({ current: 700, prior30: 690, prior60: null })).toBe("insufficient_history");
-    expect(computeMomentum({ current: null, prior30: 690, prior60: 680 })).toBe("insufficient_history");
+    expect(computeScoreMomentum({ current: 700, prior30: 690, prior60: null })).toBe("insufficient_history");
+    expect(computeScoreMomentum({ current: null, prior30: 690, prior60: 680 })).toBe("insufficient_history");
   });
 
   it("uses the documented threshold", () => {
@@ -1553,7 +1553,7 @@ import type { MomentumState } from "./score-types";
 /** 1% of the 900-point scale. */
 export const MOMENTUM_THRESHOLD = 9;
 
-export function computeMomentum(points: {
+export function computeScoreMomentum(points: {
   current: number | null; prior30: number | null; prior60: number | null;
 }): MomentumState {
   const { current, prior30, prior60 } = points;
@@ -1690,7 +1690,7 @@ import { computeMetrics } from "./metrics";
 import { computeConfidence } from "./confidence";
 import { computeScore } from "./scoring";
 import { computeScoreDelta } from "./score-delta";
-import { computeMomentum } from "./momentum-overlay";
+import { computeScoreMomentum } from "./momentum-overlay";
 import { addDays } from "./snapshot-builder";
 
 const AS_OF = "2026-07-15";
@@ -1756,7 +1756,7 @@ describe("full score pipeline", () => {
     const s30 = breakdownAt(addDays(AS_OF, -30)).overall!;
     const s60 = breakdownAt(addDays(AS_OF, -60)).overall!;
     expect(breakdownAt(AS_OF).overall).toBe(s0); // same inputs ⇒ same output
-    expect(computeMomentum({ current: s0, prior30: s30, prior60: s60 })).toBe("stable");
+    expect(computeScoreMomentum({ current: s0, prior30: s30, prior60: s60 })).toBe("stable");
     const delta = computeScoreDelta(breakdownAt(AS_OF), breakdownAt(addDays(AS_OF, -30)));
     expect(delta.state).toBe("ok");
     expect(Math.abs(delta.change ?? 99)).toBeLessThan(10);
@@ -1884,7 +1884,7 @@ Add after `getReportData` (reusing its fetch idiom — one query set, shared by 
 ```ts
 import {
   buildMetricInputs, computeMetrics, computeConfidence, computeScore,
-  computeScoreDelta, computeMomentum, addDays,
+  computeScoreDelta, computeScoreMomentum, addDays,
   type MomentumState, type OverallState, type ScoreBreakdown, type ScoreDelta,
   type ScoreAccountInput, type ScoreTransactionInput,
 } from "@/lib/financial-engine";
@@ -1989,7 +1989,7 @@ export async function getScoreData(supabase: SupabaseClient, range: ScoreRange):
   const previous = rangeStart < asOf && rangeStart >= firstDate ? breakdownAt(sources, rangeStart) : null;
   const delta = computeScoreDelta(breakdown, previous);
 
-  const momentum = computeMomentum({
+  const momentum = computeScoreMomentum({
     current: breakdown.overall,
     prior30: breakdownAt(sources, addDays(asOf, -30)).overall,
     prior60: breakdownAt(sources, addDays(asOf, -60)).overall,
@@ -2002,7 +2002,7 @@ export async function getScoreSummary(supabase: SupabaseClient): Promise<ScoreSu
   const sources = await fetchScoreSources(supabase);
   const asOf = sources.snapshots.at(-1)?.date ?? new Date().toISOString().slice(0, 10);
   const breakdown = breakdownAt(sources, asOf);
-  const momentum = computeMomentum({
+  const momentum = computeScoreMomentum({
     current: breakdown.overall,
     prior30: breakdownAt(sources, addDays(asOf, -30)).overall,
     prior60: breakdownAt(sources, addDays(asOf, -60)).overall,

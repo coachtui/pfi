@@ -5,7 +5,7 @@ import { computeMetrics } from "./metrics";
 import { computeConfidence } from "./confidence";
 import { computeScore } from "./scoring";
 import { computeScoreDelta } from "./score-delta";
-import { computeMomentum } from "./momentum-overlay";
+import { computeScoreMomentum } from "./momentum-overlay";
 import { addDays } from "./snapshot-builder";
 
 const AS_OF = "2026-07-15";
@@ -71,7 +71,7 @@ describe("full score pipeline", () => {
     const s30 = breakdownAt(addDays(AS_OF, -30)).overall!;
     const s60 = breakdownAt(addDays(AS_OF, -60)).overall!;
     expect(breakdownAt(AS_OF).overall).toBe(s0); // same inputs ⇒ same output
-    expect(computeMomentum({ current: s0, prior30: s30, prior60: s60 })).toBe("stable");
+    expect(computeScoreMomentum({ current: s0, prior30: s30, prior60: s60 })).toBe("stable");
     const delta = computeScoreDelta(breakdownAt(AS_OF), breakdownAt(addDays(AS_OF, -30)));
     expect(delta.state).toBe("ok");
     expect(Math.abs(delta.change ?? 99)).toBeLessThan(10);
