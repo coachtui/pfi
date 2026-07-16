@@ -1,5 +1,11 @@
 import type { DailySnapshot, FinancialEvent } from "@/lib/financial-engine/types";
-import { ENGINE_VERSION } from "@/lib/financial-engine";
+import {
+  ENGINE_VERSION,
+  applyOverride,
+  parseOverride,
+  type EffectiveTransaction,
+  type AccountType,
+} from "@/lib/financial-engine";
 import type { DemoAccount, DemoTransaction } from "@/lib/demo-data/koa-holdings";
 import type { TransactionInput } from "@/lib/financial-engine/snapshot-builder";
 
@@ -91,5 +97,72 @@ export function rowToTransactionInput(row: TransactionRow): TransactionInput {
     essential: row.essential,
     isTransfer: row.is_transfer,
     transferPairId: row.transfer_pair_id,
+  };
+}
+
+export interface TransactionListRow {
+  id: string; account_id: string; posted_date: string; amount: number;
+  direction: string; description: string; category: string | null;
+  essential: boolean | null; is_transfer: boolean; transfer_pair_id: string | null;
+  notes: string | null; user_override: unknown;
+  financial_accounts: { display_name: string; provider: string };
+}
+
+export interface TransactionListItem extends EffectiveTransaction {
+  notes: string | null;
+  accountName: string;
+  accountProvider: "demo" | "manual" | "csv";
+}
+
+export function rowToTransactionListItem(row: TransactionListRow): TransactionListItem {
+  const effective = applyOverride({
+    id: row.id,
+    accountId: row.account_id,
+    postedDate: row.posted_date,
+    amount: Number(row.amount),
+    direction: row.direction as "inflow" | "outflow",
+    description: row.description,
+    category: row.category,
+    essential: row.essential,
+    isTransfer: row.is_transfer,
+    transferPairId: row.transfer_pair_id,
+    userOverride: parseOverride(row.user_override),
+  });
+  return {
+    ...effective,
+    notes: row.notes,
+    accountName: row.financial_accounts.display_name,
+    accountProvider: row.financial_accounts.provider as "demo" | "manual" | "csv",
+  };
+}
+
+export interface AccountRow {
+  id: string; provider: string; institution: string | null; type: string;
+  display_name: string; mask: string | null; current_balance: number | null;
+  credit_limit: number | null; interest_rate: number | null;
+  include_in_calculations: boolean; archived_at: string | null;
+}
+
+export interface AccountSummary {
+  id: string; provider: "demo" | "manual" | "csv"; institution: string | null;
+  type: AccountType; displayName: string; mask: string | null;
+  currentBalance: number | null; creditLimit: number | null;
+  interestRate: number | null; includeInCalculations: boolean;
+  archivedAt: string | null;
+}
+
+export function rowToAccountSummary(row: AccountRow): AccountSummary {
+  return {
+    id: row.id,
+    provider: row.provider as AccountSummary["provider"],
+    institution: row.institution,
+    type: row.type as AccountType,
+    displayName: row.display_name,
+    mask: row.mask,
+    currentBalance: row.current_balance === null ? null : Number(row.current_balance),
+    creditLimit: row.credit_limit === null ? null : Number(row.credit_limit),
+    interestRate: row.interest_rate === null ? null : Number(row.interest_rate),
+    includeInCalculations: row.include_in_calculations,
+    archivedAt: row.archived_at,
   };
 }
