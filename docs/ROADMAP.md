@@ -24,7 +24,7 @@ Pulled forward ahead of the remaining Phase 1 screens (DECISIONS.md #7): Supabas
 
 ## Phase 2 — Financial engine
 
-Metric registry (savings margin, FCF margin, debt-service ratio, fixed-cost ratio, utilization, liquid runway, volatility, income consistency, drawdown, owner-created equity, contribution consistency, momentum); 0–900 health score with versioning + deterministic score-delta explanations; confidence/data-coverage model; methodology docs. Exit: no displayed metric is hard-coded; everything tested and explainable; partial data handled.
+Metric registry behind six weighted dimensions (Cash Flow 25%, Liquidity & Resilience 20%, Debt 20%, Stability 15%, Growth 15%, Concentration 5% — FINANCIAL_HEALTH_SCORE.md is the normative spec); 0–900 versioned score with deterministic score-delta explanations; Protection visible but unscored in v1; Momentum as a directional overlay, not a weighted dimension; per-dimension confidence + deterministic missing-data policy (eligibility, effective-weight renormalization, provisional/suppressed states); consumer-facing terminology (no FCF/owner-created-equity jargon in score UI). Surfaced as a dashboard score card + `/score` breakdown screen. Exit: no displayed metric is hard-coded; everything tested and explainable; partial data handled per the documented policy.
 
 ## Phase 3 — Manual data & CSV import (persistence live; manual CRUD slice landed 2026-07-16)
 
