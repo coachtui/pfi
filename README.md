@@ -6,7 +6,7 @@ A personal-finance platform that makes a household's finances feel like managing
 
 ## Status
 
-Phase 1 (visual prototype) + Phase 1.5 infrastructure. Auth (Supabase magic link) and the database (Postgres + RLS) are live; the app persists data through the real pipeline. The only data flowing through it today is the seeded Koa Holdings demo dataset — manual entry and CSV import land in Phase 3. See `docs/CURRENT_PHASE.md`.
+Phase 1 (visual prototype) + Phase 1.5 infrastructure are complete, and the first slice of Phase 3 has landed: a `/transactions` drill-down (filterable list, manual add/recategorize/delete) and an `/accounts` management screen (add/edit/include/archive), wired from the dashboard. Auth (Supabase magic link) and the database (Postgres + RLS) are live; the app persists data through the real pipeline. Seeded Koa Holdings demo data and real manual entries can now coexist — CSV import is still ahead. See `docs/CURRENT_PHASE.md` for the latest session-by-session status.
 
 ## Getting started
 
@@ -25,6 +25,7 @@ pnpm dev          # http://localhost:3000
 | `pnpm dev` | Dev server |
 | `pnpm test` | Unit tests (Vitest) |
 | `pnpm test:rls` | Live Supabase RLS tenant-isolation check (needs `SUPABASE_SERVICE_ROLE_KEY`) |
+| `pnpm test:live` | Live Supabase server-action tests (same credentials; kept out of `pnpm test`/`pnpm check` so the default suite stays fast and offline) |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm lint` | ESLint |
 | `pnpm build` | Production build |
@@ -33,6 +34,24 @@ pnpm dev          # http://localhost:3000
 ## Architecture in one paragraph
 
 Deterministic financial calculations live in `src/lib/financial-engine` (framework-free, typed, tested — extractable to a shared package later). Seeded demo datasets live in `src/lib/demo-data`. React components are presentational and never contain financial formulas. AI (Phase 4) will narrate engine output, never calculate. Full details: `docs/ARCHITECTURE.md`.
+
+## Roadmap
+
+Full detail (exit criteria, alternatives considered) lives in `docs/ROADMAP.md`; this is the condensed version.
+
+| Phase | Focus | Status |
+|---|---|---|
+| 0 | Product foundation — repo, tokens, branding, demo-data strategy | ✅ Done |
+| 1 | Visual prototype — dashboard, rankings, data, report screens | 🔨 In progress (screens above ✅; onboarding polish, second demo profile, PWA/installability remain) |
+| 1.5 | Infrastructure — Supabase auth/RLS, snapshot builder, tenant-isolation tests | ✅ Done (pulled forward ahead of schedule) |
+| 2 | Financial engine — full metric registry, 0–900 health score, confidence model | ⬜ Not started |
+| 3 | Manual data & CSV import | 🔨 In progress (manual accounts/transactions CRUD + correction workflow ✅; CSV import, recurring detection remain) |
+| 4 | AI financial interpreter — narrates verified metrics, never calculates | ⬜ Not started |
+| 5 | Scenario simulator & goals | ⬜ Not started |
+| 6 | Cohorts, rankings & gamification | ⬜ Not started |
+| 7 | Account aggregation (Plaid/MX) | ⬜ Not started |
+| 8 | Aggregate intelligence — anonymized benchmarks | ⬜ Not started |
+| 9 | Production readiness — audits, legal review, closed beta | ⬜ Not started |
 
 ## Documentation
 
