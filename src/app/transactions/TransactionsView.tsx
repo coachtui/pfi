@@ -10,6 +10,7 @@ import { formatShortDate, formatSignedDollars } from "@/lib/financial-engine/for
 import { CATEGORIES, CATEGORY_LABELS, type Category } from "@/lib/config/categories";
 import type { AccountSummary, TransactionListItem } from "@/lib/data/mappers";
 import type { TransactionFilters } from "@/lib/validation/transactions";
+import { AddTransactionSheet, TransactionDetailSheet } from "./TransactionSheet";
 
 const selectCls =
   "rounded-full border border-border-subtle bg-inset px-3 py-1.5 text-xs text-primary focus:border-border-strong focus:outline-none";
@@ -219,9 +220,15 @@ export function TransactionsView({
           <Plus size={18} aria-hidden /> Add transaction
         </button>
       )}
-      {/* TransactionSheet (add + detail) mounts here in Task 11, driven by `adding`/`selected`.
-          This expression renders nothing; it only keeps the state lint-clean until then. */}
-      {(adding || selected) && null}
+      <AddTransactionSheet accounts={manualAccounts} open={adding} onClose={() => setAdding(false)} />
+      {selected && (
+        <TransactionDetailSheet
+          key={selected.id}
+          txn={selected}
+          open
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
