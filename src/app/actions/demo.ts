@@ -6,19 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { generateKoaHoldings } from "@/lib/demo-data/koa-holdings";
 import { buildDailySnapshots } from "@/lib/financial-engine";
 import { demoAccountToRow, demoTransactionToRow, eventToRow, snapshotToRow } from "@/lib/data/mappers";
-
-const CHUNK = 500;
-
-async function insertChunked(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  table: string,
-  rows: unknown[],
-) {
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const { error } = await supabase.from(table).insert(rows.slice(i, i + CHUNK));
-    if (error) throw new Error(`insert into ${table} failed: ${error.message}`);
-  }
-}
+import { insertChunked } from "@/lib/data/insert-chunked";
+import { rebuildSnapshots } from "@/lib/data/rebuild-snapshots";
 
 export async function loadDemoData(): Promise<void> {
   const supabase = await createClient();
@@ -55,6 +44,12 @@ export async function loadDemoData(): Promise<void> {
   const snapshots = buildDailySnapshots(accounts, transactions, config);
   await insertChunked(supabase, "daily_snapshots", snapshots.map((s) => snapshotToRow(user.id, s)));
 
+  // A user may have manual accounts alongside demo data; the demo-built
+  // snapshots above only cover demo accounts. Rebuilding from the DB folds
+  // every active account in (identical output when only demo data exists).
+  const { error: rebuildErr } = await rebuildSnapshots(supabase);
+  if (rebuildErr) throw new Error(rebuildErr);
+
   revalidatePath("/");
 }
 
@@ -76,5 +71,9 @@ export async function clearDemoData(): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
   await clearDemoRows(supabase, user.id);
+
+  const { error: rebuildErr } = await rebuildSnapshots(supabase);
+  if (rebuildErr) throw new Error(rebuildErr);
+
   revalidatePath("/");
 }
