@@ -151,8 +151,9 @@ export const METRICS: MetricDef[] = [
     compute: (i) => {
       if (!i.hasRevolvingAccounts) return { notApplicable: "No credit cards" };
       if (i.revolvingLimitTotal === null) return { unavailable: "No credit limits on file" };
-      const balance = i.snapshot?.revolvingBalances ?? 0;
-      return { value: clamp(balance / i.revolvingLimitTotal, 0, 1.5) };
+      // Never fabricate a $0 balance when there's simply no balance history yet.
+      if (i.snapshot === null) return { unavailable: "No balance history yet" };
+      return { value: clamp(i.snapshot.revolvingBalances / i.revolvingLimitTotal, 0, 1.5) };
     },
   },
   {

@@ -95,6 +95,15 @@ describe("computeMetrics", () => {
     expect(by.revolving_utilization.reason).toMatch(/limit/i);
   });
 
+  it("marks utilization unavailable (never a fabricated $0 balance) when there's no balance history", () => {
+    const fx = healthyFixture();
+    const by = Object.fromEntries(
+      computeMetrics(buildMetricInputs([], fx.txns, ACCOUNTS, AS_OF)).map((r) => [r.id, r]),
+    );
+    expect(by.revolving_utilization.availability).toBe("unavailable");
+    expect(by.revolving_utilization.reason).toMatch(/balance history/i);
+  });
+
   it("requires full 90-day history for volatility/consistency metrics", () => {
     const fx = healthyFixture();
     const shortSnaps = fx.snapshots.slice(-40); // ~40 days of history

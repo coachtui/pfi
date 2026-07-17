@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DailySnapshot } from "./types";
 import {
-  buildMetricInputs, WINDOW_DAYS,
+  buildMetricInputs,
   type ScoreAccountInput, type ScoreTransactionInput,
 } from "./metric-inputs";
 

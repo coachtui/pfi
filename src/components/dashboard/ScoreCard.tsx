@@ -19,10 +19,10 @@ const chipCls = "rounded-full border border-border-subtle px-2 py-0.5 text-xs te
 export function ScoreCard({ summary }: { summary: ScoreSummary }) {
   const label =
     summary.state === "suppressed"
-      ? "PFI Score: add data to unlock. View details"
+      ? `PFI Score: add data to unlock, momentum ${momentumLabel(summary.momentum)}. View details`
       : `PFI Score: ${summary.overall} out of 900, ${summary.band}${
           summary.state === "provisional" ? ", provisional" : ""
-        }. View details`;
+        }, momentum ${momentumLabel(summary.momentum)}. View details`;
 
   return (
     <Link href="/score" aria-label={label} className="block rounded-card">
