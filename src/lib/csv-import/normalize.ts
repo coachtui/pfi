@@ -43,11 +43,16 @@ export function normalizeRows(parsed: ParsedCsv, mapping: ColumnMapping): Normal
   const rows: NormalizedRow[] = [];
   const errors: RowError[] = [];
   const cell = (cells: string[], idx: number) => (idx >= 0 && idx < cells.length ? cells[idx] : "");
+  const today = new Date().toISOString().slice(0, 10);
 
   for (const { line, cells } of parsed.rows) {
     const postedDate = parseDateToken(cell(cells, mapping.date), mapping.dateFormat);
     if (!postedDate) {
       errors.push({ line, message: `Unrecognized date "${cell(cells, mapping.date)}"` });
+      continue;
+    }
+    if (postedDate > today) {
+      errors.push({ line, message: `Date "${postedDate}" is in the future` });
       continue;
     }
     const description = cleanDescription(cell(cells, mapping.description));
@@ -88,6 +93,11 @@ export function normalizeRows(parsed: ParsedCsv, mapping: ColumnMapping): Normal
       }
       direction = hasDebit ? "outflow" : "inflow";
       amount = Math.abs(hasDebit ? debit! : credit!);
+    }
+
+    if (amount > 10_000_000) {
+      errors.push({ line, message: `Amount ${amount} exceeds the maximum` });
+      continue;
     }
 
     let category: Category = direction === "inflow" ? "income" : "other";

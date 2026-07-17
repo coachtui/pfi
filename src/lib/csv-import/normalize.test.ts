@@ -89,4 +89,30 @@ describe("normalizeRows", () => {
     expect(r.rows[0].description.startsWith("A B")).toBe(true);
     expect(r.rows[0].description.length).toBe(200);
   });
+
+  it("rejects a future-dated row, matching the server schema's notFuture check", () => {
+    // parseDateToken caps years at 2200, so use "5 years from now" rather than
+    // a fixed far-future literal like the schema tests' "2999-01-01".
+    const future = new Date();
+    future.setFullYear(future.getFullYear() + 5);
+    const mm = String(future.getMonth() + 1).padStart(2, "0");
+    const dd = String(future.getDate()).padStart(2, "0");
+    const yyyy = future.getFullYear();
+    const futureMdy = `${mm}/${dd}/${yyyy}`;
+    const futureIso = `${yyyy}-${mm}-${dd}`;
+
+    const p = parseCsv(`Date,Desc,Amount\n${futureMdy},FUTURE,5\n07/01/2026,OK,1\n`);
+    const r = normalizeRows(p, base);
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0].description).toBe("OK");
+    expect(r.errors).toEqual([{ line: 2, message: `Date "${futureIso}" is in the future` }]);
+  });
+
+  it("rejects an amount over the 10,000,000 max, matching the server schema's cap", () => {
+    const p = parseCsv("Date,Desc,Amount\n07/01/2026,TOOBIG,10000001\n07/02/2026,OK,1\n");
+    const r = normalizeRows(p, base);
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0].description).toBe("OK");
+    expect(r.errors).toEqual([{ line: 2, message: "Amount 10000001 exceeds the maximum" }]);
+  });
 });

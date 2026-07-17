@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { AlertTriangle, ArrowLeftRight, CheckCircle2, CopyX } from "lucide-react";
 import type { AccountSummary } from "@/lib/data/mappers";
-import type { ExistingTxn, NormalizeResult, NormalizedRow, TransferPair } from "@/lib/csv-import/types";
+import type { ExistingTxn, NormalizedRow, ParseError, RowError, TransferPair } from "@/lib/csv-import/types";
 
 interface Preview {
-  normalized: NormalizeResult;
   fresh: NormalizedRow[];
   duplicates: NormalizedRow[];
   pairs: TransferPair[];
+  /** Pre-mapping parse errors and post-mapping normalize errors, combined —
+   * every row excluded from `fresh`/`duplicates` for a data reason shows up here. */
+  errors: Array<ParseError | RowError>;
 }
 
 const money = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -57,8 +59,7 @@ export function PreviewStep({
 }) {
   const [openSection, setOpenSection] = useState<"" | "new" | "dup" | "transfer" | "error">("");
   const toggle = (s: typeof openSection) => setOpenSection((cur) => (cur === s ? "" : s));
-  const { fresh, duplicates, pairs } = preview;
-  const errors = preview.normalized.errors;
+  const { fresh, duplicates, pairs, errors } = preview;
   const rowByLine = new Map(fresh.map((r) => [r.line, r]));
   const existingById = new Map(existing.map((t) => [t.id, t]));
   const accountName = (id: string) => accounts.find((a) => a.id === id)?.displayName ?? "another account";

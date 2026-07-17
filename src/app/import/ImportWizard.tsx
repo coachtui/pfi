@@ -41,7 +41,10 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
     const normalized = normalizeRows(parsed, mapping);
     const { fresh, duplicates } = markDuplicates(normalized.rows, accountId, props.existing);
     const pairs = detectTransfers(fresh, accountId, props.existing);
-    return { normalized, fresh, duplicates, pairs };
+    // Combine pre-mapping parse errors (overlong rows, unclosed quotes) with
+    // post-mapping normalize errors so the preview never silently drops rows.
+    const errors = [...parsed.errors, ...normalized.errors];
+    return { fresh, duplicates, pairs, errors };
   }, [parsed, mapping, accountId, props.existing]);
 
   const onTogglePair = (line: number) => {
