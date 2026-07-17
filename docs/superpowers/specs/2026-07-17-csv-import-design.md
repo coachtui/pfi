@@ -59,10 +59,13 @@ unit-tested, extractable to a package later.
   Duplicates are skipped at commit, never silently: they are counted and listed in
   the preview.
 - **`transfers.ts`** — conservative pairing. A candidate pair is: opposite
-  direction, equal amount, posted dates within ±3 days, other side on a *different*
-  account of the same user (existing transaction) or elsewhere in the same batch.
-  Each row participates in at most one pair (greedy nearest-date match;
-  deterministic tie-break by date then id). Emits proposed pairs for the preview.
+  direction, equal amount, posted dates within ±3 days, other side an *existing*
+  transaction on a **different** account of the same user. (Batch-internal pairs
+  are impossible in v1: one CSV = one account, and transfers are cross-account.
+  Importing the second account's CSV later pairs against the first batch via the
+  existing-transaction path.) Each row participates in at most one pair (greedy
+  nearest-date match; deterministic tie-break by date then id). Emits proposed
+  pairs for the preview.
 
 ### Data model — migration `0004_csv_import`
 
@@ -169,8 +172,8 @@ counts only — never descriptions, amounts, merchant strings, or file contents
   generic debit/credit); normalize (ambiguous `03/04/2025` under both formats, sign
   conventions, parentheses-negative, thousands separators, 2-digit years); dedupe
   (existing + intra-file, near-miss non-duplicates differing by one cent/day);
-  transfers (±3-day boundary, no double-pairing, batch-internal and
-  batch-vs-existing pairs).
+  transfers (±3-day boundary, no double-pairing, batch-vs-existing pairs,
+  same-account candidates excluded).
 - **Validation:** Zod schema tests following `validation/transactions.test.ts`.
 - **RLS:** extend `scripts/test-rls.mts` — cross-user import into a foreign account
   denied; cross-user `undoImport` denied.
