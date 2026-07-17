@@ -165,10 +165,11 @@ interface ScoreSourceRows {
   snapshots: DailySnapshot[];
   transactions: ScoreTransactionInput[];
   accounts: ScoreAccountInput[];
+  events: FinancialEvent[];
 }
 
 async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceRows> {
-  const [snapRes, txnRes, acctRes] = await Promise.all([
+  const [snapRes, txnRes, acctRes, eventRes] = await Promise.all([
     supabase.from("daily_snapshots").select("*").order("date", { ascending: true }),
     supabase
       .from("transactions")
@@ -177,10 +178,12 @@ async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceR
     supabase
       .from("financial_accounts")
       .select("id, type, institution, provider, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at"),
+    supabase.from("financial_events").select("*").order("date", { ascending: true }),
   ]);
   if (snapRes.error) throw snapRes.error;
   if (txnRes.error) throw txnRes.error;
   if (acctRes.error) throw acctRes.error;
+  if (eventRes.error) throw eventRes.error;
 
   return {
     snapshots: (snapRes.data as SnapshotRow[]).map(rowToSnapshot),
@@ -219,6 +222,7 @@ async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceR
         includeInCalculations: row.include_in_calculations,
         provider: row.provider,
       })),
+    events: (eventRes.data as Array<EventRow & { id: string }>).map(rowToEvent),
   };
 }
 
@@ -244,7 +248,9 @@ export async function getScoreData(supabase: SupabaseClient, range: ScoreRange):
   const firstDate = sources.snapshots[0]?.date ?? asOf;
   const rangeStart = range === "all" ? firstDate : addDays(asOf, -RANGE_DAYS[range]);
   const previous = rangeStart < asOf && rangeStart >= firstDate ? breakdownAt(sources, rangeStart) : null;
-  const delta = computeScoreDelta(breakdown, previous);
+  // One-time events strictly after the range start, through (inclusive of) the as-of date.
+  const periodEvents = sources.events.filter((e) => e.date > rangeStart && e.date <= asOf);
+  const delta = computeScoreDelta(breakdown, previous, periodEvents);
 
   const momentum = computeScoreMomentum({
     current: breakdown.overall,

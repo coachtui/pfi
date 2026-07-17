@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ConfidenceLevel, DimensionKey, MetricResult } from "./score-types";
+import type { FinancialEvent } from "./types";
 import { METRICS } from "./metrics";
 import { computeScore } from "./scoring";
 import { computeScoreDelta } from "./score-delta";
@@ -59,5 +60,37 @@ describe("computeScoreDelta", () => {
     const current = computeScore(resultsWith({}), HIGH, "2026-07-15");
     const delta = computeScoreDelta(current, previous);
     expect(delta.notes.join(" ")).toMatch(/concentration/i);
+  });
+
+  it("flags one-time events in the period as a single note", () => {
+    const previous = computeScore(resultsWith({}), HIGH, "2026-06-15");
+    const current = computeScore(resultsWith({}), HIGH, "2026-07-15");
+    const events: FinancialEvent[] = [
+      { id: "e1", date: "2026-07-01", type: "bonus", label: "Holiday bonus", amount: 2000, direction: "inflow" },
+      // recurring/ordinary event types are not one-time and must not appear in the note
+      { id: "e2", date: "2026-07-05", type: "paycheck", label: "Paycheck", amount: 3000, direction: "inflow" },
+    ];
+    const delta = computeScoreDelta(current, previous, events);
+    const note = delta.notes.find((n) => n.startsWith("One-time events in this period:"));
+    expect(note).toBeDefined();
+    expect(note).toContain("Holiday bonus ($2,000)");
+    expect(note).not.toContain("Paycheck");
+  });
+
+  it("adds no one-time-events note when there are no events", () => {
+    const previous = computeScore(resultsWith({}), HIGH, "2026-06-15");
+    const current = computeScore(resultsWith({}), HIGH, "2026-07-15");
+    const delta = computeScoreDelta(current, previous, []);
+    expect(delta.notes.some((n) => n.startsWith("One-time events in this period:"))).toBe(false);
+  });
+
+  it("ignores events on the insufficient_history path", () => {
+    const current = computeScore(resultsWith({}), HIGH, "2026-07-15");
+    const events: FinancialEvent[] = [
+      { id: "e1", date: "2026-07-01", type: "bonus", label: "Holiday bonus", amount: 2000, direction: "inflow" },
+    ];
+    const delta = computeScoreDelta(current, null, events);
+    expect(delta.state).toBe("insufficient_history");
+    expect(delta.notes.some((n) => n.startsWith("One-time events in this period:"))).toBe(false);
   });
 });

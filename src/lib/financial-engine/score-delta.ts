@@ -3,8 +3,23 @@
  * ScoreBreakdowns. Produced BEFORE any AI narration (binding rule).
  */
 import type { DimensionDelta, MetricMover, ScoreBreakdown, ScoreDelta } from "./score-types";
+import type { FinancialEvent, FinancialEventType } from "./types";
 
-export function computeScoreDelta(current: ScoreBreakdown, previous: ScoreBreakdown | null): ScoreDelta {
+/**
+ * Event types that represent a one-time occurrence worth flagging in a
+ * score-delta explanation (vs. recurring flows like paychecks/mortgage
+ * payments/investment contributions, which are already reflected in the
+ * ordinary metric movement and would be noise here).
+ */
+const ONE_TIME_EVENT_TYPES: ReadonlySet<FinancialEventType> = new Set([
+  "bonus", "large_purchase", "unexpected_expense", "tax_payment", "debt_payoff",
+]);
+
+export function computeScoreDelta(
+  current: ScoreBreakdown,
+  previous: ScoreBreakdown | null,
+  oneTimeEvents: FinancialEvent[] = [],
+): ScoreDelta {
   if (previous === null || previous.state === "suppressed") {
     return {
       state: "insufficient_history",
@@ -48,6 +63,14 @@ export function computeScoreDelta(current: ScoreBreakdown, previous: ScoreBreakd
     }
   }
   movers.sort((a, b) => Math.abs(b.overallPointsImpact) - Math.abs(a.overallPointsImpact));
+
+  const oneTime = oneTimeEvents.filter((e) => ONE_TIME_EVENT_TYPES.has(e.type));
+  if (oneTime.length > 0) {
+    const list = oneTime
+      .map((e) => `${e.label} ($${Math.round(e.amount).toLocaleString("en-US")})`)
+      .join(", ");
+    notes.push(`One-time events in this period: ${list}`);
+  }
 
   return {
     state: "ok",
