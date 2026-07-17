@@ -13,7 +13,7 @@ Repo initialized (Next.js 16 / TS strict / Tailwind 4 / Vitest / ESLint / Pretti
 - ✅ Rankings screen (mock cohort data)
 - ✅ Data/benchmarks screen (mock aggregates)
 - ✅ Report screen (shareholder report computed from demo data via the `report.ts` engine, not mock text)
-- ⬜ Blue Reef Partners + North Shore Capital demo profiles
+- ✅ Blue Reef Partners + North Shore Capital demo profiles — landed 2026-07-17 with a demo-profile switcher (DECISIONS #17)
 - ⬜ PWA manifest & installability; Playwright smoke test
 
 Exit: all primary screens responsive; demo user navigates the full experience; components reusable; suitable for product review.

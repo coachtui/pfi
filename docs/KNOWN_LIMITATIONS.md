@@ -47,6 +47,12 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **Unbounded existing-transactions fetch in `getImportContext`/`importTransactions`.** Both fetch a user's existing transactions with no pagination, mirroring an existing pattern already present in `rebuild-snapshots.ts`. A user with a very large transaction history could see degraded dedupe/transfer accuracy if Supabase's default row cap is hit before the fetch is bounded to the relevant window.
 - **No DB-level unique constraint backing the dedupe key.** The dedupe check is correct for a single request, but a double-submitted import (double-click, two tabs) is a TOCTOU race — two concurrent `importTransactions` calls could each pass their own dedupe check against the pre-import state and both insert, producing duplicate rows despite the server-side re-check being individually correct.
 
+## Demo profiles (2026-07-17)
+
+- **Active-profile detection is a display-name heuristic.** The demo-data card infers which profile is loaded by matching seeded demo-account display names against each profile's registered signature name (`src/lib/demo-data/profiles.ts`). It only inspects `provider = "demo"` accounts, so user-created accounts can't collide, but renaming a generator's signature account without updating the registry breaks detection — a registry test asserts the pairing to guard drift.
+- **Demo profiles are labels, not identities.** Switching profiles never changes the user's company name, ticker, or cohort fields (DECISIONS #17); the Rankings/Data screens continue to reflect the user's own onboarding cohorts regardless of which demo profile is loaded, and the demo-data UI must keep profile copy clearly fictional.
+- **Blue Reef Partners' checking account has no overdraft-fee or account-closure simulation.** The generator (`src/lib/demo-data/blue-reef.ts`) lets the account run persistently negative for the entire 430-day simulated history so the profile reliably demonstrates below-waterline and low-score states; a real bank would charge escalating overdraft fees or close an account run negative that long well before a year elapsed. This is a deliberate simplification for demo purposes, not a defect.
+
 ## Manual data (transactions/accounts slice)
 
 - **Amount/date corrections are delete + re-add** on manual transactions (source columns are frozen by design). Revisit if users hit it often.
