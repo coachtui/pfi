@@ -99,8 +99,14 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
     await insertChunked(supabase, "transactions", inserts);
   } catch (e) {
     // All-or-nothing: remove whatever landed before the failing chunk.
-    await supabase.from("transactions").delete().eq("import_batch_id", batchId);
-    return { error: e instanceof Error ? e.message : "Import failed — nothing was saved" };
+    const { error: cleanupErr } = await supabase.from("transactions").delete().eq("import_batch_id", batchId);
+    const baseMessage = e instanceof Error ? e.message : "Import failed";
+    if (cleanupErr) {
+      return {
+        error: `${baseMessage} — cleanup also failed, some rows may remain (batch ${batchId}). Contact support with this batch id.`,
+      };
+    }
+    return { error: `${baseMessage} — nothing was saved` };
   }
 
   const finish = await finishWithRebuild(supabase);
@@ -118,6 +124,7 @@ export async function undoImport(batchId: string): Promise<MutationResult> {
     .from("transactions")
     .delete()
     .eq("import_batch_id", batchId)
+    .eq("user_id", user.id)
     .select("id");
   if (delErr) return { error: delErr.message };
   if (!deleted || deleted.length === 0) return { error: "Import not found" };
