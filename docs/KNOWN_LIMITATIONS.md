@@ -28,6 +28,12 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **The full transactions set is sent to the client for the report screen.** Fine at demo scale; revisit pagination/server-side aggregation for real data volumes.
 - **The period chart passes no event markers, even when events fall within the window.** Carried from Task 5's review; noted as a possible future enhancement, not a defect.
 
+## PFI score v1 slice (2026-07-16)
+
+- **`getDashboardData` runs a second query set for the score summary.** `getScoreSummary` is invoked alongside the existing dashboard queries via `Promise.all` in `src/lib/data/queries.ts`, rather than being folded into a single combined fetch. Correct today; a batching opportunity if dashboard load latency becomes a concern.
+- **The debt-service ratio (DSR) excludes housing by design, not oversight.** Housing/mortgage outflows categorized `housing` are owned by the fixed-cost ratio (Cash Flow dimension); DSR (Debt dimension) measures non-housing debt service only, to avoid double-counting the same dollars across two dimensions. Documented in FINANCIAL_HEALTH_SCORE.md.
+- **Volatility/consistency metrics (`expense_volatility`, `income_consistency`) require the full 90-day window (3 complete 30-day buckets) of history.** With less history the metric is unavailable (`null`) rather than approximated from a partial window — new accounts and freshly onboarded users will see these metrics, and any dimension that depends on them, marked "not enough data" until 90 days of transaction history accumulate.
+
 ## Manual data (transactions/accounts slice)
 
 - **Amount/date corrections are delete + re-add** on manual transactions (source columns are frozen by design). Revisit if users hit it often.

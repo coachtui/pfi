@@ -6,7 +6,7 @@ A personal-finance platform that makes a household's finances feel like managing
 
 ## Status
 
-Phase 1 (visual prototype) + Phase 1.5 infrastructure are complete, and the first slice of Phase 3 has landed: a `/transactions` drill-down (filterable list, manual add/recategorize/delete) and an `/accounts` management screen (add/edit/include/archive), wired from the dashboard. Auth (Supabase magic link) and the database (Postgres + RLS) are live; the app persists data through the real pipeline. Seeded Koa Holdings demo data and real manual entries can now coexist — CSV import is still ahead. See `docs/CURRENT_PHASE.md` for the latest session-by-session status.
+Phase 1 (visual prototype) + Phase 1.5 infrastructure are complete, and the first slice of Phase 3 has landed: a `/transactions` drill-down (filterable list, manual add/recategorize/delete) and an `/accounts` management screen (add/edit/include/archive), wired from the dashboard. Auth (Supabase magic link) and the database (Postgres + RLS) are live; the app persists data through the real pipeline. Seeded Koa Holdings demo data and real manual entries can now coexist — CSV import is still ahead. Phase 2's PFI score v1 has also landed (2026-07-16): a deterministic six-dimension scoring engine with confidence and momentum, a `/score` breakdown screen, and a dashboard score card — final live-browser verification is still in progress. See `docs/CURRENT_PHASE.md` for the latest session-by-session status.
 
 ## Getting started
 
@@ -44,7 +44,7 @@ Full detail (exit criteria, alternatives considered) lives in `docs/ROADMAP.md`;
 | 0 | Product foundation — repo, tokens, branding, demo-data strategy | ✅ Done |
 | 1 | Visual prototype — dashboard, rankings, data, report screens | 🔨 In progress (screens above ✅; onboarding polish, second demo profile, PWA/installability remain) |
 | 1.5 | Infrastructure — Supabase auth/RLS, snapshot builder, tenant-isolation tests | ✅ Done (pulled forward ahead of schedule) |
-| 2 | Financial engine — full metric registry, 0–900 health score, confidence model | ⬜ Not started |
+| 2 | Financial engine — full metric registry, 0–900 health score, confidence model | 🔨 Score v1 landed 2026-07-16 (metric registry, curves, six weighted dimensions, confidence, momentum overlay, `/score` screen, dashboard score card); final live QA (Task 11) outstanding |
 | 3 | Manual data & CSV import | 🔨 In progress (manual accounts/transactions CRUD + correction workflow ✅; CSV import, recurring detection remain) |
 | 4 | AI financial interpreter — narrates verified metrics, never calculates | ⬜ Not started |
 | 5 | Scenario simulator & goals | ⬜ Not started |
