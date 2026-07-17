@@ -153,9 +153,13 @@ try {
   });
   check("A can insert an imported row with a batch id", !impErr, impErr?.message);
 
-  const { data: bBatchRead } = await b.client.from("transactions")
+  const { data: bBatchRead, error: bBatchReadErr } = await b.client.from("transactions")
     .select("id").eq("import_batch_id", importBatchId);
-  check("B cannot read A's imported batch rows", (bBatchRead ?? []).length === 0);
+  check(
+    "B cannot read A's imported batch rows",
+    !bBatchReadErr && (bBatchRead ?? []).length === 0,
+    bBatchReadErr?.message ?? "",
+  );
 
   const { data: bBatchDel } = await b.client.from("transactions")
     .delete().eq("import_batch_id", importBatchId).select("id");
