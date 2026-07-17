@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
 import { momentumLabel, type ConfidenceLevel, type MomentumState } from "@/lib/financial-engine";
@@ -167,7 +167,7 @@ export function ScoreView({ data }: { data: ScoreData }) {
         <h2 className="text-sm font-medium text-primary">The six dimensions</h2>
         {breakdown.dimensions.map((d) => (
           <Card key={d.key} className="p-4">
-            <details>
+            <details className="group">
               <summary className="flex cursor-pointer list-none flex-col gap-1">
                 <span className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium text-primary">{d.label}</span>
@@ -181,6 +181,11 @@ export function ScoreView({ data }: { data: ScoreData }) {
                       <span className="text-tertiary">Not enough data</span>
                     )}
                     <span className={chipCls}>{CONFIDENCE_COPY[d.confidence]}</span>
+                    <ChevronDown
+                      size={16}
+                      className="shrink-0 text-tertiary transition-transform group-open:rotate-180"
+                      aria-hidden
+                    />
                   </span>
                 </span>
                 {d.score === null && d.exclusionReason && (
