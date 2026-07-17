@@ -192,12 +192,14 @@ export function TransactionDetailSheet({
             {txn.accountName} · {formatShortDate(txn.postedDate)} · {inflow ? "Money in" : "Money out"}
             {txn.isTransfer ? " · Transfer" : ""}
           </p>
-          {txn.accountProvider !== "manual" && (
+          {(txn.accountProvider !== "manual" || txn.importBatchId !== null) && (
             <p className="mt-1 text-xs text-tertiary">
-              Imported {txn.accountProvider} data — amount and date are locked; corrections below are tracked.
+              {txn.importBatchId !== null
+                ? "CSV-imported data — amount and date are locked; corrections below are tracked. To remove it, undo the whole import from Accounts."
+                : `Imported ${txn.accountProvider} data — amount and date are locked; corrections below are tracked.`}
             </p>
           )}
-          {txn.accountProvider === "manual" && (
+          {txn.accountProvider === "manual" && txn.importBatchId === null && (
             <p className="mt-1 text-xs text-tertiary">
               Wrong amount or date? Delete this transaction and re-add it.
             </p>
@@ -245,7 +247,7 @@ export function TransactionDetailSheet({
               Reset to original
             </button>
           )}
-          {txn.accountProvider === "manual" &&
+          {txn.accountProvider === "manual" && txn.importBatchId === null &&
             (confirmingDelete ? (
               <button
                 type="button"

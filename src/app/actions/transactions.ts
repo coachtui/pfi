@@ -48,7 +48,7 @@ export async function deleteTransaction(id: string): Promise<MutationResult> {
 
   const { data: txn, error: fetchErr } = await supabase
     .from("transactions")
-    .select("id, financial_accounts!inner(provider)")
+    .select("id, import_batch_id, financial_accounts!inner(provider)")
     .eq("id", id)
     .maybeSingle();
   if (fetchErr) return { error: fetchErr.message };
@@ -56,6 +56,9 @@ export async function deleteTransaction(id: string): Promise<MutationResult> {
   const provider = (txn.financial_accounts as unknown as { provider: string }).provider;
   if (provider !== "manual") {
     return { error: "Imported transactions can't be deleted — recategorize them instead" };
+  }
+  if (txn.import_batch_id !== null) {
+    return { error: "CSV-imported transactions can't be deleted one by one — undo the whole import from Accounts instead" };
   }
 
   const { error: delErr } = await supabase.from("transactions").delete().eq("id", id);

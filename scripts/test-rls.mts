@@ -143,6 +143,31 @@ try {
     .eq("id", acct!.id)
     .select("id");
   check("B cannot archive A's account", (bArch ?? []).length === 0);
+
+  // ---- CSV import slice: import_batch_id isolation + immutability ----
+  const importBatchId = randomUUID();
+  const { error: impErr } = await a.client.from("transactions").insert({
+    account_id: acct!.id, user_id: a.id, posted_date: "2026-07-01", amount: 12.34,
+    direction: "outflow", description: "rls import row", category: "other",
+    import_batch_id: importBatchId,
+  });
+  check("A can insert an imported row with a batch id", !impErr, impErr?.message);
+
+  const { data: bBatchRead, error: bBatchReadErr } = await b.client.from("transactions")
+    .select("id").eq("import_batch_id", importBatchId);
+  check(
+    "B cannot read A's imported batch rows",
+    !bBatchReadErr && (bBatchRead ?? []).length === 0,
+    bBatchReadErr?.message ?? "",
+  );
+
+  const { data: bBatchDel } = await b.client.from("transactions")
+    .delete().eq("import_batch_id", importBatchId).select("id");
+  check("B cannot delete A's imported batch rows (undo isolation)", (bBatchDel ?? []).length === 0);
+
+  const { error: aBatchMutErr } = await a.client.from("transactions")
+    .update({ import_batch_id: randomUUID() }).eq("import_batch_id", importBatchId).select("id").single();
+  check("import_batch_id is immutable after insert", !!aBatchMutErr);
 } finally {
   if (a) {
     try {

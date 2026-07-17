@@ -3,13 +3,14 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Upload } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { setAccountArchived, setAccountIncluded } from "@/app/actions/accounts";
 import { formatDollars } from "@/lib/financial-engine/format";
 import type { AccountType } from "@/lib/financial-engine";
-import type { AccountSummary } from "@/lib/data/mappers";
+import type { AccountSummary, RecentImport } from "@/lib/data/mappers";
 import { AccountSheet } from "./AccountSheet";
+import { RecentImports } from "./RecentImports";
 
 const GROUPS: ReadonlyArray<{ title: string; types: readonly AccountType[] }> = [
   { title: "Cash", types: ["checking", "savings", "money_market"] },
@@ -24,7 +25,12 @@ const chipCls =
 const actionCls =
   "rounded-lg border border-border-subtle px-2.5 py-1 text-xs text-secondary transition-colors hover:text-primary disabled:opacity-60";
 
-export function AccountsView({ accounts }: { accounts: AccountSummary[] }) {
+export function AccountsView({
+  accounts, recentImports,
+}: {
+  accounts: AccountSummary[];
+  recentImports: RecentImport[];
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState<AccountSummary | null>(null);
@@ -43,11 +49,19 @@ export function AccountsView({ accounts }: { accounts: AccountSummary[] }) {
 
   return (
     <div className="flex flex-col gap-4 pb-24">
-      <div className="flex items-center gap-3">
-        <Link href="/" aria-label="Back to dashboard" className="rounded-lg p-1 text-secondary hover:text-primary">
-          <ArrowLeft size={20} />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/" aria-label="Back to dashboard" className="rounded-lg p-1 text-secondary hover:text-primary">
+            <ArrowLeft size={20} />
+          </Link>
+          <h1 className="text-lg font-semibold text-primary">Accounts</h1>
+        </div>
+        <Link
+          href="/import"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border-subtle px-2.5 py-1.5 text-xs font-medium text-secondary transition-colors hover:text-primary"
+        >
+          <Upload size={14} aria-hidden /> Import CSV
         </Link>
-        <h1 className="text-lg font-semibold text-primary">Accounts</h1>
       </div>
 
       {notice && <p role="status" className="text-sm text-warning">{notice}</p>}
@@ -150,6 +164,8 @@ export function AccountsView({ accounts }: { accounts: AccountSummary[] }) {
           <Plus size={18} aria-hidden /> Add account
         </button>
       )}
+
+      <RecentImports imports={recentImports} />
 
       <AccountSheet account={null} open={adding} onClose={() => setAdding(false)} />
       {editing && <AccountSheet key={editing.id} account={editing} open onClose={() => setEditing(null)} />}
