@@ -57,6 +57,16 @@ describe("normalizeRows", () => {
     expect(r.errors.map((e) => e.line)).toEqual([4, 5]);
   });
 
+  it("errors on a non-empty but unparseable debit/credit cell even when the other side is valid", () => {
+    const p = parseCsv("Date,Desc,Debit,Credit\n07/01/2026,BAD,N/A,20\n07/02/2026,OK,,5\n");
+    const m = { ...base, amount: -1, debit: 2, credit: 3 };
+    const r = normalizeRows(p, m);
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0].description).toBe("OK");
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0].line).toBe(2);
+  });
+
   it("maps bank categories via categoryValues with direction fallback", () => {
     const p = parseCsv("Date,Desc,Amount,Category\n07/01/2026,SHOP,-1,Food & Drink\n07/02/2026,X,-1,Mystery\n");
     const m = { ...base, category: 3, categoryValues: { "food & drink": "groceries" as const } };

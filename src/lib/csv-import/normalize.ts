@@ -70,6 +70,14 @@ export function normalizeRows(parsed: ParsedCsv, mapping: ColumnMapping): Normal
     } else {
       const debitRaw = cell(cells, mapping.debit).trim();
       const creditRaw = cell(cells, mapping.credit).trim();
+      if (debitRaw !== "" && parseAmountToken(debitRaw) === null) {
+        errors.push({ line, message: `Unrecognized debit "${debitRaw}"` });
+        continue;
+      }
+      if (creditRaw !== "" && parseAmountToken(creditRaw) === null) {
+        errors.push({ line, message: `Unrecognized credit "${creditRaw}"` });
+        continue;
+      }
       const debit = debitRaw === "" ? null : parseAmountToken(debitRaw);
       const credit = creditRaw === "" ? null : parseAmountToken(creditRaw);
       const hasDebit = debit !== null && debit !== 0;
