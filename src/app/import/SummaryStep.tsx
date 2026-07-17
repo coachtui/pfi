@@ -21,6 +21,7 @@ export function SummaryStep({
   const [undoing, setUndoing] = useState(false);
   const [undone, setUndone] = useState(false);
   const [undoError, setUndoError] = useState("");
+  const [undoWarning, setUndoWarning] = useState("");
 
   const byCategory = useMemo(() => {
     const counts = new Map<Category, number>();
@@ -38,13 +39,18 @@ export function SummaryStep({
     const res = await undoImport(result.batchId);
     setUndoing(false);
     if (res.error) setUndoError(res.error);
-    else { setUndone(true); router.refresh(); }
+    else { setUndoWarning(res.warning ?? ""); setUndone(true); router.refresh(); }
   }
 
   if (undone) {
     return (
       <section className="space-y-3 text-center">
-        <p className="text-sm text-primary">Import undone — those transactions were removed and your index was recalculated.</p>
+        <p className="text-sm text-primary">
+          {undoWarning
+            ? "Import undone — those transactions were removed."
+            : "Import undone — those transactions were removed and your index was recalculated."}
+        </p>
+        {undoWarning && <p role="status" className="text-sm text-warning">⚠ {undoWarning}</p>}
         <Link href="/accounts" className="text-sm text-secondary hover:text-primary">Back to accounts</Link>
       </section>
     );
@@ -57,7 +63,7 @@ export function SummaryStep({
         Imported {result.imported ?? 0} transaction{(result.imported ?? 0) === 1 ? "" : "s"}
         {result.skippedDuplicates ? ` · ${result.skippedDuplicates} duplicates skipped` : ""}
       </p>
-      {result.warning && <p role="alert" className="text-sm text-warning">{result.warning}</p>}
+      {result.warning && <p role="status" className="text-sm text-warning">⚠ {result.warning}</p>}
 
       {byCategory.length > 0 && (
         <ul className="rounded-xl border border-border-subtle bg-inset p-3 text-sm text-primary">
