@@ -1,4 +1,5 @@
-import { Database } from "lucide-react";
+import Link from "next/link";
+import { Database, Upload } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { loadDemoData } from "@/app/actions/demo";
 import { LoadDemoButton } from "@/components/dashboard/LoadDemoButton";
@@ -14,12 +15,18 @@ export function EmptyDashboard({ companyName }: { companyName: string }) {
         <div>
           <p className="text-sm font-medium text-primary">No financial data yet</p>
           <p className="mt-1 max-w-sm text-sm text-secondary">
-            Load the sample dataset to explore, or add accounts once manual entry ships.
+            Load the sample dataset to explore, or import your real transactions from a bank CSV.
           </p>
         </div>
         <form action={loadDemoData}>
           <LoadDemoButton />
         </form>
+        <Link
+          href="/import"
+          className="flex items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-1.5 text-xs font-medium text-secondary transition-colors hover:text-primary"
+        >
+          <Upload size={14} aria-hidden /> Import a CSV from your bank
+        </Link>
       </Card>
     </div>
   );
