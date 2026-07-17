@@ -70,7 +70,7 @@ Explanation-only: emergency-fund target coverage (runway restated against a defa
 |---|---|---|
 | Debt burden (`debt_service_ratio`) | debt-related outflows / income | ≤10%→100 · 20%→80 · 36%→50 · 45%→25 · ≥60%→0 |
 | Credit utilization (`revolving_utilization`) | revolving balances / Σ credit limits | 0→100 · 10%→90 · 30%→65 · 50%→40 · 75%→15 · ≥100%→0 (unavailable when no credit limits on file) |
-| Interest drag (`weighted_interest_burden`) | Σ(debt balance × APR) / 12 / monthly income | ≤1%→100 · 3%→75 · 6%→45 · 10%→20 · ≥15%→0 (unavailable when rates missing) |
+| Interest drag (`weighted_interest_burden`) | Σ(debt balance × APR) / 12 / monthly income — APR as a decimal; account records store percent and are converted at the data boundary | ≤1%→100 · 3%→75 · 6%→45 · 10%→20 · ≥15%→0 (unavailable when rates missing) |
 | Revolving trend (`revolving_trajectory`) | Δ revolving balances over window / monthly income | ≤−25%→100 · 0→65 · +25%→35 · ≥+75%→0 |
 
 Not all debt is equal: utilization and interest drag weight high-interest revolving debt hardest by construction (balances × APR); mortgages/secured, lower-rate debt contribute proportionally less per dollar. High-interest debt exposure is explanation-only (it reuses the same balances × rates as interest drag — scoring it too would double-count). Minimum-payment burden and delinquency indicators: future data sources.

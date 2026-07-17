@@ -15,6 +15,7 @@ import {
   type TransactionListRow, type AccountRow, type AccountSummary, type TransactionListItem,
 } from "./mappers";
 import type { TransactionFilters } from "@/lib/validation/transactions";
+import { percentToDecimal } from "./unit-conversions";
 
 export interface ProfileRow {
   id: string; username: string; age_cohort: string; income_band: string;
@@ -211,7 +212,10 @@ async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceR
         institution: row.institution,
         currentBalance: Number(row.current_balance),
         creditLimit: row.credit_limit === null ? null : Number(row.credit_limit),
-        interestRate: row.interest_rate === null ? null : Number(row.interest_rate),
+        // Stored as a percent (per src/lib/validation/transactions.ts's accountSchema,
+        // e.g. 6.25 meaning 6.25%); the engine's interest-burden metric expects a
+        // decimal APR (0.0625), so convert at this data boundary only.
+        interestRate: percentToDecimal(row.interest_rate === null ? null : Number(row.interest_rate)),
         includeInCalculations: row.include_in_calculations,
         provider: row.provider,
       })),
