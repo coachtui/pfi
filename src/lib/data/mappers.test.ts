@@ -10,6 +10,7 @@ import {
   rowToTransactionListItem,
   type AccountRow,
   type TransactionListRow,
+  demoAccountToRow,
 } from "./mappers";
 import type { DailySnapshot, FinancialEvent } from "@/lib/financial-engine/types";
 import { ENGINE_VERSION } from "@/lib/financial-engine";
@@ -36,6 +37,19 @@ describe("mappers", () => {
     const row = eventToRow("user-1", event);
     expect(row.user_id).toBe("user-1");
     expect(rowToEvent({ ...row, id: "e1" })).toEqual(event);
+  });
+
+  it("demoAccountToRow threads creditLimit and interestRate when present, null otherwise", () => {
+    const base = {
+      id: "a1", type: "credit_card" as const, currentBalance: 4300, includeInCalculations: true,
+      provider: "demo" as const, displayName: "Card", institution: "Bank", subtype: null, mask: "1111",
+    };
+    const withCredit = demoAccountToRow("user-1", { ...base, creditLimit: 5000, interestRate: 26.99 });
+    expect(withCredit.credit_limit).toBe(5000);
+    expect(withCredit.interest_rate).toBe(26.99);
+    const without = demoAccountToRow("user-1", base);
+    expect(without.credit_limit).toBeNull();
+    expect(without.interest_rate).toBeNull();
   });
 });
 
