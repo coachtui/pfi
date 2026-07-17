@@ -10,7 +10,7 @@ function inputs(partial: Partial<MetricInputs> = {}): MetricInputs {
     incomeSources: [], recurringIncomeMonthlyAvg: 0, snapshot: null, liquidSeries: [],
     revolvingStart: null, revolvingEnd: null, debtAccounts: [], hasRevolvingAccounts: false,
     revolvingLimitTotal: null, institutionShares: [], accountCount: 2,
-    dataQuality: { uncategorizedShare: 0, demo: false },
+    dataQuality: { uncategorizedShare: 0, demo: false, unresolvedTransferShare: 0, manualShare: 0 },
     ...partial,
   };
 }
@@ -45,16 +45,66 @@ describe("computeConfidence", () => {
   });
 
   it("penalizes uncategorized transactions only for category-driven dimensions", () => {
-    const report = computeConfidence(inputs({ dataQuality: { uncategorizedShare: 0.2, demo: false } }), []);
+    const report = computeConfidence(
+      inputs({ dataQuality: { uncategorizedShare: 0.2, demo: false, unresolvedTransferShare: 0, manualShare: 0 } }),
+      [],
+    );
     expect(report.byDimension.cash_flow.level).toBe("moderate");
     expect(report.byDimension.liquidity.level).toBe("high");
   });
 
   it("caps everything at moderate for demo data", () => {
-    const report = computeConfidence(inputs({ dataQuality: { uncategorizedShare: 0, demo: true } }), []);
+    const report = computeConfidence(
+      inputs({ dataQuality: { uncategorizedShare: 0, demo: true, unresolvedTransferShare: 0, manualShare: 0 } }),
+      [],
+    );
     for (const dim of Object.values(report.byDimension)) {
       expect(["moderate", "limited"]).toContain(dim.level);
     }
     expect(report.byDimension.cash_flow.reasons).toContain("Demo dataset");
+  });
+
+  it("drops a level for transfer-sensitive dimensions when >5% of transfers are unresolved", () => {
+    const report = computeConfidence(
+      inputs({ dataQuality: { uncategorizedShare: 0, demo: false, unresolvedTransferShare: 0.1, manualShare: 0 } }),
+      [],
+    );
+    expect(report.byDimension.cash_flow.level).toBe("moderate");
+    expect(report.byDimension.cash_flow.reasons).toContain("Some transfers could not be matched");
+    expect(report.byDimension.stability.level).toBe("moderate");
+    expect(report.byDimension.growth.level).toBe("moderate");
+    // liquidity/debt/concentration are not transfer-sensitive.
+    expect(report.byDimension.liquidity.level).toBe("high");
+    expect(report.improvements).toContain("Match or correct unpaired transfers");
+  });
+
+  it("does not penalize transfers when the unresolved share is at or below 5%", () => {
+    const report = computeConfidence(
+      inputs({ dataQuality: { uncategorizedShare: 0, demo: false, unresolvedTransferShare: 0.05, manualShare: 0 } }),
+      [],
+    );
+    expect(report.byDimension.cash_flow.level).toBe("high");
+    expect(report.byDimension.cash_flow.reasons).not.toContain("Some transfers could not be matched");
+  });
+
+  it("drops a level for every dimension when over 80% of accounts are manually entered", () => {
+    const report = computeConfidence(
+      inputs({ dataQuality: { uncategorizedShare: 0, demo: false, unresolvedTransferShare: 0, manualShare: 0.9 } }),
+      [],
+    );
+    for (const dim of Object.values(report.byDimension)) {
+      expect(dim.level).toBe("moderate");
+    }
+    expect(report.byDimension.concentration.reasons).toContain("Most data was entered manually");
+    expect(report.improvements).toContain("Connect accounts when available to corroborate manual data");
+  });
+
+  it("does not penalize manual data at or below the 80% threshold", () => {
+    const report = computeConfidence(
+      inputs({ dataQuality: { uncategorizedShare: 0, demo: false, unresolvedTransferShare: 0, manualShare: 0.8 } }),
+      [],
+    );
+    expect(report.byDimension.cash_flow.level).toBe("high");
+    expect(report.byDimension.cash_flow.reasons).not.toContain("Most data was entered manually");
   });
 });

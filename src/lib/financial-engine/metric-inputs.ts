@@ -89,7 +89,14 @@ export interface MetricInputs {
   /** Positive-asset-balance shares by institution, descending. [] when <2 included accounts. */
   institutionShares: number[];
   accountCount: number;
-  dataQuality: { uncategorizedShare: number; demo: boolean };
+  dataQuality: {
+    uncategorizedShare: number;
+    demo: boolean;
+    /** Share of in-window transfers on included accounts with no matched pair. 0 when no transfers. */
+    unresolvedTransferShare: number;
+    /** Share of included accounts whose provider is "manual" (vs demo/csv/live sync). */
+    manualShare: number;
+  };
 }
 
 function daysBetween(a: ISODate, b: ISODate): number {
@@ -209,6 +216,11 @@ export function buildMetricInputs(
   const revolving = included.filter((a) => REVOLVING_TYPES.has(a.type));
   const limits = revolving.filter((a) => a.creditLimit !== null && a.creditLimit > 0);
 
+  const windowTransfers = windowTxns.filter((t) => t.isTransfer);
+  const unresolvedTransfers = windowTransfers.filter((t) => t.transferPairId === null);
+  const unresolvedTransferShare = windowTransfers.length > 0 ? unresolvedTransfers.length / windowTransfers.length : 0;
+  const manualShare = included.length > 0 ? included.filter((a) => a.provider === "manual").length / included.length : 0;
+
   return {
     asOfDate,
     windowStart,
@@ -231,6 +243,8 @@ export function buildMetricInputs(
     dataQuality: {
       uncategorizedShare: flowCount > 0 ? uncategorized / flowCount : 0,
       demo: included.some((a) => a.provider === "demo"),
+      unresolvedTransferShare,
+      manualShare,
     },
   };
 }

@@ -112,6 +112,33 @@ describe("buildMetricInputs", () => {
     expect(inputs.revolvingLimitTotal).toBe(10000);
   });
 
+  it("computes unresolvedTransferShare from in-window transfers on included accounts", () => {
+    const noTransfers = buildMetricInputs([snap(AS_OF, 20000)], [], ACCOUNTS, AS_OF);
+    expect(noTransfers.dataQuality.unresolvedTransferShare).toBe(0); // 0 when no transfers, never NaN
+
+    const inputs = buildMetricInputs(
+      [snap(AS_OF, 20000)],
+      [
+        // matched pair
+        txn({ id: "o1", postedDate: "2026-07-05", amount: 500, direction: "outflow", isTransfer: true, transferPairId: "i1" }),
+        txn({ id: "i1", postedDate: "2026-07-05", amount: 500, direction: "inflow", accountId: "brk", isTransfer: true, transferPairId: "o1" }),
+        // unpaired transfer
+        txn({ id: "o2", postedDate: "2026-07-06", amount: 200, direction: "outflow", isTransfer: true, transferPairId: null }),
+      ],
+      ACCOUNTS, AS_OF,
+    );
+    expect(inputs.dataQuality.unresolvedTransferShare).toBeCloseTo(1 / 3);
+  });
+
+  it("computes manualShare from included accounts' provider", () => {
+    const allDemo = buildMetricInputs([snap(AS_OF, 20000)], [], ACCOUNTS, AS_OF);
+    expect(allDemo.dataQuality.manualShare).toBe(0);
+
+    const mixed = ACCOUNTS.map((a, i) => (i === 0 ? { ...a, provider: "manual" } : a));
+    const inputs = buildMetricInputs([snap(AS_OF, 20000)], [], mixed, AS_OF);
+    expect(inputs.dataQuality.manualShare).toBeCloseTo(1 / 5); // 1 manual of 5 accounts (incl. property)
+  });
+
   it("respects includeInCalculations, tracks history and demo flag", () => {
     const excluded = ACCOUNTS.map((a) => a.id === "brk" ? { ...a, includeInCalculations: false } : a);
     const inputs = buildMetricInputs(

@@ -12,6 +12,8 @@ export interface ConfidenceReport {
 
 const ALL_DIMENSIONS: DimensionKey[] = ["cash_flow", "liquidity", "debt", "stability", "growth", "concentration"];
 const CATEGORY_DRIVEN: ReadonlySet<DimensionKey> = new Set(["cash_flow", "stability", "growth"]);
+/** Dimensions whose windowed flows depend on correctly-paired transfers (contributions/debt payments/income netting). */
+const TRANSFER_SENSITIVE: ReadonlySet<DimensionKey> = new Set(["cash_flow", "stability", "growth"]);
 const ORDER: ConfidenceLevel[] = ["high", "moderate", "limited"];
 
 const IMPROVEMENTS: Array<{ match: RegExp; advice: string }> = [
@@ -20,6 +22,8 @@ const IMPROVEMENTS: Array<{ match: RegExp; advice: string }> = [
   { match: /uncategorized/i, advice: "Categorize more of your transactions" },
   { match: /days of history/i, advice: "Keep your data connected — accuracy improves with history" },
   { match: /demo dataset/i, advice: "Replace demo data with your own accounts" },
+  { match: /transfers could not be matched/i, advice: "Match or correct unpaired transfers" },
+  { match: /entered manually/i, advice: "Connect accounts when available to corroborate manual data" },
   { match: /income/i, advice: "Record your income transactions" },
 ];
 
@@ -56,6 +60,16 @@ export function computeConfidence(inputs: MetricInputs, metricResults: MetricRes
     if (CATEGORY_DRIVEN.has(key) && inputs.dataQuality.uncategorizedShare > 0.10) {
       level = drop(level);
       reasons.push("Over 10% of transactions are uncategorized");
+    }
+
+    if (TRANSFER_SENSITIVE.has(key) && inputs.dataQuality.unresolvedTransferShare > 0.05) {
+      level = drop(level);
+      reasons.push("Some transfers could not be matched");
+    }
+
+    if (inputs.dataQuality.manualShare > 0.8) {
+      level = drop(level);
+      reasons.push("Most data was entered manually");
     }
 
     if (inputs.dataQuality.demo) {
