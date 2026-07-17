@@ -112,9 +112,6 @@ Format: date, decision, context, alternatives, reasoning, consequences. Do not m
 ## 16. 2026-07-17 — Drop the write-only `daily_snapshots.data_coverage_confidence` column
 
 **Decision:** migration `0005_drop_coverage_confidence` removes the column; `snapshotToRow` stops stamping it.
-
 **Alternatives:** stamp it meaningfully per rebuild (derive demo/manual/mixed from the providers of accounts feeding that rebuild); keep it and doc-note it as vestigial until Phase 7.
-
 **Reasoning:** the column was write-only — stamped `"demo"` unconditionally, never read. Score confidence is computed at read time from account providers (#14, `metric-inputs.ts`), which made the persisted field obsolete; after the manual-CRUD and CSV-import slices it actively misstated provenance for rebuilt manual/mixed snapshots. A field that lies is worse than no field, and speculative stamping logic nothing consumes fails YAGNI.
-
 **Consequences:** schema stays honest. If persisted coverage confidence returns with real provider sync (Phase 7), it gets a fresh design with real inputs (sync freshness, connection health) rather than inheriting a placeholder.
