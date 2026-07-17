@@ -5,17 +5,17 @@ import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import type { AccountSummary } from "@/lib/data/mappers";
-import type { ExistingTxn, ParsedCsv } from "@/lib/csv-import/types";
+import type { ColumnMapping, ExistingTxn, ParsedCsv } from "@/lib/csv-import/types";
 import { UploadStep } from "./UploadStep";
+import { MapStep } from "./MapStep";
 
-// TODO(Task 12): import { MapStep } from "./MapStep";
 // TODO(Task 13): import { PreviewStep } from "./PreviewStep";
 // TODO(Task 14): import { SummaryStep } from "./SummaryStep";
-// TODO(Task 12-14): wire the deterministic pipeline (normalizeRows / markDuplicates /
+// TODO(Task 13-14): wire the deterministic pipeline (normalizeRows / markDuplicates /
 // detectTransfers from "@/lib/csv-import", then importTransactions from
-// "@/app/actions/imports") into the map/preview/summary branches below, using
+// "@/app/actions/imports") into the preview/summary branches below, using
 // `props.existing` for dedupe/transfer detection. Until then those steps render
-// a "coming soon" placeholder and this component only drives the upload step.
+// a "coming soon" placeholder.
 
 type Step = "upload" | "map" | "preview" | "summary";
 const STEP_LABELS: Record<Step, string> = {
@@ -32,6 +32,7 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
   const [accountId, setAccountId] = useState("");
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const [fileName, setFileName] = useState("");
+  const [mapping, setMapping] = useState<ColumnMapping | null>(null);
 
   return (
     <div>
@@ -67,20 +68,33 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
         />
       )}
 
-      {step !== "upload" && (
+      {step === "map" && parsed && (
+        <MapStep
+          parsed={parsed}
+          fileName={fileName}
+          initialMapping={mapping}
+          onBack={() => setStep("upload")}
+          onConfirm={(next) => {
+            setMapping(next);
+            setStep("preview");
+          }}
+        />
+      )}
+
+      {(step === "preview" || step === "summary") && (
         <Card className="flex flex-col items-start gap-2 p-6">
           <p className="text-sm font-medium text-primary">{STEP_LABELS[step]} is coming soon</p>
           <p className="text-sm text-secondary">
             {parsed
-              ? `“${fileName}” has ${parsed.rows.length.toLocaleString()} rows ready — column mapping and preview ship in a follow-up update.`
+              ? `“${fileName}” has ${parsed.rows.length.toLocaleString()} rows mapped — preview ships in a follow-up update.`
               : "This step isn't built yet."}
           </p>
           <button
             type="button"
-            onClick={() => setStep("upload")}
+            onClick={() => setStep("map")}
             className="mt-2 text-sm text-secondary hover:text-primary"
           >
-            Back to upload
+            Back to column mapping
           </button>
         </Card>
       )}
