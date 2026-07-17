@@ -1,10 +1,24 @@
 # Current Phase
 
-_Last updated: 2026-07-16 (PFI score v1 slice — Task 11 final verification complete)._
+_Last updated: 2026-07-17 (CSV import slice — Task 17 docs + full verification complete)._
 
-**Phase:** 0 complete, 1.5 (infrastructure) complete, visual-parity slice (Home polish, Rankings, Data) complete, report screen complete, transactions/accounts CRUD slice complete → Phase 2's PFI score v1 (metric registry, curves, six weighted dimensions, confidence, momentum overlay, `/score` screen, dashboard score card) is now **complete and verified** (Tasks 1–11), ahead of full Phase 1 completion (CSV import remains, see ROADMAP.md Phase 3).
+**Phase:** 0 complete, 1.5 (infrastructure) complete, visual-parity slice (Home polish, Rankings, Data) complete, report screen complete, transactions/accounts CRUD slice complete, PFI score v1 (Phase 2) complete → Phase 3's CSV import (column mapping, preview, dedupe, transfer detection, import summary) is now **implementation-and-docs complete** (Tasks 1–17); live browser QA (Task 18) and final whole-branch review are still pending before this slice merges.
 
-## Completed (this phase — PFI score v1, Tasks 1–10)
+## Completed (this phase — CSV import, Tasks 1–17)
+
+- **`src/lib/csv-import/` module.** Framework-free, mirroring `financial-engine`'s no-React-imports rule: `parse.ts` (quotes, BOM, delimiters, CRLF, ragged rows), `detect.ts` (header/format auto-detection against real-world fixtures — Chase, Amex, generic debit/credit), `normalize.ts` (ambiguous date formats, sign conventions, parentheses-negative, thousands separators, 2-digit years), `dedupe.ts` (exact-match against existing + intra-file), and `transfers.ts` (±3-day transfer-pair detection, no double-pairing, same-account candidates excluded).
+- **Migration `0004_csv_import`.** Adds `transactions.import_batch_id uuid` (set at insert, never updated) plus a partial index on `(user_id, import_batch_id)`; extends migration 0002's `transactions_prevent_source_update` trigger to cover the new column, so imported rows are corrected only via `user_override` and removed only by whole-batch undo.
+- **`src/lib/validation/imports.ts`.** `importTransactionsSchema`/`ImportTransactionsInput` and `ImportResult` Zod schemas, tested following the `validation/transactions.test.ts` pattern.
+- **Data-layer additions.** `getImportContext` and `getRecentImports` in `src/lib/data/queries.ts` (batch summaries are derived by grouping on `import_batch_id` — no `import_batches` table); `TransactionListItem.importBatchId` threaded through the existing transaction mapper so the UI can distinguish imported rows.
+- **Delete guard for imported rows.** `deleteTransaction` in `src/app/actions/transactions.ts` now checks `import_batch_id !== null` and refuses per-row delete on imported transactions — the only way to remove them is `undoImport`.
+- **`src/app/actions/imports.ts`.** `importTransactions` (chunked insert via the shared `insertChunked`, dedupe + transfer-pair re-check server-side, compensating delete-by-batch-id on partial chunk failure) and `undoImport` (delete-by-batch-id + `finishWithRebuild`) — both return `{ error }`/`""` behind RLS-bound queries, matching the existing action contract.
+- **`/import` wizard, four steps.** `UploadStep` (target-account picker, file guards: extension, ~5 MB/10,000-row cap, empty-file/no-recognizable-columns errors), `MapStep` (per-field column dropdowns pre-filled from `detect.ts`, date-format/sign-convention pickers with live example rows, category value-mapping table), `PreviewStep` (new/duplicate/transfer-pair/error-row summary chips, each expandable, individually un-flaggable transfer pairs, inline "why" explainers — same explainability posture as the score screen), and `SummaryStep` (commit result, per-category counts, a prominent Undo, links to `/transactions` pre-filtered to the batch and `/score`). `error.tsx`/`loading.tsx` cover the route's error/loading states.
+- **Entry points.** "Import CSV" and a derived "Recent imports" list (per-batch undo, two-step in-app confirm) on `/accounts`; the dashboard empty state's "replace demo data" CTA now links to `/import`.
+- **RLS isolation extension.** `scripts/test-rls.mts` grew to 19 checks (from 15): cross-user isolation on imported-batch rows (insert/read/delete-undo denial) and `import_batch_id` immutability after insert — 19/19 passing live against the real Supabase project.
+- **Test coverage.** Full suite: 28 test files / 219 tests, all green (up from 21 files / 169 tests before this slice) — the increase is the new `csv-import/*.test.ts` files, `imports` validation tests, and extended `mappers.test.ts`/`test-rls.mts` coverage.
+- **Task 17 (docs + full verification), done.** `docs/DECISIONS.md` #15, a new "CSV import v1" section in `docs/KNOWN_LIMITATIONS.md`, `docs/ROADMAP.md` Phase 3 marked landed, and this file updated. `pnpm check` green: 0 lint errors, 1 pre-existing warning (`AccountSheet.tsx` React Compiler incompatible-library note — the second pre-existing warning noted in the prior slice, an unused import in `metric-inputs.test.ts`, was fixed in commit `171c07b` before this task started); 219/219 tests; build succeeds, all 12 routes compile including `/import`. **Live browser QA has not been performed for this slice** — that is Task 18, still pending, along with the final whole-branch review.
+
+## Completed (previous phase — PFI score v1, Tasks 1–10)
 
 - **Score types + metric-inputs bundle.** `src/lib/financial-engine/score-types.ts` and the `MetricInputs` assembly step feeding the scoring pipeline from existing snapshot/transaction/event data — no new persistence, framework-free.
 - **Metric registry.** 17 scored metrics across six dimensions (Cash Flow Health, Liquidity & Resilience, Debt Health, Stability, Growth, Concentration — per FINANCIAL_HEALTH_SCORE.md v1.0 and `scoring.ts` `DIMENSIONS`) with eligibility guards; Protection is intentionally unscored.
@@ -66,13 +80,13 @@ _Last updated: 2026-07-16 (PFI score v1 slice — Task 11 final verification com
 
 ## In progress
 
-- Nothing mid-flight. The PFI score v1 slice (Tasks 1–11) is complete and verified.
+- **CSV import live browser QA (Task 18) and final whole-branch review.** Implementation, unit/RLS test coverage, and docs (this task) are complete; the slice has not yet been exercised in a real browser this session, and the branch has not yet had its final review pass.
 
 ## Next three priorities
 
-1. **CSV import** — column mapping, preview, dedupe, transfer detection, import summary (Phase 3 remainder; see ROADMAP.md Phase 3).
-2. **Remaining demo profiles + demo-profile switcher** — Blue Reef Partners, North Shore Capital.
-3. **PWA manifest + Playwright smoke test** — installability and automated browser verification. (Would also fix the `dev-login.ts` implicit-flow QA gap noted above, since a scripted Playwright login can drive the real form/redirect flow instead of hand-bootstrapping a session cookie.)
+1. **Remaining demo profiles + demo-profile switcher** — Blue Reef Partners, North Shore Capital.
+2. **PWA manifest + Playwright smoke test** — installability and automated browser verification. (Would also fix the `dev-login.ts` implicit-flow QA gap noted above, since a scripted Playwright login can drive the real form/redirect flow instead of hand-bootstrapping a session cookie.)
+3. **Recurring detection** — replacing the fixed 28-day obligations proxy with real recurrence detection now that real (non-demo) imports exist (Phase 3 remainder; see ROADMAP.md Phase 3 and KNOWN_LIMITATIONS).
 
 ## Known blockers
 
@@ -86,7 +100,7 @@ _Last updated: 2026-07-16 (PFI score v1 slice — Task 11 final verification com
 
 ## Test status
 
-`pnpm check` (lint + typecheck + test + build): green. 169/169 tests passing (21 test files; engine subset alone is 14 files / 122 tests). Lint: 0 errors, 2 pre-existing warnings (`AccountSheet.tsx` React Compiler incompatible-library note, an unused import in `metric-inputs.test.ts`) — both predate this slice and are unrelated to the score work. Build succeeds, all 11 routes compile including `/score`. `pnpm test:rls`: 15/15 passing against the live Supabase project (unchanged this slice, no schema/RLS changes). Live browser QA of `/score` + dashboard ScoreCard completed this session — see the Task 11 bullet above and `.superpowers/sdd/task-11-report.md` for full detail, screenshots, and the spec-conformance table.
+`pnpm check` (lint + typecheck + test + build): green. 219/219 tests passing (28 test files, up from 169/169 across 21 files before this slice). Lint: 0 errors, 1 pre-existing warning (`AccountSheet.tsx` React Compiler incompatible-library note) — predates this slice and is unrelated to the import work; the other previously-noted warning (unused import in `metric-inputs.test.ts`) was fixed in commit `171c07b`, ahead of this task. Build succeeds, all 12 routes compile including the new `/import`. `pnpm test:rls`: 19/19 passing against the live Supabase project (grew from 15/15 with this slice's cross-user imported-batch and `import_batch_id`-immutability checks). **Live browser QA of `/import` has not been performed** — that is Task 18, still pending. Live browser QA of `/score` + dashboard ScoreCard from the prior slice remains as previously verified — see `.superpowers/sdd/task-11-report.md`.
 
 ## Deployment status
 
