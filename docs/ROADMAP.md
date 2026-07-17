@@ -22,7 +22,7 @@ Exit: all primary screens responsive; demo user navigates the full experience; c
 
 Pulled forward ahead of the remaining Phase 1 screens (DECISIONS.md #7): Supabase auth (magic link/PKCE, `/auth/callback`, route guard at `src/proxy.ts`), schema + default-deny RLS (migrations `0001_core`/`0002_integrity`), snapshot builder (backward balance replay + obligation windows), demo generator seeded through the real persistence pipeline, onboarding flow, DB-backed dashboard with loading/empty states, and an automated RLS tenant-isolation test (`pnpm test:rls`).
 
-## Phase 2 — Financial engine
+## Phase 2 — Financial engine ✅ (2026-07-16)
 
 Metric registry behind six weighted dimensions (Cash Flow 25%, Liquidity & Resilience 20%, Debt 20%, Stability 15%, Growth 15%, Concentration 5% — FINANCIAL_HEALTH_SCORE.md is the normative spec); 0–900 versioned score with deterministic score-delta explanations; Protection visible but unscored in v1; Momentum as a directional overlay, not a weighted dimension; per-dimension confidence + deterministic missing-data policy (eligibility, effective-weight renormalization, provisional/suppressed states); consumer-facing terminology (no FCF/owner-created-equity jargon in score UI). Surfaced as a dashboard score card + `/score` breakdown screen. Exit: no displayed metric is hard-coded; everything tested and explainable; partial data handled per the documented policy.
 

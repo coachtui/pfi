@@ -21,7 +21,7 @@ export default async function HomePage() {
     await rebuildSnapshots(supabase);
     data = await getDashboardData(supabase);
   }
-  const { snapshots, events, staleIndex } = data;
+  const { snapshots, events, staleIndex, scoreSummary } = data;
 
   return (
     <div className="flex flex-col gap-6">
@@ -32,6 +32,7 @@ export default async function HomePage() {
           profile={{ companyName: company.name, ticker: company.ticker, username: profile.username, level: VIEWER_LEVEL }}
           snapshots={snapshots}
           events={events}
+          scoreSummary={scoreSummary}
           staleIndex={staleIndex}
         />
       )}

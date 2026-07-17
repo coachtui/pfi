@@ -120,12 +120,12 @@ export function ReportView({ companyName, ticker, snapshots, transactions, event
         <dl className="flex flex-col">
           <StatementRow label="Revenue" value={formatDollars(statement.revenue)} tone="positive" />
           <StatementRow label="Operating expenses" value={`− ${formatDollars(statement.operatingExpenses)}`} tone="negative" />
-          <StatementRow label="Free cash flow" value={formatSignedDollars(statement.freeCashFlow)} tone={statement.freeCashFlow >= 0 ? "positive" : "negative"} emphasized />
+          <StatementRow label="Monthly surplus" value={formatSignedDollars(statement.freeCashFlow)} tone={statement.freeCashFlow >= 0 ? "positive" : "negative"} emphasized />
           <p className="mt-3 mb-1 text-xs font-medium text-secondary">Allocated to</p>
           <StatementRow label="Savings (retained cash)" value={formatSignedDollars(statement.savings)} indent />
           <StatementRow label="Investments (contributions)" value={formatDollars(statement.investments)} indent />
           <StatementRow label="Debt reduction" value={formatSignedDollars(statement.debtReduction)} indent />
-          <StatementRow label="Owner-created equity" value={formatSignedDollars(statement.ownerCreatedEquity)} tone={statement.ownerCreatedEquity >= 0 ? "positive" : "negative"} emphasized indent />
+          <StatementRow label="Growth you created" value={formatSignedDollars(statement.ownerCreatedEquity)} tone={statement.ownerCreatedEquity >= 0 ? "positive" : "negative"} emphasized indent />
           <StatementRow label="Market appreciation" value="n/a — no market data yet" muted indent />
           <div className="my-2 border-t border-border-subtle" />
           <StatementRow label="Index movement" value={`${statement.indexChange >= 0 ? "+" : "−"}${Math.abs(statement.indexChange).toFixed(1)} pts`} tone={statement.indexChange >= 0 ? "positive" : "negative"} />

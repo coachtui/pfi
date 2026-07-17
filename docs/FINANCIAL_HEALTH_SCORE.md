@@ -70,7 +70,7 @@ Explanation-only: emergency-fund target coverage (runway restated against a defa
 |---|---|---|
 | Debt burden (`debt_service_ratio`) | debt-related outflows / income | ≤10%→100 · 20%→80 · 36%→50 · 45%→25 · ≥60%→0 |
 | Credit utilization (`revolving_utilization`) | revolving balances / Σ credit limits | 0→100 · 10%→90 · 30%→65 · 50%→40 · 75%→15 · ≥100%→0 (unavailable when no credit limits on file) |
-| Interest drag (`weighted_interest_burden`) | Σ(debt balance × APR) / 12 / monthly income | ≤1%→100 · 3%→75 · 6%→45 · 10%→20 · ≥15%→0 (unavailable when rates missing) |
+| Interest drag (`weighted_interest_burden`) | Σ(debt balance × APR) / 12 / monthly income — APR as a decimal; account records store percent and are converted at the data boundary | ≤1%→100 · 3%→75 · 6%→45 · 10%→20 · ≥15%→0 (unavailable when rates missing) |
 | Revolving trend (`revolving_trajectory`) | Δ revolving balances over window / monthly income | ≤−25%→100 · 0→65 · +25%→35 · ≥+75%→0 |
 
 Not all debt is equal: utilization and interest drag weight high-interest revolving debt hardest by construction (balances × APR); mortgages/secured, lower-rate debt contribute proportionally less per dollar. High-interest debt exposure is explanation-only (it reuses the same balances × rates as interest drag — scoring it too would double-count). Minimum-payment burden and delinquency indicators: future data sources.
@@ -106,7 +106,7 @@ Explanation-only: net-worth growth decomposition — **user-driven growth (net c
 
 | Metric | Formula | Curve anchor points |
 |---|---|---|
-| Institution concentration (`institution_concentration`) | largest share of total balances at one institution | ≤35%→100 · 50%→80 · 75%→45 · 100%→20 |
+| Institution concentration (`institution_concentration`) | largest share of custodial asset balances (bank/brokerage/retirement accounts) at a single institution — non-custodial assets like property are excluded | ≤35%→100 · 50%→80 · 75%→45 · 100%→20 |
 | Income-source concentration (`income_source_concentration`) | share of income from top source (normalized description match) | ≤60%→100 · 80%→75 · 100%→55 |
 
 A single income source (one salaried job) is normal and scored gently. Whether that income is *irregular* is owned by Stability (`irregular_income_reliance`) — the concentration curve deliberately does not re-penalize irregularity (anti-double-counting). Single-asset, employer-stock, sector, and variable-rate concentration: future — require investment holdings/loan-terms data that doesn't exist yet. **Never auto-recommend specific securities trades.**
@@ -173,7 +173,7 @@ The score-delta engine's driver attribution supplies the supporting explanation 
 
 ## Confidence / data coverage
 
-**Per-dimension confidence**: `high` · `moderate` · `limited` · `insufficient_data`, derived deterministically from: history length (<60d → limited cap, <90d → moderate cap), share of the dimension's metrics unavailable (any optional metric missing, e.g. utilization without credit limits → drop one level), categorization quality (uncategorized share of transactions), unresolved transfers, manually entered data share, and sync freshness (stale/disconnected accounts). Demo data caps every dimension at `moderate` with the reason "demo dataset".
+**Per-dimension confidence**: `high` · `moderate` · `limited` · `insufficient_data`, derived deterministically from: history length (<60d → limited cap, <90d → moderate cap), share of the dimension's metrics unavailable (any optional metric missing, e.g. utilization without credit limits → drop one level), categorization quality (uncategorized share of transactions), unresolved transfers (>5% of in-window transfers on included accounts unpaired → drop one level for Cash Flow/Stability/Growth, whose windowed totals depend on correctly-paired transfers), manually entered data share (>80% of included accounts on the `manual` provider → drop one level for every dimension, applied before the demo cap), and sync freshness (deferred to provider integration — see KNOWN_LIMITATIONS). Demo data caps every dimension at `moderate` with the reason "demo dataset".
 
 **Overall confidence** = the minimum of Cash Flow and Liquidity confidence, dropped one level if any other weighted dimension is ineligible. Displayed with plain-language reasons and a concrete "what would improve accuracy" list.
 
