@@ -34,7 +34,7 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
   const [fileName, setFileName] = useState("");
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-6">
+    <div>
       <div className="mb-4 flex items-center gap-2">
         <Link href="/accounts" aria-label="Back to accounts" className="rounded-lg p-1 text-secondary hover:text-primary">
           <ArrowLeft size={20} aria-hidden />
@@ -84,6 +84,6 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
           </button>
         </Card>
       )}
-    </main>
+    </div>
   );
 }
