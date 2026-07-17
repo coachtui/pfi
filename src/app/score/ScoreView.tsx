@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
-import { momentumLabel, type MomentumState } from "@/lib/financial-engine";
+import { momentumLabel, type ConfidenceLevel, type MomentumState } from "@/lib/financial-engine";
 import { branding } from "@/lib/config/branding";
 import type { ScoreData, ScoreRange } from "@/lib/data/queries";
 
@@ -26,7 +26,7 @@ const MOMENTUM_GLYPH: Record<MomentumState, string> = {
   insufficient_history: "…",
 };
 
-const CONFIDENCE_COPY: Record<string, string> = {
+const CONFIDENCE_COPY: Record<ConfidenceLevel | "insufficient_data", string> = {
   high: "High confidence",
   moderate: "Moderate confidence",
   limited: "Limited confidence",
@@ -110,18 +110,22 @@ export function ScoreView({ data }: { data: ScoreData }) {
             <p className="text-sm text-secondary">{delta.notes.join(" ")}</p>
           ) : (
             <div className="flex flex-col gap-3 text-sm">
-              <p className="text-primary">
-                {delta.change === 0 ? (
-                  "No change"
-                ) : (
-                  <span className={delta.change !== null && delta.change > 0 ? "text-positive" : "text-negative"}>
-                    {signedPoints(delta.change ?? 0)} points
+              {delta.change === null ? (
+                <p className="text-secondary">— Not comparable for this range.</p>
+              ) : (
+                <p className="text-primary">
+                  {delta.change === 0 ? (
+                    "No change"
+                  ) : (
+                    <span className={delta.change > 0 ? "text-positive" : "text-negative"}>
+                      {signedPoints(delta.change)} points
+                    </span>
+                  )}{" "}
+                  <span className="tabular text-secondary">
+                    ({delta.from} → {delta.to})
                   </span>
-                )}{" "}
-                <span className="tabular text-secondary">
-                  ({delta.from} → {delta.to})
-                </span>
-              </p>
+                </p>
+              )}
 
               <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 {delta.dimensions.map((d) => (
