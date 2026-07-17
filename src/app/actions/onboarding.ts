@@ -50,6 +50,9 @@ export async function completeOnboarding(values: OnboardingValues): Promise<{ er
     .eq("id", user.id);
   if (updErr) return { error: updErr.message };
 
-  if (v.loadDemo) await loadDemoData();
+  if (v.loadDemo) {
+    const demo = await loadDemoData();
+    if (demo.error) return { error: demo.error };
+  }
   redirect("/");
 }

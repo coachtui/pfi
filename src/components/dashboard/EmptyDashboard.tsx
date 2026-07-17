@@ -18,7 +18,7 @@ export function EmptyDashboard({ companyName }: { companyName: string }) {
             Load the sample dataset to explore, or import your real transactions from a bank CSV.
           </p>
         </div>
-        <form action={loadDemoData}>
+        <form action={async () => { await loadDemoData(); }}>
           <LoadDemoButton />
         </form>
         <Link
