@@ -106,7 +106,7 @@ Explanation-only: net-worth growth decomposition — **user-driven growth (net c
 
 | Metric | Formula | Curve anchor points |
 |---|---|---|
-| Institution concentration (`institution_concentration`) | largest share of total balances at one institution | ≤35%→100 · 50%→80 · 75%→45 · 100%→20 |
+| Institution concentration (`institution_concentration`) | largest share of custodial asset balances (bank/brokerage/retirement accounts) at a single institution — non-custodial assets like property are excluded | ≤35%→100 · 50%→80 · 75%→45 · 100%→20 |
 | Income-source concentration (`income_source_concentration`) | share of income from top source (normalized description match) | ≤60%→100 · 80%→75 · 100%→55 |
 
 A single income source (one salaried job) is normal and scored gently. Whether that income is *irregular* is owned by Stability (`irregular_income_reliance`) — the concentration curve deliberately does not re-penalize irregularity (anti-double-counting). Single-asset, employer-stock, sector, and variable-rate concentration: future — require investment holdings/loan-terms data that doesn't exist yet. **Never auto-recommend specific securities trades.**

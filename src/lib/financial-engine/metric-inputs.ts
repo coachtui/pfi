@@ -15,8 +15,14 @@ const LIABILITY_TYPES: ReadonlySet<AccountType> = new Set([
   "credit_card", "mortgage", "auto_loan", "student_loan", "personal_loan", "other_liability",
 ]);
 const REVOLVING_TYPES: ReadonlySet<AccountType> = new Set(["credit_card"]);
-const ASSET_TYPES: ReadonlySet<AccountType> = new Set([
-  "checking", "savings", "money_market", "brokerage", "retirement", "property", "other_asset",
+/**
+ * Accounts held at a custodian (bank/brokerage/retirement provider) where
+ * "concentration at one institution" is a meaningful risk. Excludes
+ * non-custodial assets like `property`/`other_asset` — a house isn't
+ * custodial risk, so it must never inflate institution-concentration shares.
+ */
+const CUSTODIAL_TYPES: ReadonlySet<AccountType> = new Set([
+  "checking", "savings", "money_market", "brokerage", "retirement",
 ]);
 
 export interface ScoreAccountInput {
@@ -187,17 +193,16 @@ export function buildMetricInputs(
     .sort((a, b) => b.total - a.total);
   const recurringIncome = incomeSources.filter((s) => s.recurring).reduce((sum, s) => sum + s.total, 0);
 
+  const custodialIncluded = included.filter((a) => CUSTODIAL_TYPES.has(a.type) && a.currentBalance > 0);
   const assetBalances = new Map<string, number>();
   let assetTotal = 0;
-  for (const a of included) {
-    if (ASSET_TYPES.has(a.type) && a.currentBalance > 0) {
-      const key = a.institution ?? "Unknown";
-      assetBalances.set(key, (assetBalances.get(key) ?? 0) + a.currentBalance);
-      assetTotal += a.currentBalance;
-    }
+  for (const a of custodialIncluded) {
+    const key = a.institution ?? "Unknown";
+    assetBalances.set(key, (assetBalances.get(key) ?? 0) + a.currentBalance);
+    assetTotal += a.currentBalance;
   }
   const institutionShares =
-    included.length >= 2 && assetTotal > 0
+    custodialIncluded.length >= 2 && assetTotal > 0
       ? [...assetBalances.values()].map((v) => v / assetTotal).sort((a, b) => b - a)
       : [];
 

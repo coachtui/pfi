@@ -12,6 +12,7 @@ const ACCOUNTS: ScoreAccountInput[] = [
   { id: "sav", type: "savings", institution: "Ally", currentBalance: 12000, creditLimit: null, interestRate: null, includeInCalculations: true, provider: "demo" },
   { id: "card", type: "credit_card", institution: "First Bank", currentBalance: 2000, creditLimit: 10000, interestRate: 0.24, includeInCalculations: true, provider: "demo" },
   { id: "brk", type: "brokerage", institution: "Vanguard", currentBalance: 30000, creditLimit: null, interestRate: null, includeInCalculations: true, provider: "demo" },
+  { id: "house", type: "property", institution: null, currentBalance: 640000, creditLimit: null, interestRate: null, includeInCalculations: true, provider: "demo" },
 ];
 
 function txn(partial: Partial<ScoreTransactionInput> & Pick<ScoreTransactionInput, "id" | "postedDate" | "amount" | "direction">): ScoreTransactionInput {
@@ -101,10 +102,12 @@ describe("buildMetricInputs", () => {
     expect(inputs.recurringIncomeMonthlyAvg).toBe(2000); // 6000 / 3 buckets
   });
 
-  it("computes institution shares over positive asset balances and debt account list", () => {
+  it("computes institution shares over custodial accounts only, excluding property", () => {
     const inputs = buildMetricInputs([snap(AS_OF, 20000)], [], ACCOUNTS, AS_OF);
-    // assets: chk 8000 (First Bank) + sav 12000 (Ally) + brk 30000 (Vanguard) = 50000
+    // custodial assets: chk 8000 (First Bank) + sav 12000 (Ally) + brk 30000 (Vanguard) = 50000.
+    // The $640,000 "house" (property) account must not be counted — it's not custodial risk.
     expect(inputs.institutionShares[0]).toBeCloseTo(0.6); // Vanguard
+    expect(inputs.institutionShares.length).toBe(3); // First Bank, Ally, Vanguard — not property's "—"
     expect(inputs.debtAccounts).toEqual([{ balance: 2000, rate: 0.24 }]);
     expect(inputs.revolvingLimitTotal).toBe(10000);
   });

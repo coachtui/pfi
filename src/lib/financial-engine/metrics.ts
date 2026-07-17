@@ -239,12 +239,12 @@ export const METRICS: MetricDef[] = [
   // ── Concentration ─────────────────────────────────────────────────
   {
     id: "institution_concentration", name: "Institution concentration", dimension: "concentration", scored: true,
-    definition: "The largest share of your asset balances held at a single institution.",
-    assumptions: ["Positive asset balances only"],
+    definition: "The largest share of your custodial asset balances (bank/brokerage/retirement accounts) held at a single institution.",
+    assumptions: ["Positive balances only", "Non-custodial assets like property are excluded"],
     limitations: ["Investment holdings (single stocks, sectors) are not yet analyzed"],
     format: pct,
     compute: (i) => i.institutionShares.length === 0
-      ? { unavailable: "Needs at least two accounts with balances" }
+      ? { unavailable: "Needs at least two custodial accounts with balances" }
       : { value: i.institutionShares[0] },
   },
   {
