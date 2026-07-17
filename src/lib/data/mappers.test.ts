@@ -28,6 +28,7 @@ describe("mappers", () => {
     const row = snapshotToRow("user-1", snapshot);
     expect(row.user_id).toBe("user-1");
     expect(row.engine_version).toBe(ENGINE_VERSION);
+    expect("data_coverage_confidence" in row).toBe(false);
     expect(rowToSnapshot(row)).toEqual(snapshot);
   });
 

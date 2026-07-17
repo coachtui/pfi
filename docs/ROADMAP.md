@@ -9,7 +9,7 @@ Repo initialized (Next.js 16 / TS strict / Tailwind 4 / Vitest / ESLint / Pretti
 ## Phase 1 — Visual prototype 🔨 (in progress)
 
 - ✅ Home dashboard: company header, personal index, actual/baseline/waterline chart with event markers + 30D/90D/1Y/All, metric cards, "What moved your line", deterministic performance brief
-- ⬜ Onboarding flow (identity, cohorts, privacy, sample data)
+- ✅ Onboarding flow (identity, cohorts, privacy, sample data) — landed with Phase 1.5
 - ✅ Rankings screen (mock cohort data)
 - ✅ Data/benchmarks screen (mock aggregates)
 - ✅ Report screen (shareholder report computed from demo data via the `report.ts` engine, not mock text)

@@ -12,7 +12,7 @@ import type { TransactionInput } from "@/lib/financial-engine/snapshot-builder";
 export interface SnapshotRow {
   user_id: string; date: string; liquid_assets: number; revolving_balances: number;
   near_term_obligations: number; essential_obligations: number; safety_buffer: number;
-  net_worth: number; engine_version: string; data_coverage_confidence: string;
+  net_worth: number; engine_version: string;
 }
 
 export function snapshotToRow(userId: string, s: DailySnapshot): SnapshotRow {
@@ -20,7 +20,7 @@ export function snapshotToRow(userId: string, s: DailySnapshot): SnapshotRow {
     user_id: userId, date: s.date, liquid_assets: s.liquidAssets,
     revolving_balances: s.revolvingBalances, near_term_obligations: s.nearTermObligations,
     essential_obligations: s.essentialObligations, safety_buffer: s.safetyBuffer,
-    net_worth: s.netWorth, engine_version: ENGINE_VERSION, data_coverage_confidence: "demo",
+    net_worth: s.netWorth, engine_version: ENGINE_VERSION,
   };
 }
 

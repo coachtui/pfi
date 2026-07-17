@@ -154,14 +154,14 @@ export function MapStep({
         </div>
       )}
 
-      <div className="flex gap-2 pt-2">
+      {!ready && <p className="text-xs text-secondary">Choose a date, description, and amount column (or a debit/credit pair) to continue.</p>}
+      <div className="sticky bottom-20 z-10 flex gap-2 bg-base pt-2 pb-1">
         <button type="button" onClick={onBack} className="text-sm text-secondary hover:text-primary">Back</button>
         <button type="button" disabled={!ready} onClick={() => onConfirm(m)}
           className="flex-1 rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base disabled:opacity-60">
           Preview import
         </button>
       </div>
-      {!ready && <p className="text-xs text-secondary">Choose a date, description, and amount column (or a debit/credit pair) to continue.</p>}
     </section>
   );
 }
