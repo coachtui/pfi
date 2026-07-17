@@ -6,8 +6,10 @@ import { Card } from "@/components/ui/Card";
 import { FinancialChart, type ChartMarker, type StemMarker } from "@/components/chart/FinancialChart";
 import { CompanyHeader } from "@/components/dashboard/CompanyHeader";
 import { MetricCard, type MetricTone } from "@/components/dashboard/MetricCard";
+import { ScoreCard } from "@/components/dashboard/ScoreCard";
 import { Segmented } from "@/components/ui/Segmented";
 import { WhatMovedYourLine } from "@/components/dashboard/WhatMovedYourLine";
+import type { ScoreSummary } from "@/lib/data/queries";
 import {
   availablePosition,
   buildIndexSeries,
@@ -53,11 +55,12 @@ interface HomeDashboardProps {
   profile: DashboardIdentity;
   snapshots: DailySnapshot[];
   events: FinancialEvent[];
+  scoreSummary: ScoreSummary;
   /** True when a snapshot rebuild is pending/failed and the chart may lag recent edits. */
   staleIndex?: boolean;
 }
 
-export function HomeDashboard({ profile, snapshots, events, staleIndex }: HomeDashboardProps) {
+export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleIndex }: HomeDashboardProps) {
   const [range, setRange] = useState<RangeKey>("30D");
 
   // The index is anchored on full history once; ranges only slice the view.
@@ -140,6 +143,8 @@ export function HomeDashboard({ profile, snapshots, events, staleIndex }: HomeDa
           ⚠ Index recalculation pending — recent data changes aren’t reflected in the chart yet. They’ll be picked up automatically.
         </p>
       )}
+
+      <ScoreCard summary={scoreSummary} />
 
       {/* Key metrics */}
       <section aria-label="Key metrics" className="grid grid-cols-2 gap-3 md:grid-cols-4">
