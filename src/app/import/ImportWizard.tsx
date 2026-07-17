@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { Card } from "@/components/ui/Card";
 import type { AccountSummary } from "@/lib/data/mappers";
 import type { ColumnMapping, ExistingTxn, ParsedCsv } from "@/lib/csv-import/types";
 import { normalizeRows } from "@/lib/csv-import/normalize";
@@ -12,12 +11,9 @@ import { detectTransfers } from "@/lib/csv-import/transfers";
 import { UploadStep } from "./UploadStep";
 import { MapStep } from "./MapStep";
 import { PreviewStep } from "./PreviewStep";
-
-// TODO(Task 14): import { SummaryStep } from "./SummaryStep";
-// TODO(Task 14): wire importTransactions from "@/app/actions/imports" into onCommit
-// below — call it with the kept fresh rows + transfer pairs, track submitting/
-// submitError state, and advance to SummaryStep on success. Until then "summary"
-// renders a "coming soon" placeholder and onCommit is a no-op.
+import { SummaryStep } from "./SummaryStep";
+import { importTransactions } from "@/app/actions/imports";
+import type { ImportResult } from "@/lib/validation/imports";
 
 type Step = "upload" | "map" | "preview" | "summary";
 const STEP_LABELS: Record<Step, string> = {
@@ -36,6 +32,9 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
   const [fileName, setFileName] = useState("");
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [removedPairs, setRemovedPairs] = useState<Set<number>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [result, setResult] = useState<ImportResult | null>(null);
 
   const preview = useMemo(() => {
     if (!parsed || !mapping || !accountId) return null;
@@ -52,6 +51,24 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
       else next.add(line);
       return next;
     });
+  };
+
+  const onCommit = async () => {
+    if (!preview || submitting) return;
+    setSubmitting(true);
+    setSubmitError("");
+    const res = await importTransactions({
+      accountId,
+      rows: preview.fresh,
+      transferPairs: preview.pairs.filter((p) => !removedPairs.has(p.line)),
+    });
+    setSubmitting(false);
+    if (res.error) {
+      setSubmitError(res.error);
+      return;
+    }
+    setResult(res);
+    setStep("summary");
   };
 
   return (
@@ -109,33 +126,15 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
           existing={props.existing}
           removedPairs={removedPairs}
           onTogglePair={onTogglePair}
-          submitting={false}
-          submitError=""
+          submitting={submitting}
+          submitError={submitError}
           onBack={() => setStep("map")}
-          onCommit={() => {
-            // TODO(Task 14): call importTransactions with preview.fresh + kept
-            // transfer pairs (preview.pairs minus removedPairs) for accountId,
-            // then advance to SummaryStep on success. No-op until Task 14 lands.
-          }}
+          onCommit={onCommit}
         />
       )}
 
-      {step === "summary" && (
-        <Card className="flex flex-col items-start gap-2 p-6">
-          <p className="text-sm font-medium text-primary">{STEP_LABELS[step]} is coming soon</p>
-          <p className="text-sm text-secondary">
-            {parsed
-              ? `“${fileName}” has ${parsed.rows.length.toLocaleString()} rows mapped — the summary step ships in a follow-up update.`
-              : "This step isn't built yet."}
-          </p>
-          <button
-            type="button"
-            onClick={() => setStep("preview")}
-            className="mt-2 text-sm text-secondary hover:text-primary"
-          >
-            Back to preview
-          </button>
-        </Card>
+      {step === "summary" && result && preview && (
+        <SummaryStep result={result} accountId={accountId} fresh={preview.fresh} />
       )}
     </div>
   );
