@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DailySnapshot, FinancialEvent } from "@/lib/financial-engine/types";
 import type { TransactionInput } from "@/lib/financial-engine/snapshot-builder";
+import type { ExistingTxn } from "@/lib/csv-import/types";
 import {
   applyOverride, parseOverride,
   buildMetricInputs, computeMetrics, computeConfidence, computeScore,
@@ -13,6 +14,7 @@ import {
   rowToSnapshot, rowToEvent, rowToTransactionListItem,
   rowToAccountSummary, type SnapshotRow, type EventRow, type TransactionRow,
   type TransactionListRow, type AccountRow, type AccountSummary, type TransactionListItem,
+  type RecentImport,
 } from "./mappers";
 import type { TransactionFilters } from "@/lib/validation/transactions";
 import { percentToDecimal } from "./unit-conversions";
@@ -58,7 +60,7 @@ export async function getTransactionsData(
 ): Promise<{ transactions: TransactionListItem[]; accounts: AccountSummary[] }> {
   let query = supabase
     .from("transactions")
-    .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, notes, user_override, financial_accounts!inner(display_name, provider)")
+    .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, notes, user_override, import_batch_id, financial_accounts!inner(display_name, provider)")
     .order("posted_date", { ascending: false })
     .order("created_at", { ascending: false });
   if (filters.account) query = query.eq("account_id", filters.account);
@@ -274,4 +276,65 @@ export async function getScoreSummary(supabase: SupabaseClient): Promise<ScoreSu
     state: breakdown.state, overall: breakdown.overall, band: breakdown.band,
     momentum, confidence: breakdown.overallConfidence,
   };
+}
+
+/** Everything the /import wizard needs: candidate target accounts and the
+ * user's existing transactions (source values) for dedupe + transfer detection. */
+export async function getImportContext(
+  supabase: SupabaseClient,
+): Promise<{ accounts: AccountSummary[]; existing: ExistingTxn[] }> {
+  const [acctRes, txnRes] = await Promise.all([
+    supabase.from("financial_accounts").select(
+      "id, provider, institution, type, display_name, mask, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at",
+    ),
+    supabase.from("transactions").select(
+      "id, account_id, posted_date, amount, direction, description, is_transfer, transfer_pair_id",
+    ),
+  ]);
+  if (acctRes.error) throw new Error(acctRes.error.message);
+  if (txnRes.error) throw new Error(txnRes.error.message);
+  const accounts = (acctRes.data as AccountRow[])
+    .map(rowToAccountSummary)
+    .filter((a) => a.provider !== "demo" && a.archivedAt === null);
+  const existing: ExistingTxn[] = (txnRes.data as Array<{
+    id: string; account_id: string; posted_date: string; amount: number;
+    direction: string; description: string; is_transfer: boolean; transfer_pair_id: string | null;
+  }>).map((t) => ({
+    id: t.id, accountId: t.account_id, postedDate: t.posted_date,
+    amount: Number(t.amount), direction: t.direction as "inflow" | "outflow",
+    description: t.description, isTransfer: t.is_transfer, transferPairId: t.transfer_pair_id,
+  }));
+  return { accounts, existing };
+}
+
+/** Derived batch summaries — no import_batches table; grouped client-side. */
+export async function getRecentImports(supabase: SupabaseClient): Promise<RecentImport[]> {
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("import_batch_id, posted_date, created_at, financial_accounts!inner(display_name)")
+    .not("import_batch_id", "is", null);
+  if (error) throw new Error(error.message);
+  const groups = new Map<string, RecentImport>();
+  for (const r of data as unknown as Array<{
+    import_batch_id: string; posted_date: string; created_at: string;
+    financial_accounts: { display_name: string };
+  }>) {
+    const g = groups.get(r.import_batch_id);
+    if (!g) {
+      groups.set(r.import_batch_id, {
+        batchId: r.import_batch_id,
+        accountName: r.financial_accounts.display_name,
+        rowCount: 1,
+        firstDate: r.posted_date,
+        lastDate: r.posted_date,
+        importedAt: r.created_at,
+      });
+    } else {
+      g.rowCount++;
+      if (r.posted_date < g.firstDate) g.firstDate = r.posted_date;
+      if (r.posted_date > g.lastDate) g.lastDate = r.posted_date;
+      if (r.created_at > g.importedAt) g.importedAt = r.created_at;
+    }
+  }
+  return [...groups.values()].sort((a, b) => (a.importedAt < b.importedAt ? 1 : -1));
 }

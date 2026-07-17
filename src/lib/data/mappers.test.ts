@@ -71,7 +71,7 @@ describe("rowToTransactionListItem", () => {
     id: "t1", account_id: "a1", posted_date: "2026-06-01", amount: "120.50" as unknown as number,
     direction: "outflow", description: "Card purchases", category: "discretionary",
     essential: false, is_transfer: false, transfer_pair_id: null, notes: "june trip",
-    user_override: { category: "dining", amount: 9999 },
+    user_override: { category: "dining", amount: 9999 }, import_batch_id: null,
     financial_accounts: { display_name: "Rewards Card", provider: "demo" },
   };
 
@@ -90,6 +90,12 @@ describe("rowToTransactionListItem", () => {
     const item = rowToTransactionListItem({ ...row, user_override: "junk" });
     expect(item.corrected).toBe(false);
     expect(item.category).toBe("discretionary");
+  });
+
+  it("passes import_batch_id through as importBatchId", () => {
+    const withBatch = { ...row, import_batch_id: "11111111-2222-4333-8444-555555555555" };
+    expect(rowToTransactionListItem(withBatch).importBatchId).toBe("11111111-2222-4333-8444-555555555555");
+    expect(rowToTransactionListItem({ ...row, import_batch_id: null }).importBatchId).toBeNull();
   });
 });
 

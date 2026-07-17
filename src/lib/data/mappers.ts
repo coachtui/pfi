@@ -104,7 +104,7 @@ export interface TransactionListRow {
   id: string; account_id: string; posted_date: string; amount: number;
   direction: string; description: string; category: string | null;
   essential: boolean | null; is_transfer: boolean; transfer_pair_id: string | null;
-  notes: string | null; user_override: unknown;
+  notes: string | null; user_override: unknown; import_batch_id: string | null;
   financial_accounts: { display_name: string; provider: string };
 }
 
@@ -112,6 +112,7 @@ export interface TransactionListItem extends EffectiveTransaction {
   notes: string | null;
   accountName: string;
   accountProvider: "demo" | "manual" | "csv";
+  importBatchId: string | null;
 }
 
 export function rowToTransactionListItem(row: TransactionListRow): TransactionListItem {
@@ -133,6 +134,7 @@ export function rowToTransactionListItem(row: TransactionListRow): TransactionLi
     notes: row.notes,
     accountName: row.financial_accounts.display_name,
     accountProvider: row.financial_accounts.provider as "demo" | "manual" | "csv",
+    importBatchId: row.import_batch_id,
   };
 }
 
@@ -165,4 +167,13 @@ export function rowToAccountSummary(row: AccountRow): AccountSummary {
     includeInCalculations: row.include_in_calculations,
     archivedAt: row.archived_at,
   };
+}
+
+export interface RecentImport {
+  batchId: string;
+  accountName: string;
+  rowCount: number;
+  firstDate: string;
+  lastDate: string;
+  importedAt: string;
 }
