@@ -36,7 +36,7 @@ interface FinancialChartProps {
   ariaDescription: string;
 }
 
-const PLOT_LEFT_INSET = 28; // YAxis width 46 + chart margin left −18
+const PLOT_LEFT_INSET = 24; // YAxis width 40 + chart margin left −16
 // Coupled to recharts' default point-scale (edge-to-edge) category axis on XAxis,
 // where the first/last points sit flush with the plot edges — that's what lets
 // markerXFraction's 0..1 fraction map directly onto this inset/right-margin box.
@@ -57,8 +57,8 @@ export function FinancialChart({ points, markers, stems = [], ariaDescription }:
 
   const lastPoint = points[points.length - 1];
   const yValues = points.flatMap((p) => [p.actual, p.waterline, ...(p.baseline === null ? [] : [p.baseline])]);
-  const domainMin = Math.floor(Math.min(...yValues) - 4);
-  const domainMax = Math.ceil(Math.max(...yValues) + 4);
+  const domainMin = Math.floor(Math.min(...yValues) - 2);
+  const domainMax = Math.ceil(Math.max(...yValues) + 2);
   const [actualPos, baselinePos, waterlinePos] = railPositions(
     [lastPoint?.actual ?? null, lastPoint?.baseline ?? null, lastPoint?.waterline ?? null],
     domainMin,
@@ -71,7 +71,7 @@ export function FinancialChart({ points, markers, stems = [], ariaDescription }:
       <div className="flex w-full items-stretch">
         <div className="h-64 min-w-0 flex-1">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: -18 }}>
+            <ComposedChart data={points} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--chart-actual-fill-from)" />
@@ -92,7 +92,7 @@ export function FinancialChart({ points, markers, stems = [], ariaDescription }:
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-                width={46}
+                width={40}
                 tickFormatter={(v: number) => String(Math.round(v))}
               />
               <Tooltip

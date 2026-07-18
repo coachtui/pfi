@@ -37,12 +37,12 @@ export function MetricCard({
 }: MetricCardProps) {
   const card = (
     <Card
-      className={`flex min-h-28 flex-col justify-between p-4 ${
+      className={`flex min-h-24 flex-col justify-between p-2.5 sm:min-h-28 sm:p-4 ${
         href ? "transition-colors hover:border-border-strong" : ""
       }`}
     >
-      <p className="text-xs font-medium text-secondary">{label}</p>
-      <p className={`tabular mt-1 text-xl font-semibold ${toneText[tone]}`}>{value}</p>
+      <p className="text-[11px] leading-tight font-medium text-secondary sm:text-xs">{label}</p>
+      <p className={`tabular mt-1 text-base font-semibold sm:text-xl ${toneText[tone]}`}>{value}</p>
       {trend && trend.length > 1 && (
         <>
           <Sparkline values={trend} tone={tone} />

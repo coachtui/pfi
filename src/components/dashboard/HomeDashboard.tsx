@@ -93,7 +93,7 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
   const cushionNow = cushion(latest);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <CompanyHeader
         companyName={profile.companyName}
         ticker={profile.ticker}
@@ -102,7 +102,7 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
       />
 
       {/* Personal index + chart */}
-      <Card className="p-5">
+      <Card className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-sm font-medium text-secondary">
@@ -128,7 +128,7 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
             ariaLabel="Chart time range"
           />
         </div>
-        <div className="mt-4">
+        <div className="mt-3">
           <FinancialChart
             points={view.visible}
             markers={view.markers}
@@ -147,7 +147,7 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
       <ScoreCard summary={scoreSummary} />
 
       {/* Key metrics */}
-      <section aria-label="Key metrics" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <section aria-label="Key metrics" className="grid grid-cols-4 gap-2 md:gap-3">
         <MetricCard
           label="Available Capital"
           value={formatDollars(availableNow)}
@@ -232,7 +232,7 @@ function MomentumBars({ direction }: { direction: Momentum["direction"] }) {
   const heights = direction === "improving" ? [5, 8, 11, 14] : direction === "declining" ? [14, 11, 8, 5] : [9, 9, 9, 9];
   const fill = direction === "improving" ? "var(--positive)" : direction === "declining" ? "var(--warning)" : "var(--neutral)";
   return (
-    <svg viewBox="0 0 30 16" className="h-4 w-8" aria-hidden focusable="false">
+    <svg viewBox="0 0 30 16" className="h-3.5 w-7 shrink-0" aria-hidden focusable="false">
       {heights.map((h, i) => (
         <rect key={i} x={i * 8} y={16 - h} width={5} height={h} rx={1.5} fill={fill} opacity={0.4 + i * 0.2} />
       ))}
@@ -256,12 +256,12 @@ function MomentumCard({ momentum }: { momentum: Momentum }) {
       value={label}
       tone={tone}
       footer={
-        <p className="mt-2 flex items-center gap-2 text-xs text-secondary">
-          <Icon size={14} aria-hidden />
+        <p className="mt-2 flex items-center gap-1.5 text-secondary">
+          <Icon size={13} className="shrink-0" aria-hidden />
           <MomentumBars direction={momentum.direction} />
-          <span className="tabular">
+          <span className="sr-only">
             {momentum.delta >= 0 ? "+" : ""}
-            {momentum.delta.toFixed(1)} pts
+            {momentum.delta.toFixed(1)} points
           </span>
         </p>
       }
