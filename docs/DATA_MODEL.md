@@ -33,6 +33,10 @@ Cohort fields are **bands, never exact values** (privacy by construction). `disp
 
 This is the raw-dollar-components shape, not the original draft's shape (which included `available_position`, `baseline`, `waterline`, `owner_created_equity`, `financial_index`, `health_score`, `score_version` as stored columns). Those derived values are computed at read time from the stored components by `src/lib/financial-engine` — see DECISIONS.md #8 and FINANCIAL_INDEX_METHODOLOGY.md's "Snapshot derivation (v1)" section. `health_score`/`score_version` remain deferred to Phase 2.
 
+### balance_anchors (implemented)
+
+Append-only (date, balance) truth points per account — statement ending balances entered at import (`source = 'import'`, with the server-computed reconciliation `discrepancy` recorded; `import_batch_id` ties the anchor to its batch so undo removes it) and manual balance entries (`source = 'manual'`). The engine trusts the *effective anchor*: greatest `anchor_date`, tiebreak latest `created_at`. `balance` uses the same positive-owed convention as `financial_accounts.current_balance`. Owner-only RLS. See DECISIONS #24.
+
 ### financial_goals
 `id`, `user_id`, `type`, `name`, `target_amount`, `target_date`, `current_amount`, `monthly_target`, `priority`, `status`.
 
