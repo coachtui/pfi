@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeftRight, CheckCircle2, CopyX } from "lucide-react";
 import type { AccountSummary } from "@/lib/data/mappers";
 import type { ExistingTxn, NormalizedRow, ParseError, RowError, TransferPair } from "@/lib/csv-import/types";
+import { computeDiscrepancy, type AccountInput, type TransactionInput } from "@/lib/financial-engine";
+import { formatDollars } from "@/lib/financial-engine/format";
 
 interface Preview {
   fresh: NormalizedRow[];
@@ -46,6 +48,7 @@ function Chip({
 
 export function PreviewStep({
   preview, accounts, existing, removedPairs, onTogglePair, submitting, submitError, onBack, onCommit,
+  accountId, anchors, endingBalance, anchorDate, defaultAnchorDate, onEndingBalanceChange, onAnchorDateChange,
 }: {
   preview: Preview;
   accounts: AccountSummary[];
@@ -56,6 +59,13 @@ export function PreviewStep({
   submitError: string;
   onBack: () => void;
   onCommit: () => void;
+  accountId: string;
+  anchors: Record<string, { anchorDate: string; balance: number }>;
+  endingBalance: string;
+  anchorDate: string;
+  defaultAnchorDate: string;
+  onEndingBalanceChange: (v: string) => void;
+  onAnchorDateChange: (v: string) => void;
 }) {
   const [openSection, setOpenSection] = useState<"" | "new" | "dup" | "transfer" | "error">("");
   const toggle = (s: typeof openSection) => setOpenSection((cur) => (cur === s ? "" : s));
@@ -64,6 +74,32 @@ export function PreviewStep({
   const existingById = new Map(existing.map((t) => [t.id, t]));
   const accountName = (id: string) => accounts.find((a) => a.id === id)?.displayName ?? "another account";
   const keptPairCount = pairs.filter((p) => !removedPairs.has(p.line)).length;
+
+  const account = accounts.find((a) => a.id === accountId);
+  const priorAnchor = anchors[accountId] ?? null;
+  const effAnchorDate = anchorDate || defaultAnchorDate;
+  const recon = useMemo(() => {
+    const n = Number(endingBalance.trim());
+    if (endingBalance.trim() === "" || !Number.isFinite(n) || !account || !effAnchorDate) return null;
+    const acctForMath: AccountInput = {
+      id: accountId, type: account.type, currentBalance: 0, includeInCalculations: true,
+    };
+    const mathTxns: TransactionInput[] = [
+      ...existing
+        .filter((t) => t.accountId === accountId)
+        .map((t) => ({
+          id: t.id, accountId: t.accountId, postedDate: t.postedDate, amount: t.amount,
+          direction: t.direction, description: t.description, category: null,
+          essential: null, isTransfer: t.isTransfer, transferPairId: t.transferPairId,
+        })),
+      ...preview.fresh.map((r) => ({
+        id: `line-${r.line}`, accountId, postedDate: r.postedDate, amount: r.amount,
+        direction: r.direction, description: r.description, category: null,
+        essential: null, isTransfer: false, transferPairId: null,
+      })),
+    ];
+    return { discrepancy: computeDiscrepancy(acctForMath, priorAnchor, n, effAnchorDate, mathTxns) };
+  }, [endingBalance, effAnchorDate, account, accountId, existing, preview.fresh, priorAnchor]);
 
   return (
     <section className="space-y-4">
@@ -142,6 +178,44 @@ export function PreviewStep({
           </ul>
         </div>
       )}
+
+      <section aria-labelledby="anchor-heading" className="rounded-card border border-border-subtle bg-elevated p-3">
+        <h3 id="anchor-heading" className="text-sm font-medium text-primary">Statement ending balance</h3>
+        <p className="mt-1 text-xs text-secondary">
+          Printed on your statement — &ldquo;new balance&rdquo; on credit cards (enter the amount owed as a
+          positive number). This anchors the account&apos;s balance so your score stays accurate.
+          Optional — skip it and the balance stays as of {priorAnchor ? priorAnchor.anchorDate : "its last manual entry"}.
+        </p>
+        <div className="mt-2 flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="anchor-balance" className="mb-1 block text-xs font-medium text-primary">Ending balance ($)</label>
+            <input
+              id="anchor-balance" type="number" step="0.01" inputMode="decimal"
+              value={endingBalance}
+              onChange={(e) => onEndingBalanceChange(e.target.value)}
+              className="w-40 rounded-xl border border-border-subtle bg-inset px-3 py-2 text-sm text-primary"
+            />
+          </div>
+          <div>
+            <label htmlFor="anchor-date" className="mb-1 block text-xs font-medium text-primary">As of</label>
+            <input
+              id="anchor-date" type="date"
+              value={effAnchorDate}
+              onChange={(e) => onAnchorDateChange(e.target.value)}
+              className="rounded-xl border border-border-subtle bg-inset px-3 py-2 text-sm text-primary"
+            />
+          </div>
+        </div>
+        {recon && (
+          <p role="status" className="mt-2 text-xs text-secondary">
+            {recon.discrepancy === null
+              ? "First anchor for this account — nothing to reconcile against yet."
+              : recon.discrepancy === 0
+                ? "✓ Reconciles cleanly with your existing data."
+                : `⚠ ${formatDollars(Math.abs(recon.discrepancy))} unaccounted for between ${priorAnchor?.anchorDate} and ${effAnchorDate} — some transactions may be missing from this period. You can still import; the difference is recorded.`}
+          </p>
+        )}
+      </section>
 
       {submitError && (
         <p role="alert" className="text-sm text-negative">✕ {submitError} — your preview is unchanged; you can retry.</p>
