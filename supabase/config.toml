@@ -2,4 +2,4 @@ project_id = "dgkcmvjfvdlsyuhuewkx"
 
 [auth]
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000/auth/callback", "http://localhost:3000/**"]
+additional_redirect_urls = ["http://localhost:3000/auth/callback", "http://localhost:3000/**", "https://pfi-one.vercel.app/auth/callback", "https://pfi-one.vercel.app/**"]
