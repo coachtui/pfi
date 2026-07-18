@@ -3,7 +3,7 @@
     PFI monogram icon source (provisional branding — see src/lib/config/branding.ts).
     Regenerate the committed PNGs from this file with any svg->png rasterizer at
     192x192 and 512x512 (icon-maskable.svg -> icon-maskable-512.png at 512x512).
-    Colors: background #0b0d0f (app background), mark #34d399 (--positive token).
+    Colors: background #0b0d0f (app background), mark #34d399 (the "positive" design token).
   -->
   <rect width="512" height="512" fill="#0b0d0f"/>
   <text x="256" y="268" text-anchor="middle" dominant-baseline="middle"
