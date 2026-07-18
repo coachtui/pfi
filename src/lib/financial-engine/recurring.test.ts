@@ -174,6 +174,38 @@ describe("detectRecurringSeries", () => {
     expect(a).toEqual(b);
     expect(a.map((s) => s.seriesKey)).toEqual([...a.map((s) => s.seriesKey)].sort());
   });
+
+  // Contract: detectRecurringSeries filters candidate transactions by account
+  // TYPE only (LIQUID_TYPES / LIABILITY_TYPES) — it deliberately does NOT look
+  // at includeInCalculations. Every caller is responsible for pre-filtering
+  // `accounts` (and any transactions on excluded accounts) down to only
+  // includeInCalculations: true accounts before calling this function. This
+  // test proves the engine itself still detects a series on an excluded
+  // account, so a caller that forgets to pre-filter will silently surface
+  // series that don't exist anywhere in the obligations projection.
+  //
+  // Both current callers must honor this:
+  //   - src/lib/data/rebuild-snapshots.ts (`included` — the actual obligations
+  //     projection path, buildDailySnapshots)
+  //   - src/lib/data/queries.ts (`active` in getRecurringData — the /accounts
+  //     Recurring section's list of confirmable/dismissible series)
+  // If a future change adds a new caller, it MUST filter accounts by
+  // includeInCalculations before passing them in, or confirm/dismiss actions
+  // on excluded-account series will silently have no effect on the dashboard.
+  it("does not filter by includeInCalculations itself — that is the caller's responsibility", () => {
+    const excludedChecking: AccountInput = {
+      id: "excluded-chk", type: "checking", currentBalance: 1000, includeInCalculations: false,
+    };
+    const txns = ["2026-04-01", "2026-05-01", "2026-06-01"].map((d) =>
+      txn({ postedDate: d, amount: 1500, description: "Rent", accountId: "excluded-chk" }));
+    // The engine has no way to know this account is excluded from
+    // calculations — it still qualifies by type (checking is liquid) and
+    // still detects the series. Callers MUST pre-filter `accounts` (and
+    // transactions) to includeInCalculations: true before calling this.
+    const series = detectRecurringSeries([excludedChecking], txns, "2026-06-15");
+    expect(series).toHaveLength(1);
+    expect(series[0].accountId).toBe("excluded-chk");
+  });
 });
 
 describe("occurrence projection", () => {

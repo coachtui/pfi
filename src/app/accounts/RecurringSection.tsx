@@ -88,8 +88,16 @@ export function RecurringSection({ items }: { items: RecurringListItem[] }) {
 
   const dismissed = items.filter((i) => i.status === "dismissed");
   const visible = items.filter((i) => i.status !== "dismissed");
-  const income = visible.filter((i) => i.isIncome);
-  const bills = visible.filter((i) => !i.isIncome);
+  // Group by direction, not the narrower isIncome flag: isIncome additionally
+  // requires a majority of transactions to be category-tagged "income" (it's
+  // tuned for the obligations engine's window-length estimation in
+  // computeObligations). A recurring inflow that isn't category-tagged —
+  // a reimbursement, an interest credit, an uncategorized paycheck — would
+  // otherwise render under "Bills & payments" with no indication it's money
+  // coming in, which is what the design spec's "income must not read as a
+  // bill" requirement rules out. Do not change this to isIncome.
+  const income = visible.filter((i) => i.direction === "inflow");
+  const bills = visible.filter((i) => i.direction === "outflow");
 
   const renderRow = (i: RecurringListItem) => (
     <Row key={i.seriesKey} item={i} pending={pending}

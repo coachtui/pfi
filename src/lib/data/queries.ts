@@ -411,7 +411,9 @@ export async function getRecurringData(supabase: SupabaseClient): Promise<Recurr
   ]);
   if (acctRes.error) throw acctRes.error;
 
-  const active = (acctRes.data as RecurringAccountRow[]).filter((a) => a.archived_at === null);
+  const active = (acctRes.data as RecurringAccountRow[]).filter(
+    (a) => a.archived_at === null && a.include_in_calculations,
+  );
   const activeIds = new Set(active.map((a) => a.id));
   const accounts: AccountInput[] = active.map((a) => ({
     id: a.id,
