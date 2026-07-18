@@ -706,20 +706,21 @@ describe("obligations with recurring projection", () => {
   });
 
   it("projects a confirmed lapsed series but not an unconfirmed one", () => {
-    // Lapsed: last occurrence 2026-04-01, monthly → 90 days before endDate.
-    const lapsed = ["2026-02-01", "2026-03-01", "2026-04-01"].map((d, i) =>
+    // lastDate 2026-05-02, monthly (interval 30) → nextExpectedDate 2026-06-01,
+    // whose +30 step lands exactly on 2026-07-01 — the one day the projected
+    // span (2026-06-30, 2026-07-01] at date "2026-06-20" covers. lapsed
+    // because daysBetween(05-02, 06-20) = 49 > 45 (1.5x the 30-day interval).
+    const lapsed = ["2026-03-03", "2026-04-02", "2026-05-02"].map((d, i) =>
       txn({ id: `l${i}`, accountId: "chk", postedDate: d, amount: 200, direction: "outflow", description: "Old Gym", essential: false }));
     const key = seriesKeyOf("chk", "outflow", normalizeDescription("Old Gym"));
     const base = [...rent, ...payroll, ...lapsed];
     const without = buildDailySnapshots([chk], base, config).find((s) => s.date === "2026-06-20")!;
-    expect(without.nearTermObligations).toBe(1500); // lapsed series ignored
+    expect(without.nearTermObligations).toBe(1500); // lapsed series ignored by default
     const confirmed = buildDailySnapshots([chk], base, config, [{ seriesKey: key, status: "confirmed" }])
       .find((s) => s.date === "2026-06-20")!;
-    // Confirmed lapsed series rolls forward: next occurrence after 06-30 lands
-    // in (06-30, 07-01] window only if it steps onto 07-01 — 04-01 + 30*3 = 06-30,
-    // +30 = 07-30 → outside the 07-01 window end, so nearTerm stays 1500 here;
-    // assert instead at a date whose window reaches it.
-    expect(confirmed.nearTermObligations).toBeGreaterThanOrEqual(1500);
+    // Confirming makes the lapsed series project its 07-01 occurrence too.
+    expect(confirmed.nearTermObligations).toBe(1700);
+    expect(confirmed.essentialObligations).toBe(1500); // Old Gym isn't essential
   });
 });
 ```
@@ -1293,6 +1294,13 @@ export function RecurringSection({ items }: { items: RecurringListItem[] }) {
   const income = visible.filter((i) => i.isIncome);
   const bills = visible.filter((i) => !i.isIncome);
 
+  const renderRow = (i: RecurringListItem) => (
+    <Row key={i.seriesKey} item={i} pending={pending}
+      onConfirm={() => mutate(() => setRecurringOverride(i.seriesKey, "confirmed"))}
+      onDismiss={() => mutate(() => setRecurringOverride(i.seriesKey, "dismissed"))}
+      onClear={() => mutate(() => clearRecurringOverride(i.seriesKey))} />
+  );
+
   return (
     <section id="recurring" aria-labelledby="recurring-heading">
       <Card>
@@ -1318,23 +1326,13 @@ export function RecurringSection({ items }: { items: RecurringListItem[] }) {
             {income.length > 0 && (
               <>
                 <h3 className="mt-3 text-xs font-medium uppercase tracking-wide text-tertiary">Income</h3>
-                <ul>{income.map((i) => (
-                  <Row key={i.seriesKey} item={i} pending={pending}
-                    onConfirm={() => mutate(() => setRecurringOverride(i.seriesKey, "confirmed"))}
-                    onDismiss={() => mutate(() => setRecurringOverride(i.seriesKey, "dismissed"))}
-                    onClear={() => mutate(() => clearRecurringOverride(i.seriesKey))} />
-                ))}</ul>
+                <ul>{income.map(renderRow)}</ul>
               </>
             )}
             {bills.length > 0 && (
               <>
                 <h3 className="mt-3 text-xs font-medium uppercase tracking-wide text-tertiary">Bills &amp; payments</h3>
-                <ul>{bills.map((i) => (
-                  <Row key={i.seriesKey} item={i} pending={pending}
-                    onConfirm={() => mutate(() => setRecurringOverride(i.seriesKey, "confirmed"))}
-                    onDismiss={() => mutate(() => setRecurringOverride(i.seriesKey, "dismissed"))}
-                    onClear={() => mutate(() => clearRecurringOverride(i.seriesKey))} />
-                ))}</ul>
+                <ul>{bills.map(renderRow)}</ul>
               </>
             )}
           </>
