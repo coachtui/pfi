@@ -196,20 +196,23 @@ function computeObligations(
   config: SnapshotBuilderConfig,
 ): { nearTerm: number; essential: number } {
   const nextIncome = ctx.incomeDates.find((d) => d > date);
-  let gap: number;
-  if (nextIncome) {
-    gap = daysBetween(date, nextIncome);
-  } else {
-    // Past the last known income: a detected recurring income series gives a
-    // better next-income estimate than the historical median gap.
+  const fallbackGap = nextIncome ? daysBetween(date, nextIncome) : ctx.medianGap;
+  let windowStart = date;
+  let windowEnd = addDays(date, fallbackGap);
+
+  if (!nextIncome && windowEnd > config.endDate) {
+    // Only refine using a detected recurring income series once the plain
+    // medianGap estimate already reaches past known history — never let a
+    // projection shrink or grow an otherwise-settled, fully-in-history
+    // window just because a recurring series happens to exist.
     const projectedNext = ctx.projectedIncome
       .map((s) => nextOccurrenceAfter(s, date))
       .filter((d): d is ISODate => d !== null)
       .sort()[0];
-    gap = projectedNext ? daysBetween(date, projectedNext) : ctx.medianGap;
+    if (projectedNext) {
+      windowEnd = addDays(date, daysBetween(date, projectedNext));
+    }
   }
-  let windowStart = date;
-  let windowEnd = addDays(date, gap);
 
   const beyondHistory = windowEnd > config.endDate;
   const canProject = ctx.projectedOutflows.length > 0;
@@ -240,10 +243,9 @@ function computeObligations(
     // Split window: actuals covered above up to endDate; recurring series
     // project their expected occurrences into (endDate, windowEnd].
     for (const s of ctx.projectedOutflows) {
-      for (const _occurrence of occurrencesAfter(s, config.endDate, windowEnd)) {
-        nearTerm += s.typicalAmount;
-        if (s.essential) essential += s.typicalAmount;
-      }
+      const count = occurrencesAfter(s, config.endDate, windowEnd).length;
+      nearTerm += s.typicalAmount * count;
+      if (s.essential) essential += s.typicalAmount * count;
     }
   }
   return { nearTerm, essential };

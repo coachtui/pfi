@@ -175,4 +175,34 @@ describe("obligations with recurring projection", () => {
     expect(confirmed.nearTermObligations).toBe(1700);
     expect(confirmed.essentialObligations).toBe(1500); // Old Gym isn't essential
   });
+
+  it("does not let a detected income series change an obligations window that is already fully inside known history", () => {
+    // Weekly payroll, 3 occurrences 7 days apart, last on 2026-05-15 →
+    // nextExpectedDate 2026-05-22. Not lapsed at endDate 2026-05-24
+    // (9 days <= 1.5x the 7-day interval = 10.5).
+    const weeklyPayroll = ["2026-05-01", "2026-05-08", "2026-05-15"].map((d, i) =>
+      txn({ id: `wp${i}`, accountId: "chk", postedDate: d, amount: 1000, direction: "inflow", description: "Weekly Payroll", category: "income" }));
+    // Lands inside the medianGap-derived window (05-16, 05-23] but outside
+    // the income-projection-derived window (05-16, 05-22] — exactly the gap
+    // between the two candidate window ends that the bug conflated.
+    const carRepair = txn({ id: "cr1", accountId: "chk", postedDate: "2026-05-23", amount: 250, direction: "outflow", description: "Car Repair" });
+    const localConfig = { startDate: "2026-04-01", endDate: "2026-05-24", safetyBuffer: 500 };
+    const localTxns = [...weeklyPayroll, carRepair];
+    const payrollKey = seriesKeyOf("chk", "inflow", normalizeDescription("Weekly Payroll"));
+
+    // 2026-05-16: no actual income date after it (last income was 05-15), so
+    // nextIncome is undefined; the medianGap fallback (7 days, from the
+    // 05-01→05-08→05-15 gaps) already lands the window at 05-23, at or
+    // before endDate — this date is fully "in known history." Whether the
+    // recurring income series is left to project (default) or is dismissed
+    // must not change the answer.
+    const withIncomeSeries = buildDailySnapshots([chk], localTxns, localConfig)
+      .find((s) => s.date === "2026-05-16")!;
+    const incomeSeriesDismissed = buildDailySnapshots([chk], localTxns, localConfig, [
+      { seriesKey: payrollKey, status: "dismissed" },
+    ]).find((s) => s.date === "2026-05-16")!;
+
+    expect(withIncomeSeries.nearTermObligations).toBe(incomeSeriesDismissed.nearTermObligations);
+    expect(withIncomeSeries.nearTermObligations).toBe(250);
+  });
 });
