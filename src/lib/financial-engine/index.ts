@@ -14,3 +14,4 @@ export * from "./scoring";
 export * from "./confidence";
 export * from "./momentum-overlay";
 export * from "./score-delta";
+export * from "./recurring";
