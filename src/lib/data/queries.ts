@@ -299,7 +299,7 @@ export async function getImportContext(
         .order("id", { ascending: true })
         .range(from, to);
       if (res.error) throw new Error(res.error.message);
-      return res.data as Array<{
+      return (res.data ?? []) as Array<{
         id: string; account_id: string; posted_date: string; amount: number;
         direction: string; description: string; is_transfer: boolean; transfer_pair_id: string | null;
       }>;
