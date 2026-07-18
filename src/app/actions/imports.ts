@@ -7,8 +7,14 @@ import { dedupeKey } from "@/lib/csv-import/dedupe";
 import { dayGap, TRANSFER_MAX_DAY_GAP } from "@/lib/csv-import/transfers";
 import { finishWithRebuild } from "@/lib/data/finish-mutation";
 import { insertChunked } from "@/lib/data/insert-chunked";
+import { paginateAll } from "@/lib/data/paginate";
 import { importTransactionsSchema, type ImportResult, type ImportTransactionsInput } from "@/lib/validation/imports";
 import type { MutationResult } from "@/lib/validation/transactions";
+
+// PostgREST caps unbounded selects at 1000 rows (see DECISIONS #18); the
+// dedupe/transfer re-check below needs every existing transaction, not just
+// the first page, or rows past the cap would re-import as duplicates.
+const EXISTING_TXN_PAGE_SIZE = 1000;
 
 /** Commit an import batch. The client's dedupe/transfer output is advisory:
  * everything is re-validated here against current DB state. All-or-nothing —
@@ -33,11 +39,23 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
   if (account.archived_at) return { error: "This account is archived" };
 
   // Server-side dedupe re-check against current DB state (stale-client/race guard).
-  const { data: existingRows, error: exErr } = await supabase
-    .from("transactions")
-    .select("id, account_id, posted_date, amount, direction, description, is_transfer, transfer_pair_id");
-  if (exErr) return { error: exErr.message };
-  const existing = (existingRows ?? []).map((t) => ({
+  let existingRows: Array<{
+    id: string; account_id: string; posted_date: string; amount: number;
+    direction: string; description: string; is_transfer: boolean; transfer_pair_id: string | null;
+  }>;
+  try {
+    existingRows = await paginateAll(EXISTING_TXN_PAGE_SIZE, async (from, to) => {
+      const res = await supabase.from("transactions")
+        .select("id, account_id, posted_date, amount, direction, description, is_transfer, transfer_pair_id")
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (res.error) throw new Error(res.error.message);
+      return res.data ?? [];
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to read existing transactions" };
+  }
+  const existing = existingRows.map((t) => ({
     id: t.id as string,
     accountId: t.account_id as string,
     postedDate: t.posted_date as string,

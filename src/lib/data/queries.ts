@@ -18,6 +18,12 @@ import {
 } from "./mappers";
 import type { TransactionFilters } from "@/lib/validation/transactions";
 import { percentToDecimal } from "./unit-conversions";
+import { paginateAll } from "./paginate";
+
+// PostgREST caps unbounded selects at 1000 rows (see DECISIONS #18); a user
+// with more than 1000 transactions needs every row for correct dedupe and
+// transfer-pair detection, not just the first page.
+const IMPORT_CONTEXT_PAGE_SIZE = 1000;
 
 export interface ProfileRow {
   id: string; username: string; age_cohort: string; income_band: string;
@@ -283,23 +289,27 @@ export async function getScoreSummary(supabase: SupabaseClient): Promise<ScoreSu
 export async function getImportContext(
   supabase: SupabaseClient,
 ): Promise<{ accounts: AccountSummary[]; existing: ExistingTxn[] }> {
-  const [acctRes, txnRes] = await Promise.all([
+  const [acctRes, txnRows] = await Promise.all([
     supabase.from("financial_accounts").select(
       "id, provider, institution, type, display_name, mask, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at",
     ),
-    supabase.from("transactions").select(
-      "id, account_id, posted_date, amount, direction, description, is_transfer, transfer_pair_id",
-    ),
+    paginateAll(IMPORT_CONTEXT_PAGE_SIZE, async (from, to) => {
+      const res = await supabase.from("transactions")
+        .select("id, account_id, posted_date, amount, direction, description, is_transfer, transfer_pair_id")
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (res.error) throw new Error(res.error.message);
+      return (res.data ?? []) as Array<{
+        id: string; account_id: string; posted_date: string; amount: number;
+        direction: string; description: string; is_transfer: boolean; transfer_pair_id: string | null;
+      }>;
+    }),
   ]);
   if (acctRes.error) throw new Error(acctRes.error.message);
-  if (txnRes.error) throw new Error(txnRes.error.message);
   const accounts = (acctRes.data as AccountRow[])
     .map(rowToAccountSummary)
     .filter((a) => a.provider !== "demo" && a.archivedAt === null);
-  const existing: ExistingTxn[] = (txnRes.data as Array<{
-    id: string; account_id: string; posted_date: string; amount: number;
-    direction: string; description: string; is_transfer: boolean; transfer_pair_id: string | null;
-  }>).map((t) => ({
+  const existing: ExistingTxn[] = txnRows.map((t) => ({
     id: t.id, accountId: t.account_id, postedDate: t.posted_date,
     amount: Number(t.amount), direction: t.direction as "inflow" | "outflow",
     description: t.description, isTransfer: t.is_transfer, transferPairId: t.transfer_pair_id,
