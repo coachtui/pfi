@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { ArrowUpRight, ArrowRight, ArrowDownRight, Info } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { FinancialChart, type ChartMarker, type StemMarker } from "@/components/chart/FinancialChart";
@@ -8,6 +9,7 @@ import { CompanyHeader } from "@/components/dashboard/CompanyHeader";
 import { MetricCard, type MetricTone } from "@/components/dashboard/MetricCard";
 import { ScoreCard } from "@/components/dashboard/ScoreCard";
 import { Segmented } from "@/components/ui/Segmented";
+import { StaleDataBanner } from "@/components/dashboard/StaleDataBanner";
 import { WhatMovedYourLine } from "@/components/dashboard/WhatMovedYourLine";
 import type { ScoreSummary } from "@/lib/data/queries";
 import {
@@ -44,6 +46,11 @@ const MAX_MARKERS = 8;
 const STEM_TYPES: FinancialEvent["type"][] = ["paycheck", "mortgage_payment", "bonus"];
 const STEM_MAX_RANGE_DAYS = 45;
 
+function formatLongDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
 export interface DashboardIdentity {
   companyName: string;
   ticker: string;
@@ -58,9 +65,10 @@ interface HomeDashboardProps {
   scoreSummary: ScoreSummary;
   /** True when a snapshot rebuild is pending/failed and the chart may lag recent edits. */
   staleIndex?: boolean;
+  freshness: { currentThrough: string | null; showNudge: boolean };
 }
 
-export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleIndex }: HomeDashboardProps) {
+export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleIndex, freshness }: HomeDashboardProps) {
   const [range, setRange] = useState<RangeKey>("30D");
 
   // The index is anchored on full history once; ranges only slice the view.
@@ -128,6 +136,14 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
             ariaLabel="Chart time range"
           />
         </div>
+        {freshness.currentThrough && (
+          <p className="mt-1 text-xs text-tertiary">
+            Data current through{" "}
+            <Link href="/accounts" className="underline decoration-dotted underline-offset-2 hover:text-secondary">
+              {formatLongDate(freshness.currentThrough)}
+            </Link>
+          </p>
+        )}
         <div className="mt-2">
           <FinancialChart
             points={view.visible}
@@ -137,6 +153,10 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
           />
         </div>
       </Card>
+
+      {freshness.showNudge && freshness.currentThrough && (
+        <StaleDataBanner currentThrough={freshness.currentThrough} />
+      )}
 
       {staleIndex && (
         <p role="status" className="rounded-card border border-border-subtle bg-elevated p-3 text-sm text-warning">
