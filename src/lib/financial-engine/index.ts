@@ -16,3 +16,4 @@ export * from "./momentum-overlay";
 export * from "./score-delta";
 export * from "./recurring";
 export * from "./anchors";
+export * from "./staleness";
