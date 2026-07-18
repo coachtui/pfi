@@ -16,12 +16,14 @@ export function TrendStatCard({
   trend: number[];
 }) {
   return (
-    <Card className="flex min-h-32 flex-col justify-between p-4">
-      <p className="text-xs font-medium text-secondary">{label}</p>
-      <p className={`tabular mt-1 text-xl font-semibold ${tone === "positive" ? "text-positive" : "text-negative"}`}>
+    <Card className="flex min-h-24 flex-col justify-between p-2.5 sm:min-h-32 sm:p-4">
+      <p className="text-[11px] leading-tight font-medium text-secondary sm:text-xs">{label}</p>
+      <p
+        className={`tabular mt-1 text-base font-semibold sm:text-xl ${tone === "positive" ? "text-positive" : "text-negative"}`}
+      >
         {value}
       </p>
-      <p className="text-xs text-tertiary">{sub}</p>
+      <p className="text-[10px] leading-tight text-tertiary sm:text-xs">{sub}</p>
       <Sparkline values={trend} tone={tone} fill />
     </Card>
   );

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import {
-  ArrowUpRight, CircleDollarSign, Droplet, Home, Info, MapPin, PiggyBank,
+  ArrowUpRight, ChevronDown, CircleDollarSign, Droplet, Home, Info, MapPin, PiggyBank,
   TrendingUp, UserRound, type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -40,26 +40,29 @@ export default async function DataPage() {
         <p className="mt-1 text-xs text-tertiary">Preview — sample cohort data</p>
       </header>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-nowrap gap-2 overflow-x-auto pb-0.5">
         {chips.map(({ icon: Icon, label }) => (
-          <span key={label} className="flex items-center gap-1.5 rounded-full border border-border-subtle bg-elevated px-3 py-1.5 text-xs text-secondary">
-            <Icon size={13} aria-hidden />
+          <span
+            key={label}
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-border-subtle bg-elevated px-2.5 py-1 text-xs text-secondary"
+          >
+            <Icon size={12} aria-hidden />
             {label}
           </span>
         ))}
       </div>
 
-      <Card className="p-5">
+      <Card className="p-4">
         <div className="flex items-start justify-between">
           <h2 className="text-base font-semibold text-primary">Household Financial Conditions</h2>
           <Info size={14} className="text-tertiary" aria-label="Sample index of overall household financial conditions in your cohort" />
         </div>
-        <div className="mt-3 flex items-end gap-6">
+        <div className="mt-3 flex items-end gap-4">
           <div className="shrink-0">
             <p className="text-xs text-secondary">Conditions Index</p>
             <p className="tabular mt-1 text-4xl font-semibold text-primary">{b.conditionsIndex.toFixed(1)}</p>
-            <p className="mt-2 flex items-center gap-1 text-xs font-medium text-positive">
-              <ArrowUpRight size={13} aria-hidden />
+            <p className="mt-2 flex items-center gap-1 text-[11px] font-medium text-positive">
+              <ArrowUpRight size={12} aria-hidden />
               {b.conditionsNote}
             </p>
           </div>
@@ -69,42 +72,57 @@ export default async function DataPage() {
         </div>
       </Card>
 
-      <section aria-label="Cohort benchmark stats" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <section aria-label="Cohort benchmark stats" className="grid grid-cols-4 gap-2 md:gap-3">
         {b.stats.map((s) => (
           <TrendStatCard key={s.label} label={s.label} value={s.value} sub={s.vsCohort} tone={s.tone} trend={s.trend} />
         ))}
       </section>
 
-      <Card className="p-5">
-        <div className="mb-4 flex items-baseline justify-between">
+      <Card className="p-4">
+        <div className="mb-4 flex items-center justify-between">
           <h2 className="flex items-center gap-1.5 text-base font-semibold text-primary">
             How you compare
             <Info size={14} className="text-tertiary" aria-label="Your position within the cohort, by percentile" />
           </h2>
-          <span className="text-xs text-tertiary" title="Coming soon">Percentile ▾</span>
+          <span
+            className="flex items-center gap-1 rounded-full bg-positive-muted px-2.5 py-1 text-xs font-medium text-positive"
+            title="Coming soon"
+          >
+            Percentile
+            <ChevronDown size={12} aria-hidden />
+          </span>
         </div>
-        <ul className="flex flex-col gap-4">
+        <ul className="flex flex-col gap-3.5">
           {b.compare.map((row) => {
             const Icon = compareIcons[row.icon];
             return (
-              <li key={row.label} className="flex items-center gap-3">
-                <span aria-hidden className={`flex size-9 shrink-0 items-center justify-center rounded-full ${row.goodDirection ? "bg-positive-muted text-positive" : "bg-negative-muted text-negative"}`}>
-                  <Icon size={16} />
+              <li key={row.label} className="flex items-center gap-2.5">
+                <span aria-hidden className={`flex size-7 shrink-0 items-center justify-center rounded-full ${row.goodDirection ? "bg-positive-muted text-positive" : "bg-negative-muted text-negative"}`}>
+                  <Icon size={14} />
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-primary">{row.label}</p>
-                  <p className="tabular text-xs text-tertiary">{row.viewerValue}</p>
-                  <div className="mt-1.5">
-                    <PercentileBar percentile={row.percentile} goodDirection={row.goodDirection} />
-                  </div>
+                <div className="w-20 shrink-0 sm:w-24">
+                  <p className="text-xs leading-tight font-medium text-primary">{row.label}</p>
+                  <p className="tabular truncate text-[10px] text-tertiary">{row.viewerValue}</p>
                 </div>
-                <span className="tabular w-12 text-right text-sm font-semibold text-primary">{formatOrdinal(row.percentile)}</span>
+                <div className="min-w-0 flex-1">
+                  <PercentileBar percentile={row.percentile} goodDirection={row.goodDirection} />
+                </div>
+                <span className="tabular w-9 shrink-0 text-right text-sm font-semibold text-primary">
+                  {formatOrdinal(row.percentile)}
+                </span>
               </li>
             );
           })}
         </ul>
-        <div className="mt-3 flex justify-between pl-12 text-[10px] text-tertiary">
-          <span>0th</span><span>50th</span><span>100th</span>
+        <div className="mt-2 flex items-center gap-2.5">
+          <span aria-hidden className="size-7 shrink-0" />
+          <span aria-hidden className="w-20 shrink-0 sm:w-24" />
+          <div className="flex min-w-0 flex-1 justify-between text-[10px] text-tertiary">
+            <span>0th</span>
+            <span>50th</span>
+            <span>100th</span>
+          </div>
+          <span aria-hidden className="w-9 shrink-0" />
         </div>
       </Card>
 

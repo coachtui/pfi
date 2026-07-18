@@ -36,7 +36,7 @@ interface FinancialChartProps {
   ariaDescription: string;
 }
 
-const PLOT_LEFT_INSET = 24; // YAxis width 40 + chart margin left −16
+const PLOT_LEFT_INSET = 22; // YAxis width 36 + chart margin left −14
 // Coupled to recharts' default point-scale (edge-to-edge) category axis on XAxis,
 // where the first/last points sit flush with the plot edges — that's what lets
 // markerXFraction's 0..1 fraction map directly onto this inset/right-margin box.
@@ -57,8 +57,8 @@ export function FinancialChart({ points, markers, stems = [], ariaDescription }:
 
   const lastPoint = points[points.length - 1];
   const yValues = points.flatMap((p) => [p.actual, p.waterline, ...(p.baseline === null ? [] : [p.baseline])]);
-  const domainMin = Math.floor(Math.min(...yValues) - 2);
-  const domainMax = Math.ceil(Math.max(...yValues) + 2);
+  const domainMin = Math.floor(Math.min(...yValues) - 1);
+  const domainMax = Math.ceil(Math.max(...yValues) + 1);
   const [actualPos, baselinePos, waterlinePos] = railPositions(
     [lastPoint?.actual ?? null, lastPoint?.baseline ?? null, lastPoint?.waterline ?? null],
     domainMin,
@@ -71,7 +71,7 @@ export function FinancialChart({ points, markers, stems = [], ariaDescription }:
       <div className="flex w-full items-stretch">
         <div className="h-64 min-w-0 flex-1">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={points} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
+            <ComposedChart data={points} margin={{ top: 2, right: 2, bottom: 0, left: -14 }}>
               <defs>
                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--chart-actual-fill-from)" />
@@ -92,7 +92,7 @@ export function FinancialChart({ points, markers, stems = [], ariaDescription }:
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: "var(--text-tertiary)", fontSize: 11 }}
-                width={40}
+                width={36}
                 tickFormatter={(v: number) => String(Math.round(v))}
               />
               <Tooltip
@@ -156,7 +156,7 @@ export function FinancialChart({ points, markers, stems = [], ariaDescription }:
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-        <div aria-hidden className="relative h-64 w-16 shrink-0">
+        <div aria-hidden className="relative h-64 w-14 shrink-0">
           <RailLabel top={actualPos} color="var(--chart-actual)" label="Actual" />
           <RailLabel top={baselinePos} color="var(--chart-baseline)" label="Baseline" />
           <RailLabel top={waterlinePos} color="var(--chart-waterline)" label="Waterline" />
@@ -166,7 +166,7 @@ export function FinancialChart({ points, markers, stems = [], ariaDescription }:
         <div
           aria-hidden
           className="relative mt-1 h-14"
-          style={{ marginLeft: PLOT_LEFT_INSET, marginRight: 4 + 64 }}
+          style={{ marginLeft: PLOT_LEFT_INSET, marginRight: 2 + 56 }}
         >
           {stems.map((s) => {
             const Icon = eventIcons[s.event.type];
@@ -204,7 +204,7 @@ function RailLabel({ top, color, label }: { top: number | null; color: string; l
   if (top === null) return null;
   return (
     <span
-      className="absolute left-1 flex -translate-y-1/2 items-center gap-1 text-[11px] text-secondary"
+      className="absolute left-0.5 flex -translate-y-1/2 items-center gap-1 text-[11px] text-secondary"
       style={{ top: `calc(${top} * (100% - ${X_AXIS_HEIGHT}px - 8px) / 100 + 8px)` }}
     >
       <span className="size-1.5 rounded-full" style={{ background: color }} />

@@ -9,8 +9,8 @@ export default function Loading() {
         </div>
       </div>
       <div className="h-96 rounded-card bg-elevated" />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => <div key={i} className="h-28 rounded-card bg-elevated" />)}
+      <div className="grid grid-cols-4 gap-2 md:gap-3">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="h-24 rounded-card bg-elevated sm:h-28" />)}
       </div>
     </div>
   );

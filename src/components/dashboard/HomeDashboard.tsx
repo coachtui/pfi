@@ -102,7 +102,7 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
       />
 
       {/* Personal index + chart */}
-      <Card className="p-4">
+      <Card className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-sm font-medium text-secondary">
@@ -128,7 +128,7 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
             ariaLabel="Chart time range"
           />
         </div>
-        <div className="mt-3">
+        <div className="mt-2">
           <FinancialChart
             points={view.visible}
             markers={view.markers}

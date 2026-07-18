@@ -42,7 +42,7 @@ export function WhatMovedYourLine({ drivers }: { drivers: Driver[] }) {
     );
   }
   return (
-    <ul className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <ul className="grid grid-cols-4 gap-2 md:gap-3">
       {drivers.map((driver) => {
         const { event } = driver;
         const display = driverDisplay(driver);
@@ -55,24 +55,26 @@ export function WhatMovedYourLine({ drivers }: { drivers: Driver[] }) {
               aria-label={`${event.label}, ${formatSignedDollars(display.displayAmount)} on ${formatShortDate(event.date)}. View transactions`}
               className="block h-full"
             >
-              <Card className="flex h-full flex-col gap-2 p-4 transition-colors hover:border-border-strong">
+              <Card className="flex h-full min-h-24 flex-col justify-between gap-1 p-2.5 transition-colors hover:border-border-strong sm:min-h-28 sm:p-4">
                 <span
                   aria-hidden
-                  className={`flex size-9 items-center justify-center rounded-full ${
+                  className={`flex size-7 items-center justify-center rounded-full sm:size-9 ${
                     positive ? "bg-positive-muted text-positive" : "bg-negative-muted text-negative"
                   }`}
                 >
-                  {display.buildsEquity ? <PiggyBank size={18} /> : <Icon size={18} />}
+                  {display.buildsEquity ? <PiggyBank size={15} /> : <Icon size={15} />}
                 </span>
-                <p className="text-sm font-medium text-primary">{event.label}</p>
+                <p className="truncate text-[11px] leading-tight font-medium text-primary sm:text-sm">
+                  {event.label}
+                </p>
                 <p
-                  className={`tabular text-sm font-semibold ${
+                  className={`tabular text-xs font-semibold sm:text-sm ${
                     positive ? "text-positive" : "text-negative"
                   }`}
                 >
                   {formatSignedDollars(display.displayAmount)}
                 </p>
-                <p className="text-xs text-tertiary">{formatShortDate(event.date)}</p>
+                <p className="text-[10px] text-tertiary sm:text-xs">{formatShortDate(event.date)}</p>
               </Card>
             </Link>
           </li>
