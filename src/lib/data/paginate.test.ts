@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { paginateAll } from "./paginate";
+import { paginateAll, paginateSelect } from "./paginate";
 
 function pagedFetcher<T>(all: T[]) {
   return vi.fn(async (from: number, to: number) => all.slice(from, to + 1));
@@ -37,5 +37,32 @@ describe("paginateAll", () => {
     expect(result).toEqual(all);
     expect(fetchPage).toHaveBeenCalledTimes(3);
     expect(fetchPage).toHaveBeenNthCalledWith(3, 2000, 2999);
+  });
+});
+
+describe("paginateSelect", () => {
+  const all = Array.from({ length: 1042 }, (_, i) => ({ id: i }));
+
+  it("collects every page from a Supabase-shaped query builder", async () => {
+    const build = vi.fn(async (from: number, to: number) => ({
+      data: all.slice(from, to + 1),
+      error: null,
+    }));
+    const rows = await paginateSelect(1000, build);
+    expect(rows).toEqual(all);
+    expect(build).toHaveBeenCalledTimes(2);
+    expect(build).toHaveBeenNthCalledWith(1, 0, 999);
+    expect(build).toHaveBeenNthCalledWith(2, 1000, 1999);
+  });
+
+  it("throws the PostgREST error message on a failed page", async () => {
+    const build = vi.fn(async () => ({ data: null, error: { message: "permission denied" } }));
+    await expect(paginateSelect(1000, build)).rejects.toThrow("permission denied");
+  });
+
+  it("treats a null data payload on success as an empty page", async () => {
+    const build = vi.fn(async () => ({ data: null, error: null }));
+    expect(await paginateSelect(1000, build)).toEqual([]);
+    expect(build).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,7 +7,7 @@ import { dedupeKey } from "@/lib/csv-import/dedupe";
 import { dayGap, TRANSFER_MAX_DAY_GAP } from "@/lib/csv-import/transfers";
 import { finishWithRebuild } from "@/lib/data/finish-mutation";
 import { insertChunked } from "@/lib/data/insert-chunked";
-import { paginateAll } from "@/lib/data/paginate";
+import { paginateSelect } from "@/lib/data/paginate";
 import { importTransactionsSchema, type ImportResult, type ImportTransactionsInput } from "@/lib/validation/imports";
 import type { MutationResult } from "@/lib/validation/transactions";
 
@@ -44,14 +44,11 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
     direction: string; description: string; is_transfer: boolean; transfer_pair_id: string | null;
   }>;
   try {
-    existingRows = await paginateAll(EXISTING_TXN_PAGE_SIZE, async (from, to) => {
-      const res = await supabase.from("transactions")
+    existingRows = await paginateSelect(EXISTING_TXN_PAGE_SIZE, (from, to) =>
+      supabase.from("transactions")
         .select("id, account_id, posted_date, amount, direction, description, is_transfer, transfer_pair_id")
         .order("id", { ascending: true })
-        .range(from, to);
-      if (res.error) throw new Error(res.error.message);
-      return res.data ?? [];
-    });
+        .range(from, to));
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to read existing transactions" };
   }
