@@ -1,4 +1,8 @@
 import type { DailySnapshot, ISODate } from "./types";
+import {
+  detectRecurringSeries, nextOccurrenceAfter, occurrencesAfter,
+  type RecurringOverride, type RecurringSeries,
+} from "./recurring";
 
 export const ENGINE_VERSION = "1.0.0";
 
@@ -82,11 +86,14 @@ interface ObligationContext {
   liquidIds: Set<string>;
   liabilityIds: Set<string>;
   txnById: Map<string, TransactionInput>;
+  projectedOutflows: RecurringSeries[];
+  projectedIncome: RecurringSeries[];
 }
 
 function buildObligationContext(
   accounts: AccountInput[],
   transactions: TransactionInput[],
+  projected: RecurringSeries[],
 ): ObligationContext {
   const liquidIds = new Set(accounts.filter((a) => LIQUID_TYPES.has(a.type)).map((a) => a.id));
   const liabilityIds = new Set(
@@ -110,6 +117,8 @@ function buildObligationContext(
     liquidIds,
     liabilityIds,
     txnById: new Map(transactions.map((t) => [t.id, t])),
+    projectedOutflows: projected.filter((s) => s.direction === "outflow" && !s.isIncome),
+    projectedIncome: projected.filter((s) => s.isIncome),
   };
 }
 
@@ -117,6 +126,7 @@ export function buildDailySnapshots(
   accounts: AccountInput[],
   transactions: TransactionInput[],
   config: SnapshotBuilderConfig,
+  recurringOverrides: RecurringOverride[] = [],
 ): DailySnapshot[] {
   const included = accounts.filter((a) => a.includeInCalculations);
   if (included.length === 0 || config.startDate > config.endDate) return [];
@@ -144,7 +154,14 @@ export function buildDailySnapshots(
     cursor = prev;
   }
 
-  const ctx = buildObligationContext(included, transactions);
+  const overrideByKey = new Map(recurringOverrides.map((o) => [o.seriesKey, o.status]));
+  // Dismissed series never project; confirmed series always do, even lapsed.
+  const projected = detectRecurringSeries(included, transactions, config.endDate).filter(
+    (s) =>
+      overrideByKey.get(s.seriesKey) !== "dismissed" &&
+      (!s.lapsed || overrideByKey.get(s.seriesKey) === "confirmed"),
+  );
+  const ctx = buildObligationContext(included, transactions, projected);
 
   return dates.map((date) => {
     const bal = balances.get(date)!;
@@ -179,19 +196,37 @@ function computeObligations(
   config: SnapshotBuilderConfig,
 ): { nearTerm: number; essential: number } {
   const nextIncome = ctx.incomeDates.find((d) => d > date);
-  const gap = nextIncome ? daysBetween(date, nextIncome) : ctx.medianGap;
+  let gap: number;
+  if (nextIncome) {
+    gap = daysBetween(date, nextIncome);
+  } else {
+    // Past the last known income: a detected recurring income series gives a
+    // better next-income estimate than the historical median gap.
+    const projectedNext = ctx.projectedIncome
+      .map((s) => nextOccurrenceAfter(s, date))
+      .filter((d): d is ISODate => d !== null)
+      .sort()[0];
+    gap = projectedNext ? daysBetween(date, projectedNext) : ctx.medianGap;
+  }
   let windowStart = date;
   let windowEnd = addDays(date, gap);
-  if (windowEnd > config.endDate) {
+
+  const beyondHistory = windowEnd > config.endDate;
+  const canProject = ctx.projectedOutflows.length > 0;
+  if (beyondHistory && !canProject) {
+    // Legacy previous-cycle proxy, retained as fallback: with nothing
+    // detected, reuse the window one cycle back. Undercounts when the true
+    // income gap exceeds 28 days (KNOWN_LIMITATIONS).
     windowStart = addDays(windowStart, -PROXY_SHIFT_DAYS);
     windowEnd = addDays(windowEnd, -PROXY_SHIFT_DAYS);
   }
 
   let nearTerm = 0;
   let essential = 0;
+  const actualEnd = windowEnd > config.endDate ? config.endDate : windowEnd;
   for (const t of transactions) {
     if (t.direction !== "outflow" || !ctx.liquidIds.has(t.accountId)) continue;
-    if (!(t.postedDate > windowStart && t.postedDate <= windowEnd)) continue;
+    if (!(t.postedDate > windowStart && t.postedDate <= actualEnd)) continue;
     if (t.isTransfer) {
       const pair = t.transferPairId ? ctx.txnById.get(t.transferPairId) : undefined;
       if (pair && ctx.liabilityIds.has(pair.accountId)) nearTerm += t.amount; // debt payment
@@ -199,6 +234,17 @@ function computeObligations(
     }
     nearTerm += t.amount;
     if (t.essential === true) essential += t.amount;
+  }
+
+  if (beyondHistory && canProject) {
+    // Split window: actuals covered above up to endDate; recurring series
+    // project their expected occurrences into (endDate, windowEnd].
+    for (const s of ctx.projectedOutflows) {
+      for (const _occurrence of occurrencesAfter(s, config.endDate, windowEnd)) {
+        nearTerm += s.typicalAmount;
+        if (s.essential) essential += s.typicalAmount;
+      }
+    }
   }
   return { nearTerm, essential };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDailySnapshots, type AccountInput, type TransactionInput } from "./snapshot-builder";
+import { normalizeDescription, seriesKeyOf, type RecurringOverride } from "./recurring";
 
 const accounts: AccountInput[] = [
   { id: "chk", type: "checking", currentBalance: 5000, includeInCalculations: true },
@@ -104,5 +105,74 @@ describe("buildDailySnapshots — obligations", () => {
     // contains the Jan02 rent (1200). Finite, and never reads past endDate.
     expect(snaps.find((s) => s.date === "2026-01-16")!.nearTermObligations).toBe(1200);
     expect(snaps.find((s) => s.date === "2026-01-16")!.essentialObligations).toBe(1200);
+  });
+});
+
+const account = (
+  a: Partial<AccountInput> & { id: string; type: AccountInput["type"]; currentBalance: number },
+): AccountInput => ({ includeInCalculations: true, ...a });
+
+describe("obligations with recurring projection", () => {
+  const chk = account({ id: "chk", type: "checking", currentBalance: 5000 });
+  const config = { startDate: "2026-05-01", endDate: "2026-06-30", safetyBuffer: 500 };
+  // Monthly rent, 3 occurrences → projects 2026-07-01 at 1500.
+  const rent = ["2026-04-01", "2026-05-01", "2026-06-01"].map((d, i) =>
+    txn({ id: `r${i}`, accountId: "chk", postedDate: d, amount: 1500, direction: "outflow", description: "Rent", essential: true }));
+  // Semimonthly-ish monthly payroll, 3 occurrences → projects 2026-07-01.
+  const payroll = ["2026-04-01", "2026-05-01", "2026-06-01"].map((d, i) =>
+    txn({ id: `p${i}`, accountId: "chk", postedDate: d, amount: 4000, direction: "inflow", description: "Employer payroll", category: "income" }));
+  // One-off inside the legacy shifted window (2026-05-23..2026-06-03] but
+  // outside the split window's actual span (2026-06-20..2026-06-30].
+  const oneOff = txn({ id: "x1", accountId: "chk", postedDate: "2026-05-25", amount: 999, direction: "outflow", description: "Car repair" });
+  const all = [...rent, ...payroll, oneOff];
+
+  const snapshotFor = (date: string, overrides: RecurringOverride[] = []) =>
+    buildDailySnapshots([chk], all, config, overrides).find((s) => s.date === date)!;
+
+  it("projects recurring outflows into the window beyond endDate instead of shifting", () => {
+    // At 2026-06-20: no actual income after that date; recurring payroll
+    // projects 2026-07-01 → window (06-20, 07-01]. Actual span (06-20, 06-30]
+    // holds no outflows; projection adds rent on 07-01.
+    const s = snapshotFor("2026-06-20");
+    expect(s.nearTermObligations).toBe(1500);
+    expect(s.essentialObligations).toBe(1500);
+  });
+
+  it("falls back to the 28-day shift when every outflow series is dismissed", () => {
+    const rentKey = seriesKeyOf("chk", "outflow", normalizeDescription("Rent"));
+    const s = snapshotFor("2026-06-20", [{ seriesKey: rentKey, status: "dismissed" }]);
+    // Legacy shifted window (2026-05-23, 2026-06-03]: rent 1500 + one-off 999.
+    expect(s.nearTermObligations).toBe(2499);
+    expect(s.essentialObligations).toBe(1500);
+  });
+
+  it("keeps windows fully inside known history identical to the pre-recurring behavior", () => {
+    const withRecurring = buildDailySnapshots([chk], all, config);
+    const dismissedAll = buildDailySnapshots([chk], all, config, [
+      { seriesKey: seriesKeyOf("chk", "outflow", normalizeDescription("Rent")), status: "dismissed" },
+    ]);
+    // 2026-05-10's window ends at the 2026-06-01 payroll — inside history, so
+    // projection never engages and overrides change nothing.
+    const a = withRecurring.find((s) => s.date === "2026-05-10")!;
+    const b = dismissedAll.find((s) => s.date === "2026-05-10")!;
+    expect(a.nearTermObligations).toBe(b.nearTermObligations);
+  });
+
+  it("projects a confirmed lapsed series but not an unconfirmed one", () => {
+    // lastDate 2026-05-02, monthly (interval 30) → nextExpectedDate 2026-06-01,
+    // whose +30 step lands exactly on 2026-07-01 — the one day the projected
+    // span (2026-06-30, 2026-07-01] at date "2026-06-20" covers. lapsed
+    // because daysBetween(05-02, 06-20) = 49 > 45 (1.5x the 30-day interval).
+    const lapsed = ["2026-03-03", "2026-04-02", "2026-05-02"].map((d, i) =>
+      txn({ id: `l${i}`, accountId: "chk", postedDate: d, amount: 200, direction: "outflow", description: "Old Gym", essential: false }));
+    const key = seriesKeyOf("chk", "outflow", normalizeDescription("Old Gym"));
+    const base = [...rent, ...payroll, ...lapsed];
+    const without = buildDailySnapshots([chk], base, config).find((s) => s.date === "2026-06-20")!;
+    expect(without.nearTermObligations).toBe(1500); // lapsed series ignored by default
+    const confirmed = buildDailySnapshots([chk], base, config, [{ seriesKey: key, status: "confirmed" }])
+      .find((s) => s.date === "2026-06-20")!;
+    // Confirming makes the lapsed series project its 07-01 occurrence too.
+    expect(confirmed.nearTermObligations).toBe(1700);
+    expect(confirmed.essentialObligations).toBe(1500); // Old Gym isn't essential
   });
 });
