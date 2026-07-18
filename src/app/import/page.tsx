@@ -7,6 +7,6 @@ export default async function ImportPage() {
   const supabase = await createClient();
   const profile = await getProfile(supabase);
   if (!profile?.onboarding_completed_at) redirect("/onboarding");
-  const { accounts, existing } = await getImportContext(supabase);
-  return <ImportWizard accounts={accounts} existing={existing} />;
+  const { accounts, existing, anchors } = await getImportContext(supabase);
+  return <ImportWizard accounts={accounts} existing={existing} anchors={anchors} />;
 }

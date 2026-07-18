@@ -24,7 +24,13 @@ const STEP_LABELS: Record<Step, string> = {
 };
 const STEPS: Step[] = ["upload", "map", "preview", "summary"];
 
-export function ImportWizard(props: { accounts: AccountSummary[]; existing: ExistingTxn[] }) {
+export function ImportWizard(props: {
+  accounts: AccountSummary[];
+  existing: ExistingTxn[];
+  // Effective anchor per account, keyed by account id. Not yet consumed here —
+  // Task 7 wires this into the ending-balance card's reconciliation copy.
+  anchors: Record<string, { anchorDate: string; balance: number }>;
+}) {
   const { accounts } = props;
   const [step, setStep] = useState<Step>("upload");
   const [accountId, setAccountId] = useState("");
