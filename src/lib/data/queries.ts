@@ -98,6 +98,8 @@ export async function getDashboardData(
 }> {
   const [snapRows, eventRows, latestTxnRes, scoreSummary] = await Promise.all([
     paginateSelect<SnapshotRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      // date alone is a unique order here only because RLS scopes rows to one
+      // user (PK is (user_id, date)) — do not reuse with a service-role client.
       supabase.from("daily_snapshots").select("*").order("date", { ascending: true }).range(from, to)),
     paginateSelect<EventRow & { id: string }>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
       supabase.from("financial_events").select("*")
@@ -130,6 +132,8 @@ export async function getReportData(supabase: SupabaseClient): Promise<{
 }> {
   const [snapRows, txnRows, eventRows] = await Promise.all([
     paginateSelect<SnapshotRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      // date alone is a unique order here only because RLS scopes rows to one
+      // user (PK is (user_id, date)) — do not reuse with a service-role client.
       supabase.from("daily_snapshots").select("*").order("date", { ascending: true }).range(from, to)),
     paginateSelect<TransactionRow & { description: string; notes: string | null; user_override: unknown }>(
       TRANSACTIONS_PAGE_SIZE, (from, to) =>
@@ -194,6 +198,8 @@ interface ScoreSourceRows {
 async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceRows> {
   const [snapRows, txnRows, acctRes, eventRows] = await Promise.all([
     paginateSelect<SnapshotRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      // date alone is a unique order here only because RLS scopes rows to one
+      // user (PK is (user_id, date)) — do not reuse with a service-role client.
       supabase.from("daily_snapshots").select("*").order("date", { ascending: true }).range(from, to)),
     paginateSelect<TransactionRow & { description: string; user_override: unknown }>(
       TRANSACTIONS_PAGE_SIZE, (from, to) =>
