@@ -38,7 +38,7 @@ export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ erro
         .select("id, type, current_balance, include_in_calculations, archived_at"),
       paginateSelect<TransactionRow>(PAGE_SIZE, (from, to) =>
         supabase.from("transactions")
-          .select("id, account_id, posted_date, amount, direction, category, essential, is_transfer, transfer_pair_id")
+          .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id")
           .order("id", { ascending: true })
           .range(from, to)),
       paginateSelect<{ date: string; safety_buffer: number }>(PAGE_SIZE, (from, to) =>

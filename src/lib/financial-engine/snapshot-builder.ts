@@ -7,8 +7,8 @@ export type AccountType =
   | "auto_loan" | "student_loan" | "personal_loan" | "brokerage"
   | "retirement" | "property" | "other_asset" | "other_liability";
 
-const LIQUID_TYPES: ReadonlySet<AccountType> = new Set(["checking", "savings", "money_market"]);
-const LIABILITY_TYPES: ReadonlySet<AccountType> = new Set([
+export const LIQUID_TYPES: ReadonlySet<AccountType> = new Set(["checking", "savings", "money_market"]);
+export const LIABILITY_TYPES: ReadonlySet<AccountType> = new Set([
   "credit_card", "mortgage", "auto_loan", "student_loan", "personal_loan", "other_liability",
 ]);
 
@@ -26,6 +26,7 @@ export interface TransactionInput {
   postedDate: ISODate;
   amount: number;
   direction: "inflow" | "outflow";
+  description: string;
   /** "income" marks income events used for obligation windows. */
   category: string | null;
   essential: boolean | null;
@@ -71,7 +72,7 @@ function median(xs: number[]): number {
   return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m];
 }
 
-function daysBetween(a: ISODate, b: ISODate): number {
+export function daysBetween(a: ISODate, b: ISODate): number {
   return Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
 }
 

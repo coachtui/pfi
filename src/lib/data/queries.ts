@@ -161,8 +161,8 @@ export async function getReportData(supabase: SupabaseClient): Promise<{
       });
       return {
         id: effective.id, accountId: effective.accountId, postedDate: effective.postedDate,
-        amount: effective.amount, direction: effective.direction, category: effective.category,
-        essential: effective.essential, isTransfer: effective.isTransfer,
+        amount: effective.amount, direction: effective.direction, description: effective.description,
+        category: effective.category, essential: effective.essential, isTransfer: effective.isTransfer,
         transferPairId: effective.transferPairId,
       };
     }),

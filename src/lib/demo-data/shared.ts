@@ -47,9 +47,7 @@ export interface DemoAccount extends AccountInput {
   interestRate?: number | null;
 }
 
-export interface DemoTransaction extends TransactionInput {
-  description: string;
-}
+export type DemoTransaction = TransactionInput;
 
 export interface DemoDataset {
   profile: DemoProfileBase;

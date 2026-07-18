@@ -6,7 +6,7 @@ import { generateKoaHoldings } from "@/lib/demo-data/koa-holdings";
 function txn(postedDate: string): TransactionInput {
   return {
     id: `t-${postedDate}`, accountId: "a1", postedDate, amount: 10,
-    direction: "outflow", category: null, essential: null,
+    direction: "outflow", description: "", category: null, essential: null,
     isTransfer: false, transferPairId: null,
   };
 }

@@ -8,7 +8,7 @@ const accounts: AccountInput[] = [
 ];
 
 const txn = (t: Partial<TransactionInput> & { id: string; accountId: string; postedDate: string; amount: number; direction: "inflow" | "outflow" }): TransactionInput => ({
-  category: null, essential: null, isTransfer: false, transferPairId: null, ...t,
+  description: "", category: null, essential: null, isTransfer: false, transferPairId: null, ...t,
 });
 
 // Timeline (endDate 2026-01-16, checking ends at 5000, card ends at 1000):

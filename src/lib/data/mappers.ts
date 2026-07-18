@@ -83,7 +83,7 @@ export function demoTransactionToRow(
 
 export interface TransactionRow {
   id: string; account_id: string; posted_date: string; amount: number;
-  direction: string; category: string | null; essential: boolean | null;
+  direction: string; description: string; category: string | null; essential: boolean | null;
   is_transfer: boolean; transfer_pair_id: string | null;
 }
 
@@ -94,6 +94,7 @@ export function rowToTransactionInput(row: TransactionRow): TransactionInput {
     postedDate: row.posted_date,
     amount: Number(row.amount),
     direction: row.direction as TransactionInput["direction"],
+    description: row.description,
     category: row.category,
     essential: row.essential,
     isTransfer: row.is_transfer,

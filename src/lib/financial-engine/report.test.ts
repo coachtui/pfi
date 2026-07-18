@@ -85,7 +85,7 @@ const txn = (
   opts: Partial<TransactionInput> = {},
 ): TransactionInput => ({
   id: `${postedDate}-${amount}-${direction}`, accountId: "chk", postedDate, amount, direction,
-  category: null, essential: null, isTransfer: false, transferPairId: null, ...opts,
+  description: "", category: null, essential: null, isTransfer: false, transferPairId: null, ...opts,
 });
 
 // A tiny hand-computed June with a May-31 prev snapshot for exact deltas.

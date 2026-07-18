@@ -57,12 +57,12 @@ describe("rowToTransactionInput", () => {
   it("maps a transaction row to the engine TransactionInput shape", () => {
     const row: TransactionRow = {
       id: "t1", account_id: "acc1", posted_date: "2026-06-15", amount: 3450,
-      direction: "inflow", category: "income", essential: null,
+      direction: "inflow", description: "Test", category: "income", essential: null,
       is_transfer: false, transfer_pair_id: null,
     };
     expect(rowToTransactionInput(row)).toEqual({
       id: "t1", accountId: "acc1", postedDate: "2026-06-15", amount: 3450,
-      direction: "inflow", category: "income", essential: null,
+      direction: "inflow", description: "Test", category: "income", essential: null,
       isTransfer: false, transferPairId: null,
     });
   });
@@ -70,11 +70,12 @@ describe("rowToTransactionInput", () => {
   it("coerces a numeric-string amount and preserves nulls", () => {
     const row: TransactionRow = {
       id: "t2", account_id: "acc1", posted_date: "2026-06-12", amount: "500" as unknown as number,
-      direction: "outflow", category: null, essential: false,
+      direction: "outflow", description: "Test", category: null, essential: false,
       is_transfer: true, transfer_pair_id: "t3",
     };
     const out = rowToTransactionInput(row);
     expect(out.amount).toBe(500);
+    expect(out.description).toBe("Test");
     expect(out.category).toBeNull();
     expect(out.isTransfer).toBe(true);
     expect(out.transferPairId).toBe("t3");
