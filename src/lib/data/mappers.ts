@@ -56,6 +56,7 @@ export function demoAccountToRow(userId: string, a: DemoAccount): Record<string,
     user_id: userId, provider: a.provider, institution: a.institution, type: a.type,
     subtype: a.subtype, display_name: a.displayName, mask: a.mask,
     current_balance: a.currentBalance, include_in_calculations: a.includeInCalculations,
+    credit_limit: a.creditLimit ?? null, interest_rate: a.interestRate ?? null,
     connection_status: "ok", last_synced_at: new Date().toISOString(),
   };
 }

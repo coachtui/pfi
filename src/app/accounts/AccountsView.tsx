@@ -10,6 +10,7 @@ import { formatDollars } from "@/lib/financial-engine/format";
 import type { AccountType } from "@/lib/financial-engine";
 import type { AccountSummary, RecentImport } from "@/lib/data/mappers";
 import { AccountSheet } from "./AccountSheet";
+import { DemoDataCard } from "./DemoDataCard";
 import { RecentImports } from "./RecentImports";
 
 const GROUPS: ReadonlyArray<{ title: string; types: readonly AccountType[] }> = [
@@ -164,6 +165,8 @@ export function AccountsView({
           <Plus size={18} aria-hidden /> Add account
         </button>
       )}
+
+      <DemoDataCard accounts={accounts} />
 
       <RecentImports imports={recentImports} />
 
