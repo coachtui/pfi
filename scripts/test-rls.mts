@@ -190,6 +190,28 @@ try {
   const { error: ovDeleteOwn } = await a.client.from("recurring_overrides")
     .delete().eq("user_id", a.id).eq("series_key", "deadbeef");
   check("recurring_overrides: owner can delete", !ovDeleteOwn, ovDeleteOwn?.message ?? "");
+
+  // ---- Balance anchoring slice: balance_anchors isolation ----
+  const { error: baInsertOwn } = await a.client.from("balance_anchors")
+    .insert({ user_id: a.id, account_id: acct!.id, anchor_date: "2026-07-31", balance: 1500, source: "manual" });
+  check("balance_anchors: owner can insert", !baInsertOwn, baInsertOwn?.message ?? "");
+
+  const { data: baCrossRead } = await b.client.from("balance_anchors").select("id");
+  check("balance_anchors: cross-user read returns nothing", (baCrossRead ?? []).length === 0);
+
+  const { error: baForge } = await b.client.from("balance_anchors")
+    .insert({ user_id: a.id, account_id: acct!.id, anchor_date: "2026-07-31", balance: 9999, source: "manual" });
+  check("balance_anchors: cross-user insert rejected", !!baForge);
+
+  await b.client.from("balance_anchors")
+    .update({ balance: 0 }).eq("user_id", a.id);
+  const { data: baAfter } = await a.client.from("balance_anchors")
+    .select("balance").eq("account_id", acct!.id).single();
+  check("balance_anchors: cross-user update is a no-op", Number(baAfter?.balance) === 1500);
+
+  const { error: baDeleteOwn } = await a.client.from("balance_anchors")
+    .delete().eq("user_id", a.id).eq("account_id", acct!.id);
+  check("balance_anchors: owner can delete", !baDeleteOwn, baDeleteOwn?.message ?? "");
 } finally {
   if (a) {
     try {
