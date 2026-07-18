@@ -6,7 +6,7 @@ import {
 } from "@/lib/financial-engine";
 import { rowToTransactionInput, snapshotToRow, type TransactionRow } from "./mappers";
 import { insertChunked } from "./insert-chunked";
-import { paginateAll } from "./paginate";
+import { paginateSelect } from "./paginate";
 
 // PostgREST caps unbounded selects at 1000 rows; a demo profile or long-lived
 // real account can exceed that, which used to silently truncate the
@@ -36,22 +36,16 @@ export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ erro
     const [acctRes, transactionRows, priorRows] = await Promise.all([
       supabase.from("financial_accounts")
         .select("id, type, current_balance, include_in_calculations, archived_at"),
-      paginateAll(PAGE_SIZE, async (from, to) => {
-        const res = await supabase.from("transactions")
+      paginateSelect<TransactionRow>(PAGE_SIZE, (from, to) =>
+        supabase.from("transactions")
           .select("id, account_id, posted_date, amount, direction, category, essential, is_transfer, transfer_pair_id")
           .order("id", { ascending: true })
-          .range(from, to);
-        if (res.error) throw new Error(res.error.message);
-        return res.data as TransactionRow[];
-      }),
-      paginateAll(PAGE_SIZE, async (from, to) => {
-        const res = await supabase.from("daily_snapshots")
+          .range(from, to)),
+      paginateSelect<{ date: string; safety_buffer: number }>(PAGE_SIZE, (from, to) =>
+        supabase.from("daily_snapshots")
           .select("date, safety_buffer")
           .order("date", { ascending: true })
-          .range(from, to);
-        if (res.error) throw new Error(res.error.message);
-        return res.data as Array<{ date: string; safety_buffer: number }>;
-      }),
+          .range(from, to)),
     ]);
     if (acctRes.error) throw new Error(acctRes.error.message);
 

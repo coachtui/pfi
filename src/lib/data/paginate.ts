@@ -21,3 +21,21 @@ export async function paginateAll<T>(
   }
   return all;
 }
+
+/**
+ * `paginateAll` specialized to Supabase/PostgREST's `{ data, error }` response
+ * shape: throws on a page error, treats a null payload as an empty page. Any
+ * select whose table can exceed PostgREST's row cap (1000 by default) must go
+ * through this (or `paginateAll` directly) with a STABLE, UNIQUE `.order()` —
+ * otherwise `.range()` pages can skip or duplicate rows. See DECISIONS #18–#21.
+ */
+export async function paginateSelect<T>(
+  pageSize: number,
+  buildPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  return paginateAll(pageSize, async (from, to) => {
+    const res = await buildPage(from, to);
+    if (res.error) throw new Error(res.error.message);
+    return res.data ?? [];
+  });
+}

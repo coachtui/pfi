@@ -18,12 +18,13 @@ import {
 } from "./mappers";
 import type { TransactionFilters } from "@/lib/validation/transactions";
 import { percentToDecimal } from "./unit-conversions";
-import { paginateAll } from "./paginate";
+import { paginateSelect } from "./paginate";
 
-// PostgREST caps unbounded selects at 1000 rows (see DECISIONS #18); a user
-// with more than 1000 transactions needs every row — for correct dedupe and
-// transfer-pair detection in getImportContext, and so no import batch is
-// silently dropped from getRecentImports' "Recent imports" list.
+// PostgREST caps unbounded selects at 1000 rows (see DECISIONS #18–#21).
+// Every select in this file on a table that grows without bound per user
+// (transactions, daily_snapshots, financial_events) goes through
+// paginateSelect with this page size and a stable, unique .order() —
+// financial_accounts stays unpaginated (bounded by household scale).
 const TRANSACTIONS_PAGE_SIZE = 1000;
 
 export interface ProfileRow {
@@ -65,21 +66,25 @@ export async function getTransactionsData(
   supabase: SupabaseClient,
   filters: TransactionFilters,
 ): Promise<{ transactions: TransactionListItem[]; accounts: AccountSummary[] }> {
-  let query = supabase
-    .from("transactions")
-    .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, notes, user_override, import_batch_id, financial_accounts!inner(display_name, provider)")
-    .order("posted_date", { ascending: false })
-    .order("created_at", { ascending: false });
-  if (filters.account) query = query.eq("account_id", filters.account);
-  if (filters.from) query = query.gte("posted_date", filters.from);
-  if (filters.to) query = query.lte("posted_date", filters.to);
-
-  const [txnRes, accounts] = await Promise.all([query, getAccountsData(supabase)]);
-  if (txnRes.error) throw txnRes.error;
+  const [rows, accounts] = await Promise.all([
+    paginateSelect<TransactionListRow>(TRANSACTIONS_PAGE_SIZE, (from, to) => {
+      let query = supabase
+        .from("transactions")
+        .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, notes, user_override, import_batch_id, financial_accounts!inner(display_name, provider)")
+        .order("posted_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true }); // unique tiebreaker: posted_date/created_at ties would make .range() pages unstable
+      if (filters.account) query = query.eq("account_id", filters.account);
+      if (filters.from) query = query.gte("posted_date", filters.from);
+      if (filters.to) query = query.lte("posted_date", filters.to);
+      return query.range(from, to) as unknown as PromiseLike<{ data: TransactionListRow[] | null; error: { message: string } | null }>;
+    }),
+    getAccountsData(supabase),
+  ]);
 
   // Category/direction filter on *effective* values: overrides live in jsonb,
   // so SQL filters on the source column would miss corrections.
-  let items = (txnRes.data as unknown as TransactionListRow[]).map(rowToTransactionListItem);
+  let items = rows.map(rowToTransactionListItem);
   if (filters.category) items = items.filter((t) => t.category === filters.category);
   if (filters.direction) items = items.filter((t) => t.direction === filters.direction);
   return { transactions: items, accounts };
@@ -91,17 +96,22 @@ export async function getDashboardData(
   snapshots: DailySnapshot[]; events: FinancialEvent[]; staleIndex: boolean;
   scoreSummary: ScoreSummary;
 }> {
-  const [snapRes, eventRes, latestTxnRes, scoreSummary] = await Promise.all([
-    supabase.from("daily_snapshots").select("*").order("date", { ascending: true }),
-    supabase.from("financial_events").select("*").order("date", { ascending: true }),
+  const [snapRows, eventRows, latestTxnRes, scoreSummary] = await Promise.all([
+    paginateSelect<SnapshotRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      // date alone is a unique order here only because RLS scopes rows to one
+      // user (PK is (user_id, date)) — do not reuse with a service-role client.
+      supabase.from("daily_snapshots").select("*").order("date", { ascending: true }).range(from, to)),
+    paginateSelect<EventRow & { id: string }>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      supabase.from("financial_events").select("*")
+        .order("date", { ascending: true })
+        .order("id", { ascending: true }) // unique tiebreaker: several events can share a date
+        .range(from, to)),
     supabase.from("transactions").select("posted_date").order("posted_date", { ascending: false }).limit(1),
     getScoreSummary(supabase),
   ]);
-  if (snapRes.error) throw snapRes.error;
-  if (eventRes.error) throw eventRes.error;
   if (latestTxnRes.error) throw latestTxnRes.error;
 
-  const snapshots = (snapRes.data as SnapshotRow[]).map(rowToSnapshot);
+  const snapshots = snapRows.map(rowToSnapshot);
   const latestTxnDate = latestTxnRes.data?.[0]?.posted_date as string | undefined;
   const latestSnapDate = snapshots.at(-1)?.date;
   // Cheap divergence proxy: a transaction newer than the newest snapshot means
@@ -111,7 +121,7 @@ export async function getDashboardData(
 
   return {
     snapshots,
-    events: (eventRes.data as Array<EventRow & { id: string }>).map(rowToEvent),
+    events: eventRows.map(rowToEvent),
     staleIndex,
     scoreSummary,
   };
@@ -120,20 +130,28 @@ export async function getDashboardData(
 export async function getReportData(supabase: SupabaseClient): Promise<{
   snapshots: DailySnapshot[]; transactions: TransactionInput[]; events: FinancialEvent[];
 }> {
-  const [snapRes, txnRes, eventRes] = await Promise.all([
-    supabase.from("daily_snapshots").select("*").order("date", { ascending: true }),
-    supabase
-      .from("transactions")
-      .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, notes, user_override")
-      .order("posted_date", { ascending: true }),
-    supabase.from("financial_events").select("*").order("date", { ascending: true }),
+  const [snapRows, txnRows, eventRows] = await Promise.all([
+    paginateSelect<SnapshotRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      // date alone is a unique order here only because RLS scopes rows to one
+      // user (PK is (user_id, date)) — do not reuse with a service-role client.
+      supabase.from("daily_snapshots").select("*").order("date", { ascending: true }).range(from, to)),
+    paginateSelect<TransactionRow & { description: string; notes: string | null; user_override: unknown }>(
+      TRANSACTIONS_PAGE_SIZE, (from, to) =>
+        supabase
+          .from("transactions")
+          .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, notes, user_override")
+          .order("posted_date", { ascending: true })
+          .order("id", { ascending: true }) // unique tiebreaker for stable pages
+          .range(from, to)),
+    paginateSelect<EventRow & { id: string }>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      supabase.from("financial_events").select("*")
+        .order("date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)),
   ]);
-  if (snapRes.error) throw snapRes.error;
-  if (txnRes.error) throw txnRes.error;
-  if (eventRes.error) throw eventRes.error;
   return {
-    snapshots: (snapRes.data as SnapshotRow[]).map(rowToSnapshot),
-    transactions: (txnRes.data as Array<TransactionRow & { description: string; notes: string | null; user_override: unknown }>).map((row) => {
+    snapshots: snapRows.map(rowToSnapshot),
+    transactions: txnRows.map((row) => {
       const effective = applyOverride({
         id: row.id, accountId: row.account_id, postedDate: row.posted_date,
         amount: Number(row.amount), direction: row.direction as "inflow" | "outflow",
@@ -148,7 +166,7 @@ export async function getReportData(supabase: SupabaseClient): Promise<{
         transferPairId: effective.transferPairId,
       };
     }),
-    events: (eventRes.data as Array<EventRow & { id: string }>).map(rowToEvent),
+    events: eventRows.map(rowToEvent),
   };
 }
 
@@ -178,25 +196,34 @@ interface ScoreSourceRows {
 }
 
 async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceRows> {
-  const [snapRes, txnRes, acctRes, eventRes] = await Promise.all([
-    supabase.from("daily_snapshots").select("*").order("date", { ascending: true }),
-    supabase
-      .from("transactions")
-      .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, user_override")
-      .order("posted_date", { ascending: true }),
+  const [snapRows, txnRows, acctRes, eventRows] = await Promise.all([
+    paginateSelect<SnapshotRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      // date alone is a unique order here only because RLS scopes rows to one
+      // user (PK is (user_id, date)) — do not reuse with a service-role client.
+      supabase.from("daily_snapshots").select("*").order("date", { ascending: true }).range(from, to)),
+    paginateSelect<TransactionRow & { description: string; user_override: unknown }>(
+      TRANSACTIONS_PAGE_SIZE, (from, to) =>
+        supabase
+          .from("transactions")
+          .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, user_override")
+          .order("posted_date", { ascending: true })
+          .order("id", { ascending: true }) // unique tiebreaker for stable pages
+          .range(from, to)),
+    // financial_accounts stays unpaginated: bounded by household scale, nowhere near the row cap.
     supabase
       .from("financial_accounts")
       .select("id, type, institution, provider, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at"),
-    supabase.from("financial_events").select("*").order("date", { ascending: true }),
+    paginateSelect<EventRow & { id: string }>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      supabase.from("financial_events").select("*")
+        .order("date", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to)),
   ]);
-  if (snapRes.error) throw snapRes.error;
-  if (txnRes.error) throw txnRes.error;
   if (acctRes.error) throw acctRes.error;
-  if (eventRes.error) throw eventRes.error;
 
   return {
-    snapshots: (snapRes.data as SnapshotRow[]).map(rowToSnapshot),
-    transactions: (txnRes.data as Array<TransactionRow & { description: string; user_override: unknown }>).map((row) => {
+    snapshots: snapRows.map(rowToSnapshot),
+    transactions: txnRows.map((row) => {
       const effective = applyOverride({
         id: row.id, accountId: row.account_id, postedDate: row.posted_date,
         amount: Number(row.amount), direction: row.direction as "inflow" | "outflow",
@@ -231,7 +258,7 @@ async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceR
         includeInCalculations: row.include_in_calculations,
         provider: row.provider,
       })),
-    events: (eventRes.data as Array<EventRow & { id: string }>).map(rowToEvent),
+    events: eventRows.map(rowToEvent),
   };
 }
 
@@ -294,17 +321,14 @@ export async function getImportContext(
     supabase.from("financial_accounts").select(
       "id, provider, institution, type, display_name, mask, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at",
     ),
-    paginateAll(TRANSACTIONS_PAGE_SIZE, async (from, to) => {
-      const res = await supabase.from("transactions")
+    paginateSelect<{
+      id: string; account_id: string; posted_date: string; amount: number;
+      direction: string; description: string; is_transfer: boolean; transfer_pair_id: string | null;
+    }>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      supabase.from("transactions")
         .select("id, account_id, posted_date, amount, direction, description, is_transfer, transfer_pair_id")
         .order("id", { ascending: true })
-        .range(from, to);
-      if (res.error) throw new Error(res.error.message);
-      return (res.data ?? []) as Array<{
-        id: string; account_id: string; posted_date: string; amount: number;
-        direction: string; description: string; is_transfer: boolean; transfer_pair_id: string | null;
-      }>;
-    }),
+        .range(from, to)),
   ]);
   if (acctRes.error) throw new Error(acctRes.error.message);
   const accounts = (acctRes.data as AccountRow[])
@@ -320,18 +344,16 @@ export async function getImportContext(
 
 /** Derived batch summaries — no import_batches table; grouped client-side. */
 export async function getRecentImports(supabase: SupabaseClient): Promise<RecentImport[]> {
-  const rows = await paginateAll(TRANSACTIONS_PAGE_SIZE, async (from, to) => {
-    const res = await supabase.from("transactions")
+  interface RecentImportRow {
+    id: string; import_batch_id: string; posted_date: string; created_at: string;
+    financial_accounts: { display_name: string };
+  }
+  const rows = await paginateSelect<RecentImportRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+    supabase.from("transactions")
       .select("id, import_batch_id, posted_date, created_at, financial_accounts!inner(display_name)")
       .not("import_batch_id", "is", null)
       .order("id", { ascending: true })
-      .range(from, to);
-    if (res.error) throw new Error(res.error.message);
-    return (res.data ?? []) as unknown as Array<{
-      id: string; import_batch_id: string; posted_date: string; created_at: string;
-      financial_accounts: { display_name: string };
-    }>;
-  });
+      .range(from, to) as unknown as PromiseLike<{ data: RecentImportRow[] | null; error: { message: string } | null }>);
   const groups = new Map<string, RecentImport>();
   for (const r of rows) {
     const g = groups.get(r.import_batch_id);
