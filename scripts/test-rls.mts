@@ -212,6 +212,16 @@ try {
   const { error: baDeleteOwn } = await a.client.from("balance_anchors")
     .delete().eq("user_id", a.id).eq("account_id", acct!.id);
   check("balance_anchors: owner can delete", !baDeleteOwn, baDeleteOwn?.message ?? "");
+
+  // Trigger check: A can't anchor an account that isn't theirs, even with their own user_id.
+  const { data: bAcct, error: bAcctErr } = await b.client.from("financial_accounts")
+    .insert({ user_id: b.id, provider: "manual", type: "checking", display_name: "B checking" })
+    .select("id").single();
+  check("B can insert own account", !bAcctErr && !!bAcct, bAcctErr?.message);
+
+  const { error: baForgedAccountErr } = await a.client.from("balance_anchors")
+    .insert({ user_id: a.id, account_id: bAcct!.id, anchor_date: "2026-07-31", balance: 1, source: "manual" });
+  check("balance_anchors: cannot anchor an account that isn't yours (ownership trigger)", !!baForgedAccountErr);
 } finally {
   if (a) {
     try {

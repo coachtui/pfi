@@ -177,3 +177,11 @@ Format: date, decision, context, alternatives, reasoning, consequences. Do not m
 **Reasoning:** transactions determine changes, never levels — the engine needs a trusted (date, balance) point, and a statement's ending balance is the cleanest one that exists (posted-only, bank-reconciled, exact close date — none of the pending-transaction fuzziness of a typed-in app-screen number). Reconciliation gives gap *detection* for free: a mismatch is mathematical proof of missing transactions. ROADMAP Phase 7 (Plaid) becomes "anchor rows from a new source, daily" on the same machinery.
 
 **Consequences:** an import now moves balances for anchored accounts (upgrading the old "adding transactions reshapes history backward and never changes today's balance" quirk into correct behavior for post-anchor transactions); a statement anchor dated earlier than a newer manual anchor does not supersede it — reconciliation surfaces the disagreement instead (KNOWN_LIMITATIONS); batch undo removes its anchor row; discrepancies and freshness are recorded but do not yet feed score confidence (deferred — versioned methodology change).
+
+## 25. 2026-07-18 — `balance_anchors` account-ownership trigger (final-review fix)
+
+**Decision:** migration `0008_balance_anchors_ownership` adds `balance_anchors_check_account_ownership`, a `before insert or update` trigger mirroring `transactions_check_account_ownership` (0002): it rejects any row whose `account_id` doesn't belong to `financial_accounts.user_id = new.user_id`.
+
+**Reasoning:** `balance_anchors` (#24) has the same `(user_id, account_id)` shape as `transactions`, but shipped in 0007 with RLS ownership checks only. RLS's `own_insert` policy (`auth.uid() = user_id`) doesn't stop a client inserting their own real `user_id` alongside a forged `account_id` belonging to another user's account — Postgres FK constraints don't consult RLS. Flagged in final whole-branch review; closed by reusing the established 0002 pattern rather than inventing a new one.
+
+**Consequences:** `scripts/test-rls.mts` gained a check proving the trigger rejects a forged `account_id` even when `user_id` is genuine. No application code changes — `importTransactions` and manual anchor writes already only ever set `account_id` to an account they just looked up as the user's own.

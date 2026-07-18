@@ -135,6 +135,41 @@ test("undoing the import restores the pre-anchor balance", async () => {
   await expect(row.getByText("$1,000")).toBeVisible({ timeout: 30_000 });
 });
 
+test("a back-filled earlier-dated statement anchor reconciles but does not supersede the current balance", async () => {
+  // A second, distinct manual account so this test doesn't interfere with
+  // the "Anchor QA Checking" account used above. Creation writes a manual
+  // anchor dated today at $2000.
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "Add account" }).first().click();
+  await page.locator("#acct-name").fill("Backfill QA Savings");
+  await page.locator("#acct-balance").fill("2000");
+  await page.getByRole("button", { name: "Add account" }).last().click();
+  await expect(page.getByText("Backfill QA Savings")).toBeVisible({ timeout: 30_000 });
+
+  // Import the same fixture, but anchor the statement to a fixed date well
+  // before today (not the 35-day staleness window's edge — just clearly
+  // earlier than the creation anchor).
+  await page.goto("/import");
+  await page.locator("#import-account").selectOption({ label: "Backfill QA Savings" });
+  await page.locator("#import-file").setInputFiles("e2e/fixtures/checking-statement.csv");
+  await page.getByRole("button", { name: "Preview import" }).click();
+
+  await page.locator("#anchor-balance").fill("1900");
+  await page.locator("#anchor-date").fill("2026-06-01");
+  await page.getByRole("button", { name: /^Import 3 transactions/ }).click();
+
+  // The import commits and reconciliation is surfaced — not blocked by the
+  // earlier date.
+  await expect(page.getByText(/Balance anchored/)).toBeVisible({ timeout: 30_000 });
+
+  // Critically: the account's displayed balance is still the creation
+  // anchor's $2,000, not recomputed from the earlier-dated statement — the
+  // later (today-dated) anchor remains effective.
+  await page.goto("/accounts");
+  const row = page.locator(".rounded-card").filter({ hasText: "Backfill QA Savings" });
+  await expect(row.getByText("$2,000")).toBeVisible();
+});
+
 test("sign out returns to login", async () => {
   await page.goto("/");
   await page.getByRole("button", { name: "Sign out" }).click();
