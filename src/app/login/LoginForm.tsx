@@ -48,8 +48,11 @@ export function LoginForm() {
         setHashError("That sign-in link expired or was invalid. Try again.");
         return;
       }
+      // router.replace() alone already fetches a fresh RSC payload for the
+      // destination; a same-tick router.refresh() call was found (live e2e
+      // testing) to make the App Router drop the server's pending
+      // NEXT_REDIRECT to /onboarding, leaving the user stuck on /login.
       router.replace("/");
-      router.refresh();
     });
   }, [router]);
 
