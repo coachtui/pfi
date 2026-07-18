@@ -60,6 +60,17 @@ export async function loadDemoData(profileId?: unknown): Promise<{ error: string
   return { error: "" };
 }
 
+/**
+ * Void-returning wrapper for use as a <form action> reference from a Server
+ * Component (e.g. EmptyDashboard's per-profile buttons). Form actions must
+ * type as `(formData: FormData) => void | Promise<void>`, which loadDemoData's
+ * `{ error }` contract doesn't satisfy; this discards the result rather than
+ * changing that contract for its other (client-side, error-surfacing) callers.
+ */
+export async function loadDemoDataForForm(profileId?: unknown): Promise<void> {
+  await loadDemoData(profileId);
+}
+
 async function clearDemoRows(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,

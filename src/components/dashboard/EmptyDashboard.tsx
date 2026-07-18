@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Database, Upload } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { loadDemoData } from "@/app/actions/demo";
+import { loadDemoDataForForm } from "@/app/actions/demo";
 import { LoadDemoButton } from "@/components/dashboard/LoadDemoButton";
 import { DEMO_PROFILE_METAS } from "@/lib/demo-data/profiles";
 
@@ -21,7 +21,7 @@ export function EmptyDashboard({ companyName }: { companyName: string }) {
         </div>
         <div className="flex w-full max-w-sm flex-col gap-2">
           {DEMO_PROFILE_METAS.map((m) => (
-            <form key={m.id} action={async () => { await loadDemoData(m.id); }} className="flex flex-col items-center gap-1">
+            <form key={m.id} action={loadDemoDataForForm.bind(null, m.id)} className="flex flex-col items-center gap-1">
               <LoadDemoButton label={`Load ${m.companyName}`} pendingLabel="Loading demo data…" />
               <p className="text-xs text-secondary">{m.description}</p>
             </form>
