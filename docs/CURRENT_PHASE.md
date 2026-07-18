@@ -1,10 +1,17 @@
 # Current Phase
 
-_Last updated: 2026-07-17 (post-merge hotfix: paginate `getImportContext`/`importTransactions`' unbounded queries)._
+_Last updated: 2026-07-17 (post-merge hotfix: paginate `getRecentImports`' unbounded query)._
 
-**Phase:** 0 complete, 1.5 (infrastructure) complete, visual-parity slice (Home polish, Rankings, Data) complete, report screen complete, transactions/accounts CRUD slice complete, PFI score v1 (Phase 2) complete, Phase 3's CSV import (column mapping, preview, dedupe, transfer detection, import summary) **complete and merged to main** (Tasks 1–18 plus final whole-branch review; PR #2, merged 2026-07-17) → a post-merge **cleanup slice complete** (Tasks 1–4: vestigial-column migration, a MapStep mobile CTA-visibility fix, doc corrections, full verification) → the **demo profiles + switcher slice complete** (Tasks 1–9: profile registry architecture, two new personas, a parameterized demo-data action contract, both switcher UI surfaces, docs, and full live-QA verification, including one bug found and fixed live) → a post-merge **hotfix**: `rebuildSnapshots`' unbounded queries were silently hitting PostgREST's 1000-row cap, zeroing obligation/score data for any account past that threshold (DECISIONS #18) → a **fast follow-up hotfix is complete**: the same fix applied to `getImportContext`/`importTransactions`' unbounded existing-transaction fetches (DECISIONS #19).
+**Phase:** 0 complete, 1.5 (infrastructure) complete, visual-parity slice (Home polish, Rankings, Data) complete, report screen complete, transactions/accounts CRUD slice complete, PFI score v1 (Phase 2) complete, Phase 3's CSV import (column mapping, preview, dedupe, transfer detection, import summary) **complete and merged to main** (Tasks 1–18 plus final whole-branch review; PR #2, merged 2026-07-17) → a post-merge **cleanup slice complete** (Tasks 1–4: vestigial-column migration, a MapStep mobile CTA-visibility fix, doc corrections, full verification) → the **demo profiles + switcher slice complete** (Tasks 1–9: profile registry architecture, two new personas, a parameterized demo-data action contract, both switcher UI surfaces, docs, and full live-QA verification, including one bug found and fixed live) → three post-merge pagination hotfixes, all applying the same `paginateAll` fix to a different unbounded-`.select()` site found live: `rebuildSnapshots` (DECISIONS #18), `getImportContext`/`importTransactions` (DECISIONS #19), and now `getRecentImports` (DECISIONS #20) — all four known unbounded `transactions` fetches in this codebase are now paginated.
 
-## Completed (this phase — import-pagination follow-up hotfix)
+## Completed (this phase — getRecentImports pagination follow-up)
+
+- **`src/lib/data/queries.ts`'s `getRecentImports` fixed.** Its imported-transactions fetch (feeds `/accounts`' "Recent imports" list) now goes through `paginateAll`, ordered by `transactions.id`, sharing the page-size constant (renamed `TRANSACTIONS_PAGE_SIZE`, was `IMPORT_CONTEXT_PAGE_SIZE`) with `getImportContext`.
+- **Live-verified against a real seeded account**: 1050 transactions split across two import batches (500 + 550 rows). The old (un-ordered) unbounded query returned exactly 1000 of the 1050 rows and undercounted one batch as 450 rows (true count 500) — a real user would have seen a wrong row count (and potentially wrong first/last dates) for any batch whose rows fell past the cap. The paginated version correctly reports 500/550, 1050 total. Test user cleaned up afterward.
+- **Docs.** DECISIONS #20 records the fix. KNOWN_LIMITATIONS' now-resolved `getRecentImports` entry is replaced with a note about further unbounded selects found on `daily_snapshots`/`financial_events`/`transactions` in `getDashboardData` and `getReportData` (same file) — not audited or fixed in this pass, flagged as the next candidates if this cleanup continues.
+- **Verification.** `pnpm check` green: 0 lint errors, 1 pre-existing warning; typecheck clean; 242/242 tests (no new unit tests, same established convention as the prior two pagination hotfixes); build succeeds. `pnpm test:rls`: 19/19 (no schema change).
+
+## Completed (previous phase — import-pagination follow-up hotfix)
 
 - **`src/lib/data/queries.ts`'s `getImportContext` fixed.** Its existing-transactions fetch (used for the `/import` preview's dedupe/transfer-pair detection) now goes through `paginateAll` instead of a single unbounded `.select()`, ordered by `transactions.id` for stable pagination.
 - **`src/app/actions/imports.ts`'s `importTransactions` fixed.** The server-side dedupe re-check — the actual trust boundary, since the client's own dedupe output is only advisory — had the identical unbounded-fetch pattern; also paginated now.
@@ -120,7 +127,7 @@ _Last updated: 2026-07-17 (post-merge hotfix: paginate `getImportContext`/`impor
 
 ## In progress
 
-- Nothing — the import-pagination follow-up hotfix is complete; the next slice has not been started.
+- Nothing — the `getRecentImports` pagination follow-up is complete; the next slice has not been started.
 
 ## Next three priorities
 
@@ -140,7 +147,9 @@ _Last updated: 2026-07-17 (post-merge hotfix: paginate `getImportContext`/`impor
 
 ## Test status
 
-`pnpm check` (lint + typecheck + test + build): green, re-verified on `worktree-fix-import-pagination` after the import-pagination follow-up hotfix, 2026-07-17. 242/242 tests passing (32 test files, unchanged — no new unit tests, consistent with this codebase's convention for DB-touching data/action-layer code). Lint: 0 errors, 1 pre-existing warning (`AccountSheet.tsx` React Compiler incompatible-library note) — predates this fix and is unrelated. Build succeeds, all 12 routes compile. `pnpm test:rls`: 19/19 passing against the live Supabase project (no schema change). **Live-verified against a real seeded account** (1050 transactions): confirmed the old unbounded query returned exactly 1000 rows and the paginated version returned all 1050. Test user cleaned up afterward.
+`pnpm check` (lint + typecheck + test + build): green, re-verified on `worktree-fix-recent-imports-pagination` after the `getRecentImports` follow-up, 2026-07-17. 242/242 tests passing (32 test files, unchanged — no new unit tests, same convention as the prior two pagination hotfixes). Lint: 0 errors, 1 pre-existing warning (`AccountSheet.tsx` React Compiler incompatible-library note) — predates this fix and is unrelated. Build succeeds, all 12 routes compile. `pnpm test:rls`: 19/19 passing against the live Supabase project (no schema change). **Live-verified against a real seeded account** (1050 transactions, 2 import batches of 500/550): confirmed the old unbounded query undercounted the older batch as 450 rows (true count 500); the paginated version correctly reports 500/550, 1050 total. Test user cleaned up afterward.
+
+Prior hotfix (getImportContext/importTransactions pagination): `pnpm check` green, re-verified on `worktree-fix-import-pagination`, 2026-07-17. 242/242 tests passing (32 files, unchanged). `pnpm test:rls`: 19/19. **Live-verified against a real seeded account** (1050 transactions): confirmed the old unbounded query returned exactly 1000 rows and the paginated version returned all 1050.
 
 Prior hotfix (rebuildSnapshots pagination): `pnpm check` green, re-verified on `worktree-fix-obligations-pagination`, 2026-07-17. 242/242 tests passing (32 test files, up from 238/31 — new `paginate.test.ts`, 4 tests). `pnpm test:rls`: 19/19. **Live-verified against a real broken account**: a test user was onboarded with Blue Reef Partners loaded (1100 transactions), confirmed to reproduce the bug (`near_term_obligations: 0` in the live database and "Obligations $0" on the dashboard), then confirmed fixed after applying `paginateAll` (recomputed to 150, matching the dataset's true value; dashboard UI showed the corrected figure).
 

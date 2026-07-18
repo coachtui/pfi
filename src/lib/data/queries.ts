@@ -21,9 +21,10 @@ import { percentToDecimal } from "./unit-conversions";
 import { paginateAll } from "./paginate";
 
 // PostgREST caps unbounded selects at 1000 rows (see DECISIONS #18); a user
-// with more than 1000 transactions needs every row for correct dedupe and
-// transfer-pair detection, not just the first page.
-const IMPORT_CONTEXT_PAGE_SIZE = 1000;
+// with more than 1000 transactions needs every row — for correct dedupe and
+// transfer-pair detection in getImportContext, and so no import batch is
+// silently dropped from getRecentImports' "Recent imports" list.
+const TRANSACTIONS_PAGE_SIZE = 1000;
 
 export interface ProfileRow {
   id: string; username: string; age_cohort: string; income_band: string;
@@ -293,7 +294,7 @@ export async function getImportContext(
     supabase.from("financial_accounts").select(
       "id, provider, institution, type, display_name, mask, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at",
     ),
-    paginateAll(IMPORT_CONTEXT_PAGE_SIZE, async (from, to) => {
+    paginateAll(TRANSACTIONS_PAGE_SIZE, async (from, to) => {
       const res = await supabase.from("transactions")
         .select("id, account_id, posted_date, amount, direction, description, is_transfer, transfer_pair_id")
         .order("id", { ascending: true })
@@ -319,16 +320,20 @@ export async function getImportContext(
 
 /** Derived batch summaries — no import_batches table; grouped client-side. */
 export async function getRecentImports(supabase: SupabaseClient): Promise<RecentImport[]> {
-  const { data, error } = await supabase
-    .from("transactions")
-    .select("import_batch_id, posted_date, created_at, financial_accounts!inner(display_name)")
-    .not("import_batch_id", "is", null);
-  if (error) throw new Error(error.message);
+  const rows = await paginateAll(TRANSACTIONS_PAGE_SIZE, async (from, to) => {
+    const res = await supabase.from("transactions")
+      .select("id, import_batch_id, posted_date, created_at, financial_accounts!inner(display_name)")
+      .not("import_batch_id", "is", null)
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (res.error) throw new Error(res.error.message);
+    return (res.data ?? []) as unknown as Array<{
+      id: string; import_batch_id: string; posted_date: string; created_at: string;
+      financial_accounts: { display_name: string };
+    }>;
+  });
   const groups = new Map<string, RecentImport>();
-  for (const r of data as unknown as Array<{
-    import_batch_id: string; posted_date: string; created_at: string;
-    financial_accounts: { display_name: string };
-  }>) {
+  for (const r of rows) {
     const g = groups.get(r.import_batch_id);
     if (!g) {
       groups.set(r.import_batch_id, {
