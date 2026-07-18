@@ -63,6 +63,27 @@ test("accounts screen shows the demo data card with Koa active", async () => {
   await expect(page.getByText("Active", { exact: true })).toBeVisible();
 });
 
+test("recurring section lists series detected from Koa demo data", async () => {
+  await page.goto("/accounts");
+  const section = page.locator("#recurring");
+  await expect(section.getByRole("heading", { name: "Recurring" })).toBeVisible();
+  await expect(section.getByText(/employer payroll/i)).toBeVisible();
+  await expect(section.getByText(/mortgage payment/i)).toBeVisible();
+});
+
+test("dismissing a recurring series moves it under Dismissed and restore undoes it", async () => {
+  await page.goto("/accounts");
+  const section = page.locator("#recurring");
+  const row = section.getByTestId("recurring-row").filter({ hasText: /auto insurance/i });
+  await row.getByRole("button", { name: "Dismiss", exact: true }).click();
+  await row.getByRole("button", { name: "Confirm dismiss" }).click();
+  // The override triggers a snapshot rebuild before the refresh lands.
+  await expect(section.getByText("Dismissed (1)")).toBeVisible({ timeout: 30_000 });
+  await section.getByText("Dismissed (1)").click();
+  await section.getByTestId("recurring-dismissed-row").getByRole("button", { name: "Restore" }).click();
+  await expect(section.getByText(/^Dismissed \(/)).toBeHidden({ timeout: 30_000 });
+});
+
 test("sign out returns to login", async () => {
   await page.goto("/");
   await page.getByRole("button", { name: "Sign out" }).click();
