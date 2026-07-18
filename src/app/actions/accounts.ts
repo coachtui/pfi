@@ -36,7 +36,7 @@ export async function createAccount(values: AccountFormValues): Promise<Mutation
   });
 
   const finish = await finishWithRebuild(supabase);
-  if (anchorErr) return { ...finish, warning: finish.warning ?? `Account saved, but its balance anchor wasn't recorded: ${anchorErr.message}` };
+  if (anchorErr) return { ...finish, warning: [finish.warning, `Account saved, but its balance anchor wasn't recorded: ${anchorErr.message}`].filter(Boolean).join(" ") };
   return finish;
 }
 
@@ -79,7 +79,7 @@ export async function updateAccount(
     });
     if (anchorErr) {
       const finish = await finishWithRebuild(supabase);
-      return { ...finish, warning: finish.warning ?? `Saved, but the balance anchor wasn't recorded: ${anchorErr.message}` };
+      return { ...finish, warning: [finish.warning, `Saved, but the balance anchor wasn't recorded: ${anchorErr.message}`].filter(Boolean).join(" ") };
     }
   }
 
