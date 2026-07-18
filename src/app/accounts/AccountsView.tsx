@@ -9,9 +9,11 @@ import { setAccountArchived, setAccountIncluded } from "@/app/actions/accounts";
 import { formatDollars } from "@/lib/financial-engine/format";
 import type { AccountType } from "@/lib/financial-engine";
 import type { AccountSummary, RecentImport } from "@/lib/data/mappers";
+import type { RecurringListItem } from "@/lib/data/queries";
 import { AccountSheet } from "./AccountSheet";
 import { DemoDataCard } from "./DemoDataCard";
 import { RecentImports } from "./RecentImports";
+import { RecurringSection } from "./RecurringSection";
 
 const GROUPS: ReadonlyArray<{ title: string; types: readonly AccountType[] }> = [
   { title: "Cash", types: ["checking", "savings", "money_market"] },
@@ -27,10 +29,11 @@ const actionCls =
   "rounded-lg border border-border-subtle px-2.5 py-1 text-xs text-secondary transition-colors hover:text-primary disabled:opacity-60";
 
 export function AccountsView({
-  accounts, recentImports,
+  accounts, recentImports, recurring,
 }: {
   accounts: AccountSummary[];
   recentImports: RecentImport[];
+  recurring: RecurringListItem[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -169,6 +172,8 @@ export function AccountsView({
       <DemoDataCard accounts={accounts} />
 
       <RecentImports imports={recentImports} />
+
+      <RecurringSection items={recurring} />
 
       <AccountSheet account={null} open={adding} onClose={() => setAdding(false)} />
       {editing && <AccountSheet key={editing.id} account={editing} open onClose={() => setEditing(null)} />}
