@@ -6,7 +6,7 @@ Phases merge the original brief with the strategy addendum (explainable financia
 
 Repo initialized (Next.js 16 / TS strict / Tailwind 4 / Vitest / ESLint / Prettier), design tokens, centralized branding, env validation, docs suite, deterministic demo-data strategy, navigation shell. Supabase wiring deliberately deferred (DECISIONS #3).
 
-## Phase 1 — Visual prototype 🔨 (in progress)
+## Phase 1 — Visual prototype ✅ (2026-07-17)
 
 - ✅ Home dashboard: company header, personal index, actual/baseline/waterline chart with event markers + 30D/90D/1Y/All, metric cards, "What moved your line", deterministic performance brief
 - ✅ Onboarding flow (identity, cohorts, privacy, sample data) — landed with Phase 1.5
@@ -14,7 +14,7 @@ Repo initialized (Next.js 16 / TS strict / Tailwind 4 / Vitest / ESLint / Pretti
 - ✅ Data/benchmarks screen (mock aggregates)
 - ✅ Report screen (shareholder report computed from demo data via the `report.ts` engine, not mock text)
 - ✅ Blue Reef Partners + North Shore Capital demo profiles — landed 2026-07-17 with a demo-profile switcher (DECISIONS #17)
-- ⬜ PWA manifest & installability; Playwright smoke test
+- ✅ PWA manifest & installability; Playwright smoke test — landed 2026-07-17 (DECISIONS #22)
 
 Exit: all primary screens responsive; demo user navigates the full experience; components reusable; suitable for product review.
 

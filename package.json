@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:rls": "tsx --env-file=.env.local scripts/test-rls.mts",
     "test:live": "vitest run --config vitest.live.config.ts",
+    "test:e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
@@ -30,6 +31,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
