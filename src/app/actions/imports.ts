@@ -151,7 +151,7 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
       const finish = await finishWithRebuild(supabase);
       return {
         ...finish,
-        warning: finish.warning ?? `Imported, but the balance anchor could not be saved: ${e instanceof Error ? e.message : "anchor lookup failed"}`,
+        warning: [finish.warning, `Imported, but the balance anchor could not be saved: ${e instanceof Error ? e.message : "anchor lookup failed"}`].filter(Boolean).join(" "),
         batchId, imported: inserts.length, skippedDuplicates,
       };
     }
@@ -184,7 +184,7 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
       const finish = await finishWithRebuild(supabase);
       return {
         ...finish,
-        warning: finish.warning ?? `Imported, but the balance anchor could not be saved: ${anchorInsErr.message}`,
+        warning: [finish.warning, `Imported, but the balance anchor could not be saved: ${anchorInsErr.message}`].filter(Boolean).join(" "),
         batchId, imported: inserts.length, skippedDuplicates,
       };
     }
@@ -219,7 +219,13 @@ export async function undoImport(batchId: string): Promise<MutationResult> {
     .delete()
     .eq("import_batch_id", batchId)
     .eq("user_id", user.id);
-  if (anchorDelErr) return { error: anchorDelErr.message };
+  if (anchorDelErr) {
+    const finish = await finishWithRebuild(supabase);
+    return {
+      ...finish,
+      warning: [finish.warning, `Undone, but the batch's balance anchor could not be removed: ${anchorDelErr.message}`].filter(Boolean).join(" "),
+    };
+  }
 
   return finishWithRebuild(supabase);
 }
