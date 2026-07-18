@@ -168,6 +168,28 @@ try {
   const { error: aBatchMutErr } = await a.client.from("transactions")
     .update({ import_batch_id: randomUUID() }).eq("import_batch_id", importBatchId).select("id").single();
   check("import_batch_id is immutable after insert", !!aBatchMutErr);
+
+  // ---- Recurring detection slice: recurring_overrides isolation ----
+  const { error: ovInsertOwn } = await a.client.from("recurring_overrides")
+    .insert({ user_id: a.id, series_key: "deadbeef", status: "dismissed" });
+  check("recurring_overrides: owner can insert", !ovInsertOwn, ovInsertOwn?.message ?? "");
+
+  const { data: ovCrossRead } = await b.client.from("recurring_overrides").select("series_key");
+  check("recurring_overrides: cross-user read returns nothing", (ovCrossRead ?? []).length === 0);
+
+  const { error: ovForge } = await b.client.from("recurring_overrides")
+    .insert({ user_id: a.id, series_key: "cafef00d", status: "confirmed" });
+  check("recurring_overrides: cross-user insert rejected", !!ovForge);
+
+  await b.client.from("recurring_overrides")
+    .update({ status: "confirmed" }).eq("user_id", a.id).eq("series_key", "deadbeef");
+  const { data: ovAfter } = await a.client.from("recurring_overrides")
+    .select("status").eq("series_key", "deadbeef").single();
+  check("recurring_overrides: cross-user update is a no-op", ovAfter?.status === "dismissed");
+
+  const { error: ovDeleteOwn } = await a.client.from("recurring_overrides")
+    .delete().eq("user_id", a.id).eq("series_key", "deadbeef");
+  check("recurring_overrides: owner can delete", !ovDeleteOwn, ovDeleteOwn?.message ?? "");
 } finally {
   if (a) {
     try {
