@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildDailySnapshots, deriveRebuildConfig,
-  type AccountInput, type AccountType,
+  type AccountInput, type AccountType, type RecurringOverride,
 } from "@/lib/financial-engine";
 import { rowToTransactionInput, snapshotToRow, type TransactionRow } from "./mappers";
 import { insertChunked } from "./insert-chunked";
@@ -21,19 +21,22 @@ interface RebuildAccountRow {
 }
 
 /**
- * Recompute the user's daily_snapshots from source-of-truth accounts and
- * transactions (source columns only — overrides never move the index).
- * Idempotent: same inputs always produce the same rows. Returns an error
- * string instead of throwing so callers can degrade to a "recalculation
- * pending" state; the delete+insert is not transactional, and the stale-index
- * check plus retry-on-next-mutation covers the failure window.
+ * Recompute the user's daily_snapshots from source-of-truth accounts,
+ * transactions, and recurring overrides. Transaction category and
+ * description overrides never move the index (source columns only);
+ * recurring confirm/dismiss deliberately does — it curates which series
+ * project into the obligations window (see DECISIONS #23). Idempotent: same
+ * inputs always produce the same rows. Returns an error string instead of
+ * throwing so callers can degrade to a "recalculation pending" state; the
+ * delete+insert is not transactional, and the stale-index check plus
+ * retry-on-next-mutation covers the failure window.
  */
 export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ error: string }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Not authenticated" };
 
-    const [acctRes, transactionRows, priorRows] = await Promise.all([
+    const [acctRes, transactionRows, priorRows, overrideRows] = await Promise.all([
       supabase.from("financial_accounts")
         .select("id, type, current_balance, include_in_calculations, archived_at"),
       paginateSelect<TransactionRow>(PAGE_SIZE, (from, to) =>
@@ -45,6 +48,11 @@ export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ erro
         supabase.from("daily_snapshots")
           .select("date, safety_buffer")
           .order("date", { ascending: true })
+          .range(from, to)),
+      paginateSelect<{ series_key: string; status: string }>(PAGE_SIZE, (from, to) =>
+        supabase.from("recurring_overrides")
+          .select("series_key, status")
+          .order("series_key", { ascending: true })
           .range(from, to)),
     ]);
     if (acctRes.error) throw new Error(acctRes.error.message);
@@ -64,6 +72,10 @@ export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ erro
       date: p.date,
       safetyBuffer: Number(p.safety_buffer),
     }));
+    const recurringOverrides: RecurringOverride[] = overrideRows.map((r) => ({
+      seriesKey: r.series_key,
+      status: r.status as RecurringOverride["status"],
+    }));
 
     const config = deriveRebuildConfig(prior, transactions);
 
@@ -71,7 +83,7 @@ export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ erro
     if (del.error) throw new Error(del.error.message);
 
     if (config) {
-      const snapshots = buildDailySnapshots(accounts, transactions, config);
+      const snapshots = buildDailySnapshots(accounts, transactions, config, recurringOverrides);
       await insertChunked(supabase, "daily_snapshots", snapshots.map((s) => snapshotToRow(user.id, s)));
     }
     return { error: "" };
