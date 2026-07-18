@@ -6,6 +6,14 @@ import {
 } from "@/lib/financial-engine";
 import { rowToTransactionInput, snapshotToRow, type TransactionRow } from "./mappers";
 import { insertChunked } from "./insert-chunked";
+import { paginateAll } from "./paginate";
+
+// PostgREST caps unbounded selects at 1000 rows; a demo profile or long-lived
+// real account can exceed that, which used to silently truncate the
+// obligation-window computation to zero for the missing tail (found live:
+// Blue Reef Partners' 1042 transactions left near_term_obligations = 0 for
+// every day after the 1000th row's date).
+const PAGE_SIZE = 1000;
 
 interface RebuildAccountRow {
   id: string; type: string; current_balance: number | null;
@@ -25,16 +33,27 @@ export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ erro
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Not authenticated" };
 
-    const [acctRes, txnRes, snapRes] = await Promise.all([
+    const [acctRes, transactionRows, priorRows] = await Promise.all([
       supabase.from("financial_accounts")
         .select("id, type, current_balance, include_in_calculations, archived_at"),
-      supabase.from("transactions")
-        .select("id, account_id, posted_date, amount, direction, category, essential, is_transfer, transfer_pair_id"),
-      supabase.from("daily_snapshots").select("date, safety_buffer"),
+      paginateAll(PAGE_SIZE, async (from, to) => {
+        const res = await supabase.from("transactions")
+          .select("id, account_id, posted_date, amount, direction, category, essential, is_transfer, transfer_pair_id")
+          .order("id", { ascending: true })
+          .range(from, to);
+        if (res.error) throw new Error(res.error.message);
+        return res.data as TransactionRow[];
+      }),
+      paginateAll(PAGE_SIZE, async (from, to) => {
+        const res = await supabase.from("daily_snapshots")
+          .select("date, safety_buffer")
+          .order("date", { ascending: true })
+          .range(from, to);
+        if (res.error) throw new Error(res.error.message);
+        return res.data as Array<{ date: string; safety_buffer: number }>;
+      }),
     ]);
     if (acctRes.error) throw new Error(acctRes.error.message);
-    if (txnRes.error) throw new Error(txnRes.error.message);
-    if (snapRes.error) throw new Error(snapRes.error.message);
 
     const active = (acctRes.data as RebuildAccountRow[]).filter((a) => a.archived_at === null);
     const activeIds = new Set(active.map((a) => a.id));
@@ -44,10 +63,10 @@ export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ erro
       currentBalance: Number(a.current_balance ?? 0),
       includeInCalculations: a.include_in_calculations,
     }));
-    const transactions = (txnRes.data as TransactionRow[])
+    const transactions = transactionRows
       .map(rowToTransactionInput)
       .filter((t) => activeIds.has(t.accountId));
-    const prior = (snapRes.data as Array<{ date: string; safety_buffer: number }>).map((p) => ({
+    const prior = priorRows.map((p) => ({
       date: p.date,
       safetyBuffer: Number(p.safety_buffer),
     }));
