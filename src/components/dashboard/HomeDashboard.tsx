@@ -162,6 +162,7 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
           tone="neutral"
           trend={trendOf((s) => -s.nearTermObligations)}
           trendDescription="Near-term obligations over the last 14 days"
+          href="/accounts#recurring"
         />
         <MetricCard
           label="Cushion"

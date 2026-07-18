@@ -7,11 +7,13 @@ import {
   applyOverride, parseOverride,
   buildMetricInputs, computeMetrics, computeConfidence, computeScore,
   computeScoreDelta, computeScoreMomentum, addDays,
+  detectRecurringSeries,
   type MomentumState, type OverallState, type ScoreBreakdown, type ScoreDelta,
   type ScoreAccountInput, type ScoreTransactionInput,
+  type RecurringSeries, type AccountInput, type AccountType,
 } from "@/lib/financial-engine";
 import {
-  rowToSnapshot, rowToEvent, rowToTransactionListItem,
+  rowToSnapshot, rowToEvent, rowToTransactionListItem, rowToTransactionInput,
   rowToAccountSummary, type SnapshotRow, type EventRow, type TransactionRow,
   type TransactionListRow, type AccountRow, type AccountSummary, type TransactionListItem,
   type RecentImport,
@@ -161,8 +163,8 @@ export async function getReportData(supabase: SupabaseClient): Promise<{
       });
       return {
         id: effective.id, accountId: effective.accountId, postedDate: effective.postedDate,
-        amount: effective.amount, direction: effective.direction, category: effective.category,
-        essential: effective.essential, isTransfer: effective.isTransfer,
+        amount: effective.amount, direction: effective.direction, description: effective.description,
+        category: effective.category, essential: effective.essential, isTransfer: effective.isTransfer,
         transferPairId: effective.transferPairId,
       };
     }),
@@ -374,4 +376,63 @@ export async function getRecentImports(supabase: SupabaseClient): Promise<Recent
     }
   }
   return [...groups.values()].sort((a, b) => (a.importedAt < b.importedAt ? 1 : -1));
+}
+
+export interface RecurringListItem extends RecurringSeries {
+  status: "confirmed" | "dismissed" | null;
+}
+
+/**
+ * Detected recurring series with the user's confirm/dismiss status merged in.
+ * Detection is recomputed here, not persisted — the reference date is derived
+ * from the data (never wall-clock "today") so demo datasets with a fixed end
+ * date don't spuriously read as lapsed.
+ */
+export async function getRecurringData(supabase: SupabaseClient): Promise<RecurringListItem[]> {
+  interface RecurringAccountRow {
+    id: string; type: string; current_balance: number | null;
+    include_in_calculations: boolean; archived_at: string | null;
+  }
+  const [acctRes, txnRows, overrideRows, latestSnap] = await Promise.all([
+    supabase.from("financial_accounts")
+      .select("id, type, current_balance, include_in_calculations, archived_at"),
+    paginateSelect<TransactionRow>(1000, (from, to) =>
+      supabase.from("transactions")
+        .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id")
+        .order("id", { ascending: true })
+        .range(from, to)),
+    paginateSelect<{ series_key: string; status: string }>(1000, (from, to) =>
+      supabase.from("recurring_overrides")
+        .select("series_key, status")
+        .order("series_key", { ascending: true })
+        .range(from, to)),
+    supabase.from("daily_snapshots")
+      .select("date").order("date", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  if (acctRes.error) throw acctRes.error;
+
+  const active = (acctRes.data as RecurringAccountRow[]).filter(
+    (a) => a.archived_at === null && a.include_in_calculations,
+  );
+  const activeIds = new Set(active.map((a) => a.id));
+  const accounts: AccountInput[] = active.map((a) => ({
+    id: a.id,
+    type: a.type as AccountType,
+    currentBalance: Number(a.current_balance ?? 0),
+    includeInCalculations: a.include_in_calculations,
+  }));
+  const transactions = txnRows.map(rowToTransactionInput).filter((t) => activeIds.has(t.accountId));
+  if (transactions.length === 0) return [];
+
+  // Same reference the rebuild derives: the newest known date in the data.
+  const maxTxnDate = transactions.reduce((m, t) => (t.postedDate > m ? t.postedDate : m), transactions[0].postedDate);
+  const snapDate = (latestSnap.data as { date: string } | null)?.date;
+  const referenceDate = snapDate && snapDate > maxTxnDate ? snapDate : maxTxnDate;
+
+  const statusByKey = new Map(overrideRows.map((r) => [r.series_key, r.status as "confirmed" | "dismissed"]));
+  return detectRecurringSeries(accounts, transactions, referenceDate)
+    .map((s) => ({ ...s, status: statusByKey.get(s.seriesKey) ?? null }))
+    .sort((a, b) =>
+      a.nextExpectedDate < b.nextExpectedDate ? -1 : a.nextExpectedDate > b.nextExpectedDate ? 1
+        : a.seriesKey < b.seriesKey ? -1 : 1);
 }

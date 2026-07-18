@@ -1,4 +1,8 @@
 import type { DailySnapshot, ISODate } from "./types";
+import {
+  detectRecurringSeries, nextOccurrenceAfter, occurrencesAfter,
+  type RecurringOverride, type RecurringSeries,
+} from "./recurring";
 
 export const ENGINE_VERSION = "1.0.0";
 
@@ -7,8 +11,8 @@ export type AccountType =
   | "auto_loan" | "student_loan" | "personal_loan" | "brokerage"
   | "retirement" | "property" | "other_asset" | "other_liability";
 
-const LIQUID_TYPES: ReadonlySet<AccountType> = new Set(["checking", "savings", "money_market"]);
-const LIABILITY_TYPES: ReadonlySet<AccountType> = new Set([
+export const LIQUID_TYPES: ReadonlySet<AccountType> = new Set(["checking", "savings", "money_market"]);
+export const LIABILITY_TYPES: ReadonlySet<AccountType> = new Set([
   "credit_card", "mortgage", "auto_loan", "student_loan", "personal_loan", "other_liability",
 ]);
 
@@ -26,6 +30,7 @@ export interface TransactionInput {
   postedDate: ISODate;
   amount: number;
   direction: "inflow" | "outflow";
+  description: string;
   /** "income" marks income events used for obligation windows. */
   category: string | null;
   essential: boolean | null;
@@ -71,7 +76,7 @@ function median(xs: number[]): number {
   return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m];
 }
 
-function daysBetween(a: ISODate, b: ISODate): number {
+export function daysBetween(a: ISODate, b: ISODate): number {
   return Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
 }
 
@@ -81,11 +86,14 @@ interface ObligationContext {
   liquidIds: Set<string>;
   liabilityIds: Set<string>;
   txnById: Map<string, TransactionInput>;
+  projectedOutflows: RecurringSeries[];
+  projectedIncome: RecurringSeries[];
 }
 
 function buildObligationContext(
   accounts: AccountInput[],
   transactions: TransactionInput[],
+  projected: RecurringSeries[],
 ): ObligationContext {
   const liquidIds = new Set(accounts.filter((a) => LIQUID_TYPES.has(a.type)).map((a) => a.id));
   const liabilityIds = new Set(
@@ -109,6 +117,8 @@ function buildObligationContext(
     liquidIds,
     liabilityIds,
     txnById: new Map(transactions.map((t) => [t.id, t])),
+    projectedOutflows: projected.filter((s) => s.direction === "outflow" && !s.isIncome),
+    projectedIncome: projected.filter((s) => s.isIncome),
   };
 }
 
@@ -116,6 +126,7 @@ export function buildDailySnapshots(
   accounts: AccountInput[],
   transactions: TransactionInput[],
   config: SnapshotBuilderConfig,
+  recurringOverrides: RecurringOverride[] = [],
 ): DailySnapshot[] {
   const included = accounts.filter((a) => a.includeInCalculations);
   if (included.length === 0 || config.startDate > config.endDate) return [];
@@ -143,7 +154,14 @@ export function buildDailySnapshots(
     cursor = prev;
   }
 
-  const ctx = buildObligationContext(included, transactions);
+  const overrideByKey = new Map(recurringOverrides.map((o) => [o.seriesKey, o.status]));
+  // Dismissed series never project; confirmed series always do, even lapsed.
+  const projected = detectRecurringSeries(included, transactions, config.endDate).filter(
+    (s) =>
+      overrideByKey.get(s.seriesKey) !== "dismissed" &&
+      (!s.lapsed || overrideByKey.get(s.seriesKey) === "confirmed"),
+  );
+  const ctx = buildObligationContext(included, transactions, projected);
 
   return dates.map((date) => {
     const bal = balances.get(date)!;
@@ -178,19 +196,40 @@ function computeObligations(
   config: SnapshotBuilderConfig,
 ): { nearTerm: number; essential: number } {
   const nextIncome = ctx.incomeDates.find((d) => d > date);
-  const gap = nextIncome ? daysBetween(date, nextIncome) : ctx.medianGap;
+  const fallbackGap = nextIncome ? daysBetween(date, nextIncome) : ctx.medianGap;
   let windowStart = date;
-  let windowEnd = addDays(date, gap);
-  if (windowEnd > config.endDate) {
+  let windowEnd = addDays(date, fallbackGap);
+
+  if (!nextIncome && windowEnd > config.endDate) {
+    // Only refine using a detected recurring income series once the plain
+    // medianGap estimate already reaches past known history — never let a
+    // projection shrink or grow an otherwise-settled, fully-in-history
+    // window just because a recurring series happens to exist.
+    const projectedNext = ctx.projectedIncome
+      .map((s) => nextOccurrenceAfter(s, date))
+      .filter((d): d is ISODate => d !== null)
+      .sort()[0];
+    if (projectedNext) {
+      windowEnd = addDays(date, daysBetween(date, projectedNext));
+    }
+  }
+
+  const beyondHistory = windowEnd > config.endDate;
+  const canProject = ctx.projectedOutflows.length > 0;
+  if (beyondHistory && !canProject) {
+    // Legacy previous-cycle proxy, retained as fallback: with nothing
+    // detected, reuse the window one cycle back. Undercounts when the true
+    // income gap exceeds 28 days (KNOWN_LIMITATIONS).
     windowStart = addDays(windowStart, -PROXY_SHIFT_DAYS);
     windowEnd = addDays(windowEnd, -PROXY_SHIFT_DAYS);
   }
 
   let nearTerm = 0;
   let essential = 0;
+  const actualEnd = windowEnd > config.endDate ? config.endDate : windowEnd;
   for (const t of transactions) {
     if (t.direction !== "outflow" || !ctx.liquidIds.has(t.accountId)) continue;
-    if (!(t.postedDate > windowStart && t.postedDate <= windowEnd)) continue;
+    if (!(t.postedDate > windowStart && t.postedDate <= actualEnd)) continue;
     if (t.isTransfer) {
       const pair = t.transferPairId ? ctx.txnById.get(t.transferPairId) : undefined;
       if (pair && ctx.liabilityIds.has(pair.accountId)) nearTerm += t.amount; // debt payment
@@ -198,6 +237,16 @@ function computeObligations(
     }
     nearTerm += t.amount;
     if (t.essential === true) essential += t.amount;
+  }
+
+  if (beyondHistory && canProject) {
+    // Split window: actuals covered above up to endDate; recurring series
+    // project their expected occurrences into (endDate, windowEnd].
+    for (const s of ctx.projectedOutflows) {
+      const count = occurrencesAfter(s, config.endDate, windowEnd).length;
+      nearTerm += s.typicalAmount * count;
+      if (s.essential) essential += s.typicalAmount * count;
+    }
   }
   return { nearTerm, essential };
 }
