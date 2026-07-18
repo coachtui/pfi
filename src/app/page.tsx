@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCompany, getDashboardData, getProfile } from "@/lib/data/queries";
+import { getCompany, getDashboardData, getFreshnessData, getProfile } from "@/lib/data/queries";
 import { rebuildSnapshots } from "@/lib/data/rebuild-snapshots";
 import { VIEWER_LEVEL } from "@/lib/demo-data/cohorts";
 import { HomeDashboard } from "@/components/dashboard/HomeDashboard";
@@ -22,6 +22,7 @@ export default async function HomePage() {
     data = await getDashboardData(supabase);
   }
   const { snapshots, events, staleIndex, scoreSummary } = data;
+  const freshness = await getFreshnessData(supabase);
 
   return (
     <div className="flex flex-col gap-6">
@@ -34,6 +35,7 @@ export default async function HomePage() {
           events={events}
           scoreSummary={scoreSummary}
           staleIndex={staleIndex}
+          freshness={freshness}
         />
       )}
       <div className="flex justify-end">

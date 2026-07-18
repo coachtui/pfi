@@ -55,8 +55,11 @@ function enumerateDates(start: ISODate, end: ISODate): ISODate[] {
   return out;
 }
 
-/** Signed balance change for an account on one day. */
-function dayDelta(account: AccountInput, txns: TransactionInput[]): number {
+/** Signed net balance change for one account over any set of transactions
+ * (filters to the account internally; liability accounts invert the sign —
+ * an outflow purchase increases what you owe). The ONLY home of the
+ * liability sign rule; anchors.ts reuses it, never re-implements it. */
+export function signedNet(account: AccountInput, txns: TransactionInput[]): number {
   let delta = 0;
   for (const t of txns) {
     if (t.accountId !== account.id) continue;
@@ -148,7 +151,7 @@ export function buildDailySnapshots(
     const dayTxns = byDate.get(day) ?? [];
     const prev = new Map(cursor);
     for (const a of included) {
-      prev.set(a.id, (prev.get(a.id) ?? 0) - dayDelta(a, dayTxns));
+      prev.set(a.id, (prev.get(a.id) ?? 0) - signedNet(a, dayTxns));
     }
     balances.set(dates[i - 1], prev);
     cursor = prev;

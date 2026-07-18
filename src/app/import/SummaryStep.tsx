@@ -8,6 +8,7 @@ import type { NormalizedRow } from "@/lib/csv-import/types";
 import { CATEGORY_LABELS, type Category } from "@/lib/config/categories";
 import { undoImport } from "@/app/actions/imports";
 import type { ImportResult } from "@/lib/validation/imports";
+import { formatDollars } from "@/lib/financial-engine/format";
 
 export function SummaryStep({
   result, accountId, fresh,
@@ -64,6 +65,16 @@ export function SummaryStep({
         {result.skippedDuplicates ? ` · ${result.skippedDuplicates} duplicates skipped` : ""}
       </p>
       {result.warning && <p role="status" className="text-sm text-warning">⚠ {result.warning}</p>}
+      {result.anchoredBalance !== undefined && (
+        <p className="text-sm text-secondary">
+          Balance anchored: <span className="font-medium text-primary">{formatDollars(result.anchoredBalance)}</span> as of {result.anchorDate}.{" "}
+          {result.discrepancy === null
+            ? "First anchor for this account."
+            : result.discrepancy === 0
+              ? "Reconciled cleanly."
+              : `${formatDollars(Math.abs(result.discrepancy ?? 0))} unaccounted for — recorded for reference.`}
+        </p>
+      )}
 
       {byCategory.length > 0 && (
         <ul className="rounded-xl border border-border-subtle bg-inset p-3 text-sm text-primary">

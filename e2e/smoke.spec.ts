@@ -84,6 +84,92 @@ test("dismissing a recurring series moves it under Dismissed and restore undoes 
   await expect(section.getByText(/^Dismissed \(/)).toBeHidden({ timeout: 30_000 });
 });
 
+test("anchored CSV import updates the account balance", async () => {
+  // Create a fresh manual account to import into. The "Add account" trigger
+  // (floating action button) and the in-sheet submit button share the same
+  // accessible name, so disambiguate by DOM order: trigger renders first.
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "Add account" }).first().click();
+  await page.locator("#acct-name").fill("Anchor QA Checking");
+  await page.locator("#acct-balance").fill("1000");
+  await page.getByRole("button", { name: "Add account" }).last().click();
+  await expect(page.getByText("Anchor QA Checking")).toBeVisible({ timeout: 30_000 });
+
+  // Import the fixture statement. Headers ("Date", "Description", "Amount")
+  // auto-detect, so the map step's "Preview import" is enabled immediately.
+  await page.goto("/import");
+  await page.locator("#import-account").selectOption({ label: "Anchor QA Checking" });
+  await page.locator("#import-file").setInputFiles("e2e/fixtures/checking-statement.csv");
+  await page.getByRole("button", { name: "Preview import" }).click();
+
+  // Anchor: ending balance 1500 as of today (so this statement anchor
+  // supersedes the account-creation anchor, which is also dated today —
+  // same anchorDate, later created_at wins the tiebreak).
+  const today = new Date().toISOString().slice(0, 10);
+  await page.locator("#anchor-balance").fill("1500");
+  await page.locator("#anchor-date").fill(today);
+  await page.getByRole("button", { name: /^Import 3 transactions/ }).click();
+  await expect(page.getByText(/Balance anchored/)).toBeVisible({ timeout: 30_000 });
+
+  // The account now shows the anchored balance, not the typed 1000. Scope
+  // to the account's own Card (not just a nearby ancestor) via its actual
+  // container class, since the name and balance live in separate sibling
+  // elements a couple of levels apart.
+  await page.goto("/accounts");
+  const row = page.locator(".rounded-card").filter({ hasText: "Anchor QA Checking" });
+  await expect(row.getByText("$1,500")).toBeVisible();
+  await expect(row.getByText(/as of/)).toBeVisible();
+});
+
+test("undoing the import restores the pre-anchor balance", async () => {
+  await page.goto("/accounts");
+  // Undo the batch just imported — the only entry in Recent Imports (demo
+  // data never sets import_batch_id, so the list starts empty). The control
+  // is a real two-step confirm, not an optional one: "Undo" then "Confirm
+  // undo" / "Keep".
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm undo" }).click();
+  // Anchor removed with the batch → balance re-derives from the creation
+  // anchor (1000, dated today, no post-anchor transactions).
+  const row = page.locator(".rounded-card").filter({ hasText: "Anchor QA Checking" });
+  await expect(row.getByText("$1,000")).toBeVisible({ timeout: 30_000 });
+});
+
+test("a back-filled earlier-dated statement anchor reconciles but does not supersede the current balance", async () => {
+  // A second, distinct manual account so this test doesn't interfere with
+  // the "Anchor QA Checking" account used above. Creation writes a manual
+  // anchor dated today at $2000.
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "Add account" }).first().click();
+  await page.locator("#acct-name").fill("Backfill QA Savings");
+  await page.locator("#acct-balance").fill("2000");
+  await page.getByRole("button", { name: "Add account" }).last().click();
+  await expect(page.getByText("Backfill QA Savings")).toBeVisible({ timeout: 30_000 });
+
+  // Import the same fixture, but anchor the statement to a fixed date well
+  // before today (not the 35-day staleness window's edge — just clearly
+  // earlier than the creation anchor).
+  await page.goto("/import");
+  await page.locator("#import-account").selectOption({ label: "Backfill QA Savings" });
+  await page.locator("#import-file").setInputFiles("e2e/fixtures/checking-statement.csv");
+  await page.getByRole("button", { name: "Preview import" }).click();
+
+  await page.locator("#anchor-balance").fill("1900");
+  await page.locator("#anchor-date").fill("2026-06-01");
+  await page.getByRole("button", { name: /^Import 3 transactions/ }).click();
+
+  // The import commits and reconciliation is surfaced — not blocked by the
+  // earlier date.
+  await expect(page.getByText(/Balance anchored/)).toBeVisible({ timeout: 30_000 });
+
+  // Critically: the account's displayed balance is still the creation
+  // anchor's $2,000, not recomputed from the earlier-dated statement — the
+  // later (today-dated) anchor remains effective.
+  await page.goto("/accounts");
+  const row = page.locator(".rounded-card").filter({ hasText: "Backfill QA Savings" });
+  await expect(row.getByText("$2,000")).toBeVisible();
+});
+
 test("sign out returns to login", async () => {
   await page.goto("/");
   await page.getByRole("button", { name: "Sign out" }).click();

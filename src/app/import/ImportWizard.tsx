@@ -24,7 +24,12 @@ const STEP_LABELS: Record<Step, string> = {
 };
 const STEPS: Step[] = ["upload", "map", "preview", "summary"];
 
-export function ImportWizard(props: { accounts: AccountSummary[]; existing: ExistingTxn[] }) {
+export function ImportWizard(props: {
+  accounts: AccountSummary[];
+  existing: ExistingTxn[];
+  // Effective anchor per account, keyed by account id.
+  anchors: Record<string, { anchorDate: string; balance: number }>;
+}) {
   const { accounts } = props;
   const [step, setStep] = useState<Step>("upload");
   const [accountId, setAccountId] = useState("");
@@ -32,6 +37,8 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
   const [fileName, setFileName] = useState("");
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [removedPairs, setRemovedPairs] = useState<Set<number>>(new Set());
+  const [endingBalance, setEndingBalance] = useState("");
+  const [anchorDate, setAnchorDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -47,6 +54,11 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
     return { fresh, duplicates, pairs, errors };
   }, [parsed, mapping, accountId, props.existing]);
 
+  const defaultAnchorDate = useMemo(() => {
+    if (!preview || preview.fresh.length === 0) return "";
+    return preview.fresh.reduce((m, r) => (r.postedDate > m ? r.postedDate : m), preview.fresh[0].postedDate);
+  }, [preview]);
+
   const onTogglePair = (line: number) => {
     setRemovedPairs((cur) => {
       const next = new Set(cur);
@@ -58,12 +70,23 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
 
   const onCommit = async () => {
     if (!preview || submitting) return;
+    const trimmed = endingBalance.trim();
+    let anchor: { endingBalance: number; anchorDate: string } | undefined;
+    if (trimmed !== "") {
+      const n = Number(trimmed);
+      if (!Number.isFinite(n)) {
+        setSubmitError("Ending balance must be a number — or leave it blank to skip anchoring.");
+        return;
+      }
+      anchor = { endingBalance: n, anchorDate: anchorDate || defaultAnchorDate };
+    }
     setSubmitting(true);
     setSubmitError("");
     const res = await importTransactions({
       accountId,
       rows: preview.fresh,
       transferPairs: preview.pairs.filter((p) => !removedPairs.has(p.line)),
+      ...(anchor ?? {}),
     });
     setSubmitting(false);
     if (res.error) {
@@ -117,6 +140,8 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
           onConfirm={(next) => {
             setMapping(next);
             setRemovedPairs(new Set());
+            setEndingBalance("");
+            setAnchorDate("");
             setStep("preview");
           }}
         />
@@ -133,6 +158,13 @@ export function ImportWizard(props: { accounts: AccountSummary[]; existing: Exis
           submitError={submitError}
           onBack={() => setStep("map")}
           onCommit={onCommit}
+          accountId={accountId}
+          anchors={props.anchors}
+          endingBalance={endingBalance}
+          anchorDate={anchorDate}
+          defaultAnchorDate={defaultAnchorDate}
+          onEndingBalanceChange={setEndingBalance}
+          onAnchorDateChange={setAnchorDate}
         />
       )}
 

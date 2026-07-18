@@ -8,6 +8,10 @@ import { dayGap, TRANSFER_MAX_DAY_GAP } from "@/lib/csv-import/transfers";
 import { finishWithRebuild } from "@/lib/data/finish-mutation";
 import { insertChunked } from "@/lib/data/insert-chunked";
 import { paginateSelect } from "@/lib/data/paginate";
+import {
+  computeDiscrepancy, effectiveAnchor,
+  type AccountInput, type AccountType, type BalanceAnchor, type TransactionInput,
+} from "@/lib/financial-engine";
 import { importTransactionsSchema, type ImportResult, type ImportTransactionsInput } from "@/lib/validation/imports";
 import type { MutationResult } from "@/lib/validation/transactions";
 
@@ -30,7 +34,7 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
 
   const { data: account, error: acctErr } = await supabase
     .from("financial_accounts")
-    .select("id, provider, archived_at")
+    .select("id, provider, type, archived_at")
     .eq("id", v.accountId)
     .maybeSingle();
   if (acctErr) return { error: acctErr.message };
@@ -124,8 +128,71 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
     return { error: `${baseMessage} — nothing was saved` };
   }
 
+  // Statement anchor (optional): server-side reconciliation over existing +
+  // just-inserted rows — the client's preview math is advisory. The anchor
+  // row is provenance; the rebuild below derives current_balance from it.
+  let anchorFacts: Pick<ImportResult, "anchorDate" | "anchoredBalance" | "discrepancy"> = {};
+  if (v.endingBalance !== undefined && v.anchorDate !== undefined) {
+    let priorAnchors: BalanceAnchor[] = [];
+    try {
+      const anchorRows = await paginateSelect<{ account_id: string; anchor_date: string; balance: number; created_at: string }>(
+        EXISTING_TXN_PAGE_SIZE,
+        (from, to) =>
+          supabase.from("balance_anchors")
+            .select("account_id, anchor_date, balance, created_at")
+            .eq("account_id", v.accountId)
+            .order("id", { ascending: true })
+            .range(from, to),
+      );
+      priorAnchors = anchorRows.map((r) => ({
+        accountId: r.account_id, anchorDate: r.anchor_date, balance: Number(r.balance), createdAt: r.created_at,
+      }));
+    } catch (e) {
+      const finish = await finishWithRebuild(supabase);
+      return {
+        ...finish,
+        warning: [finish.warning, `Imported, but the balance anchor could not be saved: ${e instanceof Error ? e.message : "anchor lookup failed"}`].filter(Boolean).join(" "),
+        batchId, imported: inserts.length, skippedDuplicates,
+      };
+    }
+
+    const acctForMath: AccountInput = {
+      id: v.accountId, type: account.type as AccountType, currentBalance: 0, includeInCalculations: true,
+    };
+    const mathTxns: TransactionInput[] = [
+      ...existing
+        .filter((t) => t.accountId === v.accountId)
+        .map((t) => ({
+          id: t.id, accountId: t.accountId, postedDate: t.postedDate, amount: t.amount,
+          direction: t.direction, description: t.description, category: null,
+          essential: null, isTransfer: t.isTransfer, transferPairId: t.transferPairId,
+        })),
+      ...inserts.map((r, i) => ({
+        id: `pending-${i}`, accountId: r.account_id, postedDate: r.posted_date, amount: r.amount,
+        direction: r.direction as "inflow" | "outflow", description: r.description, category: null,
+        essential: null, isTransfer: r.is_transfer, transferPairId: null,
+      })),
+    ];
+    const eff = effectiveAnchor(priorAnchors);
+    const discrepancy = computeDiscrepancy(acctForMath, eff, v.endingBalance, v.anchorDate, mathTxns);
+
+    const { error: anchorInsErr } = await supabase.from("balance_anchors").insert({
+      user_id: user.id, account_id: v.accountId, anchor_date: v.anchorDate,
+      balance: v.endingBalance, source: "import", import_batch_id: batchId, discrepancy,
+    });
+    if (anchorInsErr) {
+      const finish = await finishWithRebuild(supabase);
+      return {
+        ...finish,
+        warning: [finish.warning, `Imported, but the balance anchor could not be saved: ${anchorInsErr.message}`].filter(Boolean).join(" "),
+        batchId, imported: inserts.length, skippedDuplicates,
+      };
+    }
+    anchorFacts = { anchorDate: v.anchorDate, anchoredBalance: v.endingBalance, discrepancy };
+  }
+
   const finish = await finishWithRebuild(supabase);
-  return { ...finish, batchId, imported: inserts.length, skippedDuplicates };
+  return { ...finish, ...anchorFacts, batchId, imported: inserts.length, skippedDuplicates };
 }
 
 /** Remove exactly one import batch's rows, then rebuild. */
@@ -143,6 +210,22 @@ export async function undoImport(batchId: string): Promise<MutationResult> {
     .select("id");
   if (delErr) return { error: delErr.message };
   if (!deleted || deleted.length === 0) return { error: "Import not found" };
+
+  // The batch's anchor (if any) claims a statement that no longer exists in
+  // the data — remove it; the rebuild re-derives current_balance from the
+  // remaining effective anchor.
+  const { error: anchorDelErr } = await supabase
+    .from("balance_anchors")
+    .delete()
+    .eq("import_batch_id", batchId)
+    .eq("user_id", user.id);
+  if (anchorDelErr) {
+    const finish = await finishWithRebuild(supabase);
+    return {
+      ...finish,
+      warning: [finish.warning, `Undone, but the batch's balance anchor could not be removed: ${anchorDelErr.message}`].filter(Boolean).join(" "),
+    };
+  }
 
   return finishWithRebuild(supabase);
 }

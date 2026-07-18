@@ -29,11 +29,12 @@ const actionCls =
   "rounded-lg border border-border-subtle px-2.5 py-1 text-xs text-secondary transition-colors hover:text-primary disabled:opacity-60";
 
 export function AccountsView({
-  accounts, recentImports, recurring,
+  accounts, recentImports, recurring, asOfByAccount,
 }: {
   accounts: AccountSummary[];
   recentImports: RecentImport[];
   recurring: RecurringListItem[];
+  asOfByAccount: Record<string, string>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -115,6 +116,9 @@ export function AccountsView({
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className={chipCls}>{a.provider}</span>
+                        {asOfByAccount[a.id] && (
+                          <span className={chipCls}>as of {asOfByAccount[a.id]}</span>
+                        )}
                         {excluded && <span className={chipCls}>Excluded</span>}
                         {archived && <span className={chipCls}>Archived</span>}
                       </div>

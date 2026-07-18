@@ -8,9 +8,11 @@ import {
   buildMetricInputs, computeMetrics, computeConfidence, computeScore,
   computeScoreDelta, computeScoreMomentum, addDays,
   detectRecurringSeries,
+  effectiveAnchor, accountFreshness, householdFreshness, nudgeVisible,
   type MomentumState, type OverallState, type ScoreBreakdown, type ScoreDelta,
   type ScoreAccountInput, type ScoreTransactionInput,
   type RecurringSeries, type AccountInput, type AccountType,
+  type BalanceAnchor, type AccountFreshnessInput,
 } from "@/lib/financial-engine";
 import {
   rowToSnapshot, rowToEvent, rowToTransactionListItem, rowToTransactionInput,
@@ -318,8 +320,8 @@ export async function getScoreSummary(supabase: SupabaseClient): Promise<ScoreSu
  * user's existing transactions (source values) for dedupe + transfer detection. */
 export async function getImportContext(
   supabase: SupabaseClient,
-): Promise<{ accounts: AccountSummary[]; existing: ExistingTxn[] }> {
-  const [acctRes, txnRows] = await Promise.all([
+): Promise<{ accounts: AccountSummary[]; existing: ExistingTxn[]; anchors: Record<string, { anchorDate: string; balance: number }> }> {
+  const [acctRes, txnRows, anchorRows] = await Promise.all([
     supabase.from("financial_accounts").select(
       "id, provider, institution, type, display_name, mask, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at",
     ),
@@ -331,6 +333,13 @@ export async function getImportContext(
         .select("id, account_id, posted_date, amount, direction, description, is_transfer, transfer_pair_id")
         .order("id", { ascending: true })
         .range(from, to)),
+    paginateSelect<{ account_id: string; anchor_date: string; balance: number; created_at: string }>(
+      TRANSACTIONS_PAGE_SIZE,
+      (from, to) =>
+        supabase.from("balance_anchors")
+          .select("account_id, anchor_date, balance, created_at")
+          .order("id", { ascending: true })
+          .range(from, to)),
   ]);
   if (acctRes.error) throw new Error(acctRes.error.message);
   const accounts = (acctRes.data as AccountRow[])
@@ -341,7 +350,83 @@ export async function getImportContext(
     amount: Number(t.amount), direction: t.direction as "inflow" | "outflow",
     description: t.description, isTransfer: t.is_transfer, transferPairId: t.transfer_pair_id,
   }));
-  return { accounts, existing };
+  const anchorsByAccount = new Map<string, BalanceAnchor[]>();
+  for (const r of anchorRows) {
+    const list = anchorsByAccount.get(r.account_id) ?? [];
+    list.push({ accountId: r.account_id, anchorDate: r.anchor_date, balance: Number(r.balance), createdAt: r.created_at });
+    anchorsByAccount.set(r.account_id, list);
+  }
+  const anchors: Record<string, { anchorDate: string; balance: number }> = {};
+  for (const [accountId, list] of anchorsByAccount) {
+    const eff = effectiveAnchor(list);
+    if (eff) anchors[accountId] = { anchorDate: eff.anchorDate, balance: eff.balance };
+  }
+  return { accounts, existing, anchors };
+}
+
+export interface FreshnessData {
+  currentThrough: string | null;
+  showNudge: boolean;
+  asOfByAccount: Record<string, string>;
+}
+
+/** Freshness of the user's real (non-demo) data: per-account "as of" dates,
+ * the household's weakest-link date, and whether the staleness nudge shows.
+ * Wall-clock "today" is supplied here — the engine functions stay pure. */
+export async function getFreshnessData(supabase: SupabaseClient): Promise<FreshnessData> {
+  const [acctRes, anchorRows, txnRows, profRes] = await Promise.all([
+    supabase.from("financial_accounts").select("id, provider, include_in_calculations, archived_at"),
+    paginateSelect<{ account_id: string; anchor_date: string; balance: number; created_at: string }>(
+      TRANSACTIONS_PAGE_SIZE,
+      (from, to) =>
+        supabase.from("balance_anchors")
+          .select("account_id, anchor_date, balance, created_at")
+          .order("id", { ascending: true })
+          .range(from, to)),
+    paginateSelect<{ account_id: string; posted_date: string }>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      supabase.from("transactions")
+        .select("account_id, posted_date")
+        .order("id", { ascending: true })
+        .range(from, to)),
+    supabase.from("user_profiles").select("stale_nudge_dismissed_at").maybeSingle(),
+  ]);
+  if (acctRes.error) throw acctRes.error;
+  if (profRes.error) throw profRes.error;
+
+  const newestTxn = new Map<string, string>();
+  for (const t of txnRows) {
+    const cur = newestTxn.get(t.account_id);
+    if (!cur || t.posted_date > cur) newestTxn.set(t.account_id, t.posted_date);
+  }
+  const anchorsByAccount = new Map<string, BalanceAnchor[]>();
+  for (const r of anchorRows) {
+    const list = anchorsByAccount.get(r.account_id) ?? [];
+    list.push({ accountId: r.account_id, anchorDate: r.anchor_date, balance: Number(r.balance), createdAt: r.created_at });
+    anchorsByAccount.set(r.account_id, list);
+  }
+
+  interface FreshAcctRow { id: string; provider: string; include_in_calculations: boolean; archived_at: string | null }
+  const inputs: AccountFreshnessInput[] = (acctRes.data as FreshAcctRow[]).map((a) => ({
+    id: a.id,
+    provider: a.provider,
+    includeInCalculations: a.include_in_calculations,
+    archived: a.archived_at !== null,
+    anchorDate: effectiveAnchor(anchorsByAccount.get(a.id) ?? [])?.anchorDate ?? null,
+    newestTxnDate: newestTxn.get(a.id) ?? null,
+  }));
+
+  const currentThrough = householdFreshness(inputs);
+  const today = new Date().toISOString().slice(0, 10);
+  const dismissedOn = profRes.data?.stale_nudge_dismissed_at?.slice(0, 10) ?? null;
+
+  const asOfByAccount: Record<string, string> = {};
+  for (const i of inputs) {
+    if (i.provider === "demo") continue;
+    const f = accountFreshness(i);
+    if (f) asOfByAccount[i.id] = f;
+  }
+
+  return { currentThrough, showNudge: nudgeVisible(currentThrough, today, dismissedOn), asOfByAccount };
 }
 
 /** Derived batch summaries — no import_batches table; grouped client-side. */
