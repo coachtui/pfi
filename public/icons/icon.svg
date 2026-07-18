@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    PFI monogram icon source (provisional branding — see src/lib/config/branding.ts).
+    Regenerate the committed PNGs from this file with any svg->png rasterizer at
+    192x192 and 512x512 (icon-maskable.svg -> icon-maskable-512.png at 512x512).
+    Colors: background #0b0d0f (app background), mark #34d399 (--positive token).
+  -->
+  <rect width="512" height="512" fill="#0b0d0f"/>
+  <text x="256" y="268" text-anchor="middle" dominant-baseline="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
+        font-weight="700" font-size="176" letter-spacing="4" fill="#34d399">PFI</text>
+</svg>

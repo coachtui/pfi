@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Maskable variant: mark confined to the central safe zone. -->
+  <rect width="512" height="512" fill="#0b0d0f"/>
+  <text x="256" y="264" text-anchor="middle" dominant-baseline="middle"
+        font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
+        font-weight="700" font-size="118" letter-spacing="3" fill="#34d399">PFI</text>
+</svg>
