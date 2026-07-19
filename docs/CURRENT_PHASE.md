@@ -208,7 +208,7 @@ _Last updated: 2026-07-19 (password auth — Tasks 1–14 complete on `worktree-
 
 ## In progress
 
-- The password auth slice (Tasks 1–14) is implementation- and verification-complete on `worktree-password-auth` but **not yet merged to main** — this branch still needs a PR and review before it ships. Task 12 (Supabase dashboard: enable "Confirm email," leaked-password protection, verify redirect URLs) is a deliberately-held manual checklist, not part of the merge blocker, but should be run by the user around the same time.
+- The password auth slice (Tasks 1–14 + whole-branch review) is implementation- and verification-complete on `worktree-password-auth`. PR: https://github.com/coachtui/pfi/pull/16 opened, awaiting review/merge. Task 12 (Supabase dashboard: enable "Confirm email," leaked-password protection, verify redirect URLs) is a deliberately-held manual checklist, not part of the merge blocker, but should be run by the user around the same time.
 
 ## Next three priorities
 
