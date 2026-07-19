@@ -223,6 +223,18 @@ try {
     .insert({ user_id: a.id, account_id: bAcct!.id, anchor_date: "2026-07-31", balance: 1, source: "manual" });
   check("balance_anchors: cannot anchor an account that isn't yours (ownership trigger)", !!baForgedAccountErr);
 
+  // ---- Password auth slice: user_agreements isolation ----
+  const { error: uaInsertOwn } = await a.client.from("user_agreements")
+    .insert({ user_id: a.id, document: "terms", version: "test-rls" });
+  check("user_agreements: owner can insert", !uaInsertOwn, uaInsertOwn?.message ?? "");
+
+  const { data: uaCrossRead } = await b.client.from("user_agreements").select("id");
+  check("user_agreements: cross-user read returns nothing", (uaCrossRead ?? []).length === 0);
+
+  const { error: uaForge } = await b.client.from("user_agreements")
+    .insert({ user_id: a.id, document: "privacy", version: "test-rls" });
+  check("user_agreements: cross-user insert rejected", !!uaForge);
+
   // ai_narrations: owner-only cache/audit rows.
   const narrationRow = {
     user_id: a.id, surface: "performance_brief", input_hash: "t".repeat(64),
