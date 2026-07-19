@@ -47,6 +47,12 @@ export default async function globalSetup(): Promise<void> {
   });
   if (createErr) throw new Error(`e2e setup: createUser failed: ${createErr.message}`);
 
+  const { error: consentErr } = await admin.from("user_agreements").insert([
+    { user_id: created.user.id, document: "terms", version: "2026-07-19" },
+    { user_id: created.user.id, document: "privacy", version: "2026-07-19" },
+  ]);
+  if (consentErr) throw new Error(`e2e setup: consent insert failed: ${consentErr.message}`);
+
   const { data: link, error: linkErr } = await admin.auth.admin.generateLink({ type: "magiclink", email });
   if (linkErr) throw new Error(`e2e setup: generateLink failed: ${linkErr.message}`);
 
