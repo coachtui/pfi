@@ -194,7 +194,9 @@ export function computePeriodStatement(
 /**
  * Deterministic shareholder-letter commentary assembled only from the
  * statement's computed figures. No fabrication; the UI tags this
- * "Calculated · AI narration in Phase 4".
+ * "Calculated" — not yet AI-narrated (unlike the dashboard's Performance
+ * brief, DECISIONS #26); quarterly shareholder report narration remains an
+ * unbuilt Phase 4 surface (ROADMAP).
  */
 export function buildManagementCommentary(statement: PeriodStatement, companyName: string): string[] {
   const s = statement;
