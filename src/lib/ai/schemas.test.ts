@@ -73,6 +73,9 @@ describe("narrationOutputSchema", () => {
         advice: "buy stocks",
       }).success,
     ).toBe(false);
+    expect(
+      narrationOutputSchema.safeParse({ body: "x".repeat(701), referencedDriverIds: [] }).success,
+    ).toBe(false);
   });
 });
 
