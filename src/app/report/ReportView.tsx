@@ -137,7 +137,7 @@ export function ReportView({ companyName, ticker, snapshots, transactions, event
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-base font-semibold text-primary">Management commentary</h2>
           <span className="rounded-full bg-neutral-muted px-2.5 py-0.5 text-[11px] font-medium text-secondary">
-            Calculated · AI narration in Phase 4
+            Calculated
           </span>
         </div>
         <div className="flex flex-col gap-2">
