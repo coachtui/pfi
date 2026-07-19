@@ -19,6 +19,18 @@ export type AuthFormState = { error?: string; message?: string };
 /** Identical for unknown username, unknown email, and wrong password — never reveals which. */
 const INVALID_CREDENTIALS = "Invalid email/username or password.";
 
+/**
+ * True when a Supabase signUp() error indicates the email is already
+ * registered (as opposed to a genuine failure like a network error or rate
+ * limit). Checked via both error code and message text — Supabase's exact
+ * error shape has varied across SDK versions.
+ */
+function isAlreadyRegisteredError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "email_exists" || error.code === "user_already_exists") return true;
+  return /already registered/i.test(error.message ?? "");
+}
+
 async function requestOrigin(): Promise<string> {
   const hdrs = await headers();
   return hdrs.get("origin") ?? "http://localhost:3000";
@@ -87,12 +99,16 @@ export async function signUpWithPassword(
     password: parsed.data.password,
     options: { emailRedirectTo: `${origin}/auth/callback` },
   });
-  if (error) return { error: "Could not create the account. Try again." };
+  if (error && !isAlreadyRegisteredError(error)) {
+    return { error: "Could not create the account. Try again." };
+  }
 
   // Supabase returns an obfuscated user with no identities when the email
-  // already has an account. Only record consent for genuinely new users,
-  // but report the identical message either way (no email enumeration).
-  const isNewUser = (data.user?.identities?.length ?? 0) > 0;
+  // already has an account (when "Confirm email" is enabled), or a real
+  // "already registered" error with no user object (when it's disabled).
+  // Either way, only record consent for genuinely new users, but report the
+  // identical message regardless (no email enumeration).
+  const isNewUser = !error && (data.user?.identities?.length ?? 0) > 0;
   if (isNewUser && data.user) {
     const admin = createAdminClient();
     // Service-role insert: the user can't write their own rows yet (email
