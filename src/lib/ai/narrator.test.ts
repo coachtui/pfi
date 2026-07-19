@@ -66,6 +66,15 @@ describe("generateNarration", () => {
     expect(result).toBeNull();
   });
 
+  it("returns null when the narration mislabels the score as a credit score (observed live: a real model did exactly this)", async () => {
+    const mislabeledBody =
+      "Test Co's credit score of 695 reflects strong financial health this period.";
+    const result = await generateNarration(input, {
+      model: mockModel(JSON.stringify({ body: mislabeledBody, referencedDriverIds: [] })),
+    });
+    expect(result).toBeNull();
+  });
+
   it("returns null with no API key and no model override", async () => {
     // Vitest env stubs AI_GATEWAY_API_KEY as absent (env.ts test branch).
     expect(await generateNarration(input)).toBeNull();

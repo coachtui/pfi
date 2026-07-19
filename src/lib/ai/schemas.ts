@@ -136,3 +136,22 @@ export function bodyOnlyReferencesKnownAmounts(
     return false;
   }
 }
+
+/** Phrases that mislabel the PFI Score as a credit product, case-insensitive. */
+const SCORE_MISLABEL_PATTERNS = [/credit\s+score/i, /credit\s+rating/i, /fico/i];
+
+/**
+ * Policy check: narration must never describe the PFI Score as a credit
+ * score, credit rating, or FICO score — CLAUDE.md is explicit that "the
+ * health score (0–900, Phase 2) is not a credit score and must never be
+ * described as one." A prompt instruction alone isn't reliable enough for a
+ * rule this load-bearing (observed live: a real model called the PFI Score
+ * a "credit score" despite no such prompting), so this is enforced as a
+ * deterministic runtime guard, the same defense-in-depth pattern already
+ * used for hallucinated dollar figures and invented driver references. Only
+ * blocks the specific mislabeling phrases — ordinary mentions of "credit
+ * card" or "debt" pass through untouched.
+ */
+export function bodyDoesNotMislabelScore(output: NarrationOutput): boolean {
+  return !SCORE_MISLABEL_PATTERNS.some((pattern) => pattern.test(output.body));
+}
