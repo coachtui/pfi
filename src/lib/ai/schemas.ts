@@ -89,12 +89,17 @@ export function referencesOnlyKnownDrivers(
  * Policy check: narration prose may not state a dollar figure absent from
  * its input (AI_RECOMMENDATION_POLICY.md — "deterministic code calculates,
  * AI only narrates"). Every "$"-prefixed number in `output.body` must round
- * to a known amount: available capital, cushion, or a driver's magnitude
- * (narration may describe a driver's size without its sign). Rounds to the
- * nearest whole dollar on both sides — narration prose doesn't state cents
- * in practice — to avoid brittle float-equality comparisons. A body with no
- * dollar figures at all passes trivially: this check only fires when the AI
- * actually asserts a number.
+ * to a known amount: available capital, cushion, a driver's magnitude
+ * (narration may describe a driver's size without its sign), or one of the
+ * natural driver aggregates a narrator reasonably states in prose — total
+ * inflows, total outflows, or the net of all driver impacts (observed live:
+ * a real model summarized two paychecks as "totaling $X" rather than citing
+ * each individually — a correct sum, not a hallucination, so the aggregate
+ * itself must be a known value too). Rounds to the nearest whole dollar on
+ * both sides — narration prose doesn't state cents in practice — to avoid
+ * brittle float-equality comparisons. A body with no dollar figures at all
+ * passes trivially: this check only fires when the AI actually asserts a
+ * number.
  */
 export function bodyOnlyReferencesKnownAmounts(
   input: NarrationInput,
@@ -105,10 +110,21 @@ export function bodyOnlyReferencesKnownAmounts(
     if (!matches) return true;
 
     const round = (n: number) => Math.round(n);
+    const totalInflow = input.drivers
+      .filter((d) => d.impact > 0)
+      .reduce((sum, d) => sum + d.impact, 0);
+    const totalOutflow = input.drivers
+      .filter((d) => d.impact < 0)
+      .reduce((sum, d) => sum + Math.abs(d.impact), 0);
+    const netImpact = input.drivers.reduce((sum, d) => sum + d.impact, 0);
+
     const known = new Set<number>([
       round(input.availableCapital),
       round(input.cushion),
       ...input.drivers.map((d) => round(Math.abs(d.impact))),
+      round(totalInflow),
+      round(totalOutflow),
+      round(Math.abs(netImpact)),
     ]);
 
     return matches.every((match) => {

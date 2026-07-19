@@ -129,4 +129,23 @@ describe("bodyOnlyReferencesKnownAmounts", () => {
       true,
     );
   });
+
+  it("passes a body that sums two same-direction driver impacts (observed live: a real model summarized two paychecks as a total rather than citing each)", () => {
+    const twoPaychecks = narrationInputSchema.parse({
+      ...validInput,
+      drivers: [
+        { id: "d1", kind: "paycheck", date: "2026-07-01", impact: 3450, buildsEquity: false },
+        { id: "d2", kind: "paycheck", date: "2026-07-15", impact: 3450, buildsEquity: false },
+      ],
+    });
+    const body = "Two paychecks totaling $6,900 drove the period's gains.";
+    expect(
+      bodyOnlyReferencesKnownAmounts(twoPaychecks, { body, referencedDriverIds: ["d1", "d2"] }),
+    ).toBe(true);
+  });
+
+  it("still rejects a genuinely fabricated aggregate that doesn't match total inflow, total outflow, or net impact", () => {
+    const body = "The household saw a combined swing of $9,999 across all drivers.";
+    expect(bodyOnlyReferencesKnownAmounts(input, { body, referencedDriverIds: [] })).toBe(false);
+  });
 });
