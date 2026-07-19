@@ -23,6 +23,7 @@ describe("policy prompt", () => {
       "not financial, tax, legal, or investment advice",
       "no shame",
       "referencedDriverIds",
+      "not a credit score",
     ]) {
       expect(SYSTEM_PROMPT.toLowerCase()).toContain(phrase.toLowerCase());
     }

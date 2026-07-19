@@ -5,6 +5,7 @@ import {
   narrationOutputSchema,
   referencesOnlyKnownDrivers,
   bodyOnlyReferencesKnownAmounts,
+  bodyDoesNotMislabelScore,
 } from "./schemas";
 
 const validInput = {
@@ -147,5 +148,43 @@ describe("bodyOnlyReferencesKnownAmounts", () => {
   it("still rejects a genuinely fabricated aggregate that doesn't match total inflow, total outflow, or net impact", () => {
     const body = "The household saw a combined swing of $9,999 across all drivers.";
     expect(bodyOnlyReferencesKnownAmounts(input, { body, referencedDriverIds: [] })).toBe(false);
+  });
+});
+
+describe("bodyDoesNotMislabelScore", () => {
+  it("passes a body that never mentions credit at all", () => {
+    const body =
+      "Blue Reef Partners is trading above its baseline with a PFI Score of 695 in the Strong band.";
+    expect(bodyDoesNotMislabelScore({ body, referencedDriverIds: [] })).toBe(true);
+  });
+
+  it("rejects a body that calls the PFI Score a credit score (observed live: a real model did exactly this)", () => {
+    const body = "The household's credit score of 695 reflects strong financial health.";
+    expect(bodyDoesNotMislabelScore({ body, referencedDriverIds: [] })).toBe(false);
+  });
+
+  it("rejects case-insensitively", () => {
+    const body = "This Credit Score indicates the household is doing well.";
+    expect(bodyDoesNotMislabelScore({ body, referencedDriverIds: [] })).toBe(false);
+  });
+
+  it("rejects the adjacent misnomers 'credit rating' and 'FICO'", () => {
+    expect(
+      bodyDoesNotMislabelScore({
+        body: "The household's credit rating stands at 695.",
+        referencedDriverIds: [],
+      }),
+    ).toBe(false);
+    expect(
+      bodyDoesNotMislabelScore({
+        body: "The household's FICO score stands at 695.",
+        referencedDriverIds: [],
+      }),
+    ).toBe(false);
+  });
+
+  it("passes a body mentioning debt or credit cards without calling the score a credit score", () => {
+    const body = "A credit card payment of $640 was offset by two paychecks this period.";
+    expect(bodyDoesNotMislabelScore({ body, referencedDriverIds: [] })).toBe(true);
   });
 });

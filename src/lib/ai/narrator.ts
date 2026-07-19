@@ -6,6 +6,7 @@ import {
   narrationOutputSchema,
   referencesOnlyKnownDrivers,
   bodyOnlyReferencesKnownAmounts,
+  bodyDoesNotMislabelScore,
   type NarrationInput,
   type NarrationOutput,
 } from "./schemas";
@@ -19,8 +20,9 @@ export interface NarratorOptions {
 /**
  * Provider-agnostic narration call. Returns null on EVERY failure —
  * missing key, provider error, timeout, schema violation, invented
- * driver — so callers fall back to the deterministic brief and
- * unvalidated text is never rendered.
+ * driver, hallucinated dollar figure, or a narration that mislabels the
+ * PFI Score as a credit score — so callers fall back to the deterministic
+ * brief and unvalidated text is never rendered.
  */
 export async function generateNarration(
   input: NarrationInput,
@@ -41,6 +43,7 @@ export async function generateNarration(
     });
     if (!referencesOnlyKnownDrivers(input, object)) return null;
     if (!bodyOnlyReferencesKnownAmounts(input, object)) return null;
+    if (!bodyDoesNotMislabelScore(object)) return null;
     return object;
   } catch {
     return null;
