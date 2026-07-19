@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCompany, getDashboardData, getFreshnessData, getProfile } from "@/lib/data/queries";
+import { getOrGenerateNarration } from "@/lib/data/narration";
 import { rebuildSnapshots } from "@/lib/data/rebuild-snapshots";
 import { VIEWER_LEVEL } from "@/lib/demo-data/cohorts";
 import { HomeDashboard } from "@/components/dashboard/HomeDashboard";
@@ -24,6 +25,22 @@ export default async function HomePage() {
   const { snapshots, events, staleIndex, scoreSummary } = data;
   const freshness = await getFreshnessData(supabase);
 
+  // Not awaited: HomeDashboard unwraps this inside a Suspense boundary via
+  // React's use(), falling back to the deterministic brief while it resolves
+  // (or forever, if AI is unavailable — the promise never rejects).
+  const narration =
+    snapshots.length > 0
+      ? getOrGenerateNarration(supabase, {
+          companyName: company.name,
+          snapshots,
+          events,
+          score:
+            scoreSummary.overall !== null
+              ? { overall: scoreSummary.overall, band: scoreSummary.band, momentum: scoreSummary.momentum }
+              : null,
+        })
+      : Promise.resolve(null);
+
   return (
     <div className="flex flex-col gap-6">
       {snapshots.length === 0 ? (
@@ -36,6 +53,7 @@ export default async function HomePage() {
           scoreSummary={scoreSummary}
           staleIndex={staleIndex}
           freshness={freshness}
+          narration={narration}
         />
       )}
       <div className="flex justify-end">

@@ -1,16 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, ArrowRight, ArrowDownRight, Info } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { FinancialChart, type ChartMarker, type StemMarker } from "@/components/chart/FinancialChart";
+import { AIPerformanceBrief } from "@/components/dashboard/AIPerformanceBrief";
 import { CompanyHeader } from "@/components/dashboard/CompanyHeader";
 import { MetricCard, type MetricTone } from "@/components/dashboard/MetricCard";
+import { PerformanceBrief } from "@/components/dashboard/PerformanceBrief";
 import { ScoreCard } from "@/components/dashboard/ScoreCard";
 import { Segmented } from "@/components/ui/Segmented";
 import { StaleDataBanner } from "@/components/dashboard/StaleDataBanner";
 import { WhatMovedYourLine } from "@/components/dashboard/WhatMovedYourLine";
+import type { NarrationResult } from "@/lib/data/narration";
 import type { ScoreSummary } from "@/lib/data/queries";
 import {
   availablePosition,
@@ -66,9 +69,10 @@ interface HomeDashboardProps {
   /** True when a snapshot rebuild is pending/failed and the chart may lag recent edits. */
   staleIndex?: boolean;
   freshness: { currentThrough: string | null; showNudge: boolean };
+  narration: Promise<NarrationResult | null>;
 }
 
-export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleIndex, freshness }: HomeDashboardProps) {
+export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleIndex, freshness, narration }: HomeDashboardProps) {
   const [range, setRange] = useState<RangeKey>("30D");
 
   // The index is anchored on full history once; ranges only slice the view.
@@ -205,15 +209,26 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
         <WhatMovedYourLine drivers={view.drivers} />
       </section>
 
-      {/* Deterministic summary (AI narration replaces the wording, never the numbers, in Phase 4) */}
-      <PerformanceBrief
-        companyName={profile.companyName}
-        momentum={momentum}
-        available={availableNow}
-        cushionNow={cushionNow}
-        aboveWaterline={availableNow > waterline(latest)}
-        aboveBaseline={latestPoint.baseline !== null && latestPoint.actual > latestPoint.baseline}
-      />
+      {/* Performance brief: AI narrates the wording; the numbers are always
+          code-calculated. Suspense's fallback and the AI-unavailable path both
+          render the identical deterministic brief, so there's no visible flash. */}
+      {(() => {
+        const deterministicBrief = (
+          <PerformanceBrief
+            companyName={profile.companyName}
+            momentum={momentum}
+            available={availableNow}
+            cushionNow={cushionNow}
+            aboveWaterline={availableNow > waterline(latest)}
+            aboveBaseline={latestPoint.baseline !== null && latestPoint.actual > latestPoint.baseline}
+          />
+        );
+        return (
+          <Suspense fallback={deterministicBrief}>
+            <AIPerformanceBrief narration={narration} fallback={deterministicBrief} />
+          </Suspense>
+        );
+      })()}
     </div>
   );
 }
@@ -287,52 +302,5 @@ function MomentumCard({ momentum }: { momentum: Momentum }) {
         </p>
       }
     />
-  );
-}
-
-function PerformanceBrief({
-  companyName,
-  momentum,
-  available,
-  cushionNow,
-  aboveWaterline,
-  aboveBaseline,
-}: {
-  companyName: string;
-  momentum: Momentum;
-  available: number;
-  cushionNow: number;
-  aboveWaterline: boolean;
-  aboveBaseline: boolean;
-}) {
-  const momentumPhrase =
-    momentum.direction === "improving"
-      ? "momentum is positive"
-      : momentum.direction === "declining"
-        ? "momentum has softened"
-        : "momentum is steady";
-  const baselinePhrase = aboveBaseline
-    ? "trading above its personal baseline"
-    : "currently below its personal baseline";
-  const waterlinePhrase = aboveWaterline
-    ? `holding ${formatDollars(cushionNow)} of cushion above the waterline`
-    : "below its financial waterline — near-term essentials exceed available capital";
-
-  return (
-    <Card className="p-5">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-primary">Performance brief</h2>
-        <span className="rounded-full bg-neutral-muted px-2.5 py-0.5 text-[11px] font-medium text-secondary">
-          Calculated · AI narration in Phase 4
-        </span>
-      </div>
-      <p className="text-sm leading-relaxed text-secondary">
-        {companyName} is {baselinePhrase} and {momentumPhrase}. Available capital stands at{" "}
-        {formatDollars(available)}, {waterlinePhrase}.
-      </p>
-      <p className="mt-3 text-xs text-tertiary">
-        Educational analysis, not financial, tax, or investment advice.
-      </p>
-    </Card>
   );
 }

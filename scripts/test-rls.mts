@@ -222,6 +222,33 @@ try {
   const { error: baForgedAccountErr } = await a.client.from("balance_anchors")
     .insert({ user_id: a.id, account_id: bAcct!.id, anchor_date: "2026-07-31", balance: 1, source: "manual" });
   check("balance_anchors: cannot anchor an account that isn't yours (ownership trigger)", !!baForgedAccountErr);
+
+  // ai_narrations: owner-only cache/audit rows.
+  const narrationRow = {
+    user_id: a.id, surface: "performance_brief", input_hash: "t".repeat(64),
+    input_json: { surface: "performance_brief" }, output_json: { body: "x".repeat(40), referencedDriverIds: [] },
+    model: "test-model",
+  };
+  const { error: nIns } = await a.client.from("ai_narrations").insert(narrationRow);
+  check("A can insert own narration", !nIns, nIns?.message);
+
+  const { data: nOwn } = await a.client.from("ai_narrations").select("id").eq("user_id", a.id);
+  check("A can read own narration", (nOwn?.length ?? 0) === 1);
+
+  const { data: nCross } = await b.client.from("ai_narrations").select("id");
+  check("B cannot read A's narrations", (nCross?.length ?? 0) === 0);
+
+  const { error: nForge } = await b.client.from("ai_narrations")
+    .insert({ ...narrationRow, input_hash: "u".repeat(64) });
+  check("B cannot insert a narration for A", !!nForge);
+
+  const { data: nUpd } = await b.client.from("ai_narrations")
+    .update({ model: "evil" }).eq("user_id", a.id).select("id");
+  check("B cannot update A's narrations", (nUpd?.length ?? 0) === 0);
+
+  const { data: nDel } = await b.client.from("ai_narrations")
+    .delete().eq("user_id", a.id).select("id");
+  check("B cannot delete A's narrations", (nDel?.length ?? 0) === 0);
 } finally {
   if (a) {
     try {

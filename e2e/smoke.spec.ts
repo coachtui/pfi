@@ -46,6 +46,9 @@ test("onboarding completes with sample data and lands on the dashboard", async (
   await expect(page.getByRole("heading", { name: "Smoke Test Co" })).toBeVisible();
   await expect(page.getByText("Personal Index")).toBeVisible();
   await expect(page.getByText("PFI Score")).toBeVisible();
+  // Keyless run: the deterministic brief must render (AI fallback path).
+  await expect(page.getByRole("heading", { name: "Performance brief" })).toBeVisible();
+  await expect(page.getByText("Calculated", { exact: true })).toBeVisible();
 });
 
 test("score screen renders the breakdown", async () => {
