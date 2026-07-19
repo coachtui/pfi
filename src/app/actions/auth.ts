@@ -97,7 +97,10 @@ export async function signUpWithPassword(
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { emailRedirectTo: `${origin}/auth/callback` },
+    // Becomes {{ .RedirectTo }} in the "Confirm signup" email template,
+    // which must link to /auth/confirm (token_hash), not /auth/callback
+    // (?code=) — see /auth/confirm's doc comment for why.
+    options: { emailRedirectTo: `${origin}/` },
   });
   if (error && !isAlreadyRegisteredError(error)) {
     return { error: "Could not create the account. Try again." };
@@ -138,8 +141,11 @@ export async function requestPasswordReset(
   const supabase = await createClient();
   // Result deliberately ignored: the response must be identical whether or
   // not the email has an account.
+  // Becomes {{ .RedirectTo }} in the "Reset Password" email template, which
+  // must link to /auth/confirm (token_hash), not /auth/callback (?code=) —
+  // see /auth/confirm's doc comment for why.
   await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${origin}/auth/callback?next=/auth/reset/update`,
+    redirectTo: `${origin}/auth/reset/update`,
   });
   return { message: "If that email has an account, a reset link is on its way." };
 }

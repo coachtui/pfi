@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { safeRedirectPath } from "@/lib/auth/safe-redirect";
 
+/**
+ * PKCE code-exchange redemption. Requires the code_verifier cookie set by
+ * the same browser storage that initiated the request — see /auth/confirm
+ * for the device-independent token_hash alternative used by email links
+ * that may be opened in a different browser/app than the one that requested
+ * them (e.g. an installed iOS PWA vs. Safari, where email links always
+ * open). This route now only serves OAuth-provider-style ?code= exchanges.
+ */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  // Only same-site relative paths — never an absolute, protocol-relative, or backslash-containing URL (open-redirect guard; backslashes can be normalized to `/` by some URL parsers).
-  const next = searchParams.get("next");
-  const safeNext =
-    next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/";
+  const safeNext = safeRedirectPath(searchParams.get("next"));
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
