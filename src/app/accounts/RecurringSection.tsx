@@ -33,39 +33,44 @@ function Row({ item, pending, onConfirm, onDismiss, onClear }: {
 }) {
   const [armed, setArmed] = useState(false);
   return (
-    <li data-testid="recurring-row" className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border-subtle py-2 last:border-b-0">
-      <div className="min-w-0 flex-1">
+    // Two stacked lines (name/meta, then chips + actions) instead of one
+    // wrapping row: at ~390px the single-row layout squeezed the name column
+    // to near-zero width once chips and two buttons competed for space.
+    <li data-testid="recurring-row" className="flex flex-col gap-1.5 border-b border-border-subtle py-2.5 last:border-b-0">
+      <div className="min-w-0">
         <p className="truncate text-sm text-primary">{titleCase(item.displayName)}</p>
         <p className="text-xs text-tertiary">
           {CADENCE_LABEL[item.cadence]} · {item.variableAmount ? "~" : ""}{formatDollars(item.typicalAmount)}
           {item.lapsed ? " · last seen " + formatNext(item.lastDate) : " · next " + formatNext(item.nextExpectedDate)}
         </p>
       </div>
-      <span className={chipCls} aria-label={`${item.confidence} confidence, based on ${item.occurrenceCount} occurrences`}>
-        {item.confidence === "high" ? "◆◆◆" : item.confidence === "medium" ? "◆◆◇" : "◆◇◇"} {item.confidence}
-      </span>
-      {item.lapsed && <span className={chipCls}>Lapsed</span>}
-      {item.isDebtPayment && <span className={chipCls}>Debt payment</span>}
-      <div className="flex items-center gap-1.5">
-        {item.status === "confirmed" ? (
-          <>
-            <span className={chipCls}>✓ Confirmed</span>
-            <button type="button" className={actionCls} disabled={pending} onClick={onClear}>Undo</button>
-          </>
-        ) : armed ? (
-          <>
-            <button type="button" className={actionCls} disabled={pending}
-              onClick={() => { setArmed(false); onDismiss(); }}>
-              Confirm dismiss
-            </button>
-            <button type="button" className={actionCls} disabled={pending} onClick={() => setArmed(false)}>Keep</button>
-          </>
-        ) : (
-          <>
-            <button type="button" className={actionCls} disabled={pending} onClick={onConfirm}>Confirm</button>
-            <button type="button" className={actionCls} disabled={pending} onClick={() => setArmed(true)}>Dismiss</button>
-          </>
-        )}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={chipCls} aria-label={`${item.confidence} confidence, based on ${item.occurrenceCount} occurrences`}>
+          {item.confidence === "high" ? "◆◆◆" : item.confidence === "medium" ? "◆◆◇" : "◆◇◇"} {item.confidence}
+        </span>
+        {item.lapsed && <span className={chipCls}>Lapsed</span>}
+        {item.isDebtPayment && <span className={chipCls}>Debt payment</span>}
+        <div className="ml-auto flex items-center gap-1.5">
+          {item.status === "confirmed" ? (
+            <>
+              <span className={chipCls}>✓ Confirmed</span>
+              <button type="button" className={actionCls} disabled={pending} onClick={onClear}>Undo</button>
+            </>
+          ) : armed ? (
+            <>
+              <button type="button" className={actionCls} disabled={pending}
+                onClick={() => { setArmed(false); onDismiss(); }}>
+                Confirm dismiss
+              </button>
+              <button type="button" className={actionCls} disabled={pending} onClick={() => setArmed(false)}>Keep</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className={actionCls} disabled={pending} onClick={onConfirm}>Confirm</button>
+              <button type="button" className={actionCls} disabled={pending} onClick={() => setArmed(true)}>Dismiss</button>
+            </>
+          )}
+        </div>
       </div>
     </li>
   );
@@ -108,9 +113,9 @@ export function RecurringSection({ items }: { items: RecurringListItem[] }) {
 
   return (
     <section id="recurring" aria-labelledby="recurring-heading">
-      <Card>
+      <Card className="p-4">
         <div className="flex items-baseline justify-between">
-          <h2 id="recurring-heading" className="text-base font-semibold text-primary">Recurring</h2>
+          <h2 id="recurring-heading" className="text-sm font-semibold text-primary">Recurring</h2>
           <span className="text-xs text-tertiary">{visible.length} detected</span>
         </div>
         <p className="mt-1 text-xs text-secondary">
