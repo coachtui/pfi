@@ -29,8 +29,12 @@ verified email underneath regardless of how the user signs in.
 - No magic-link option anywhere on the page.
 
 ### /signup (new)
-- Fields: email, username, password (same eye toggle; requirements shown
-  inline up front).
+- Fields: email, password (eye toggle; requirements shown inline up
+  front). **No username field** — usernames already exist as an
+  onboarding concern (chosen with the fictional-company identity, stored
+  in `user_profiles.username`); duplicating the question at sign-up was
+  rejected during planning (2026-07-19). Username login works once
+  onboarding completes; until then the user signs in with email.
 - One required consent checkbox: "I've read and agree to the
   [Terms of Service] and [Privacy Policy]" — both open the documents.
 - Flow: submit → Supabase creates the account and sends a verification
@@ -68,15 +72,14 @@ verified email underneath regardless of how the user signs in.
 - **Generic errors:** unknown username, unknown email, and wrong password
   all return the identical "Invalid credentials" message. No code path may
   reveal whether an identifier exists.
-- Username rules: 3–30 chars, letters/numbers/underscores, unique
-  case-insensitively.
+- Username rules: 3–20 chars, letters/numbers/underscores (matches the
+  existing onboarding validation), unique case-insensitively.
 
 ## Database (migration 0010)
 
-- `user_profiles.username` — nullable text column, case-insensitive unique
-  index (`lower(username)`), format check constraint matching the rules
-  above. Nullable because pre-existing accounts choose a username at the
-  consent gate, not via backfill.
+- `user_profiles.username` **already exists** (not null, unique, populated
+  at onboarding). Migration only adds a case-insensitive unique index on
+  `lower(username)` so `Tui` and `tui` can't coexist.
 - `user_agreements` (new table):
   - `user_id uuid references auth.users`
   - `document text check (document in ('terms', 'privacy'))`
@@ -94,10 +97,10 @@ verified email underneath regardless of how the user signs in.
   `TERMS_VERSION = "2026-07-19"`, `PRIVACY_VERSION = "2026-07-19"`).
 - After any successful login, if the account lacks agreement rows for the
   **current** versions, route to a short consent page before the app.
-- The same page prompts existing accounts without a username to choose one.
 - This single mechanism covers: existing accounts that never consented,
   and re-consent after any material document revision (bump the version
-  constant).
+  constant). (Existing accounts already have usernames from onboarding,
+  so the gate collects consent only.)
 
 ## Passwords
 
@@ -112,7 +115,8 @@ verified email underneath regardless of how the user signs in.
 
 No scripts. On first visit after ship:
 1. User taps "Forgot password?" → email link → sets first password.
-2. On login, the consent gate collects username + terms/privacy consent.
+2. On login, the consent gate collects terms/privacy consent (usernames
+   already exist from onboarding).
 
 User base is currently the owner plus throwaway QA accounts, so this
 one-time path is acceptable.
