@@ -5,6 +5,7 @@ import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 import {
   narrationOutputSchema,
   referencesOnlyKnownDrivers,
+  bodyOnlyReferencesKnownAmounts,
   type NarrationInput,
   type NarrationOutput,
 } from "./schemas";
@@ -39,6 +40,7 @@ export async function generateNarration(
       temperature: 0.4,
     });
     if (!referencesOnlyKnownDrivers(input, object)) return null;
+    if (!bodyOnlyReferencesKnownAmounts(input, object)) return null;
     return object;
   } catch {
     return null;

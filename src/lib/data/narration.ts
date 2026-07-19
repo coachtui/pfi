@@ -33,12 +33,18 @@ export async function getOrGenerateNarration(
     if (!input) return null;
     const inputHash = narrationInputHash(input);
 
-    const { data: cached } = await supabase
+    const { data: cached, error: cacheReadError } = await supabase
       .from("ai_narrations")
       .select("output_json")
       .eq("surface", NARRATION_SURFACE)
       .eq("input_hash", inputHash)
       .maybeSingle();
+    if (cacheReadError) {
+      // Redaction rule: log the failure class only, never metric values.
+      // Falls through to regeneration either way — a persistent read
+      // failure (e.g. an RLS regression) should be diagnosable, not silent.
+      console.error("[ai] narration cache read failed:", cacheReadError.message);
+    }
     if (cached) {
       const parsed = narrationOutputSchema.safeParse(cached.output_json);
       if (parsed.success) return { output: parsed.data, input };

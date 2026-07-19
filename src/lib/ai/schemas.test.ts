@@ -4,6 +4,7 @@ import {
   narrationInputSchema,
   narrationOutputSchema,
   referencesOnlyKnownDrivers,
+  bodyOnlyReferencesKnownAmounts,
 } from "./schemas";
 
 const validInput = {
@@ -90,5 +91,42 @@ describe("referencesOnlyKnownDrivers", () => {
     expect(
       referencesOnlyKnownDrivers(input, { body: "x".repeat(50), referencedDriverIds: ["d9"] }),
     ).toBe(false);
+  });
+});
+
+describe("bodyOnlyReferencesKnownAmounts", () => {
+  const input = narrationInputSchema.parse(validInput);
+
+  it("passes when every dollar figure in the body matches a known input value", () => {
+    const body =
+      "Blue Reef Partners is trading above baseline with $12,451 of available capital and $3,201 of cushion, lifted mainly by a $4,200 paycheck.";
+    expect(bodyOnlyReferencesKnownAmounts(input, { body, referencedDriverIds: ["d1"] })).toBe(
+      true,
+    );
+  });
+
+  it("fails when the body states a dollar figure absent from the input", () => {
+    const body = "Blue Reef Partners is trading above baseline with $9,000 of available capital.";
+    expect(bodyOnlyReferencesKnownAmounts(input, { body, referencedDriverIds: [] })).toBe(false);
+  });
+
+  it("passes a rounding-consistent figure (input cents round to whole dollars)", () => {
+    const centsInput = narrationInputSchema.parse({ ...validInput, availableCapital: 8000.49 });
+    const body = "Available capital stands at $8,000 this period.";
+    expect(bodyOnlyReferencesKnownAmounts(centsInput, { body, referencedDriverIds: [] })).toBe(
+      true,
+    );
+  });
+
+  it("passes a body with no dollar figures at all", () => {
+    const body = "Blue Reef Partners is trading above its baseline and momentum is improving.";
+    expect(bodyOnlyReferencesKnownAmounts(input, { body, referencedDriverIds: [] })).toBe(true);
+  });
+
+  it("passes a body describing a driver's absolute-value impact", () => {
+    const body = "Progress was tempered by a $500 investment contribution mid-period.";
+    expect(bodyOnlyReferencesKnownAmounts(input, { body, referencedDriverIds: ["d2"] })).toBe(
+      true,
+    );
   });
 });

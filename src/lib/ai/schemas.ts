@@ -84,3 +84,39 @@ export function referencesOnlyKnownDrivers(
   const known = new Set(input.drivers.map((d) => d.id));
   return output.referencedDriverIds.every((id) => known.has(id));
 }
+
+/**
+ * Policy check: narration prose may not state a dollar figure absent from
+ * its input (AI_RECOMMENDATION_POLICY.md — "deterministic code calculates,
+ * AI only narrates"). Every "$"-prefixed number in `output.body` must round
+ * to a known amount: available capital, cushion, or a driver's magnitude
+ * (narration may describe a driver's size without its sign). Rounds to the
+ * nearest whole dollar on both sides — narration prose doesn't state cents
+ * in practice — to avoid brittle float-equality comparisons. A body with no
+ * dollar figures at all passes trivially: this check only fires when the AI
+ * actually asserts a number.
+ */
+export function bodyOnlyReferencesKnownAmounts(
+  input: NarrationInput,
+  output: NarrationOutput,
+): boolean {
+  try {
+    const matches = output.body.match(/\$[\d,]+(?:\.\d{2})?/g);
+    if (!matches) return true;
+
+    const round = (n: number) => Math.round(n);
+    const known = new Set<number>([
+      round(input.availableCapital),
+      round(input.cushion),
+      ...input.drivers.map((d) => round(Math.abs(d.impact))),
+    ]);
+
+    return matches.every((match) => {
+      const value = Number.parseFloat(match.replace(/[$,]/g, ""));
+      if (Number.isNaN(value)) return false;
+      return known.has(round(value));
+    });
+  } catch {
+    return false;
+  }
+}

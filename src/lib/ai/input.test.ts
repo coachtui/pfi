@@ -86,6 +86,21 @@ describe("buildNarrationInput", () => {
     expect(serialized).not.toContain('"e1"');
   });
 
+  it("marks vsBaseline unknown before the baseline can be established", () => {
+    // rollingBaseline's minPeriods is 7 (src/lib/financial-engine/indexing.ts);
+    // 5 days of history means baseline stays null for every point, including
+    // the latest — vsBaseline must surface that as "unknown", not "below".
+    const start = new Date("2026-07-01T00:00:00Z");
+    const snapshots = Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(start);
+      d.setUTCDate(d.getUTCDate() + i);
+      const date = d.toISOString().slice(0, 10);
+      return snapshot({ date, liquidAssets: 10_000 + i * 25 });
+    });
+    const input = buildNarrationInput({ companyName: "T", snapshots, events: [], score: null });
+    expect(input!.vsBaseline).toBe("unknown");
+  });
+
   it("marks equity-building drivers", () => {
     const snapshots = buildSnapshots();
     const events = [

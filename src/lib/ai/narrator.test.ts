@@ -55,6 +55,17 @@ describe("generateNarration", () => {
     expect(result).toBeNull();
   });
 
+  it("returns null when the narration states a dollar figure not present in the input", async () => {
+    const hallucinatedBody =
+      "Test Co is trading above its personal baseline with $9,000 of available capital, lifted by a $4,200 paycheck.";
+    const result = await generateNarration(input, {
+      model: mockModel(
+        JSON.stringify({ body: hallucinatedBody, referencedDriverIds: ["d1"] }),
+      ),
+    });
+    expect(result).toBeNull();
+  });
+
   it("returns null with no API key and no model override", async () => {
     // Vitest env stubs AI_GATEWAY_API_KEY as absent (env.ts test branch).
     expect(await generateNarration(input)).toBeNull();
