@@ -97,6 +97,14 @@ export async function signUpWithPassword(
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
+    // Deliberately still points at /auth/callback: the CURRENT "Confirm
+    // signup" email template builds its link from {{ .RedirectTo }} (this
+    // value), so changing it here — before the dashboard template is
+    // switched to /auth/confirm's token_hash format — would break the live
+    // flow the moment this deploys. Once the template is updated to hardcode
+    // its own next= destination (see /auth/confirm's doc comment), this
+    // value stops mattering for routing and only needs to stay on the
+    // redirect-URL allowlist.
     options: { emailRedirectTo: `${origin}/auth/callback` },
   });
   if (error && !isAlreadyRegisteredError(error)) {
@@ -138,6 +146,14 @@ export async function requestPasswordReset(
   const supabase = await createClient();
   // Result deliberately ignored: the response must be identical whether or
   // not the email has an account.
+  // Deliberately still points at /auth/callback: the CURRENT "Reset
+  // Password" email template builds its link from {{ .RedirectTo }} (this
+  // value), so changing it here — before the dashboard template is switched
+  // to /auth/confirm's token_hash format — would break the live flow the
+  // moment this deploys. Once the template is updated to hardcode its own
+  // next= destination directly (see /auth/confirm's doc comment), this
+  // value stops mattering for routing and only needs to stay on the
+  // redirect-URL allowlist.
   await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${origin}/auth/callback?next=/auth/reset/update`,
   });
