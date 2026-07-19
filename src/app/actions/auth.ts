@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -11,7 +11,7 @@ import {
   signupSchema,
   updatePasswordSchema,
 } from "@/lib/validation/auth";
-import { CURRENT_AGREEMENTS } from "@/lib/legal/versions";
+import { AGREED_COOKIE, CURRENT_AGREEMENTS } from "@/lib/legal/versions";
 import { missingAgreements } from "@/lib/legal/consent";
 
 export type AuthFormState = { error?: string; message?: string };
@@ -182,5 +182,10 @@ export async function acceptAgreements(): Promise<AuthFormState> {
 export async function signOut(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  // Defense in depth: the consent cookie is bound to the signed-out user's
+  // id, so it's harmless to a *different* next user, but clearing it here
+  // stops it lingering into any next sign-in on this browser regardless.
+  const cookieStore = await cookies();
+  cookieStore.delete(AGREED_COOKIE);
   redirect("/login");
 }

@@ -16,6 +16,6 @@ export const CURRENT_AGREEMENTS: readonly { document: AgreementDocument; version
 /** Cookie that caches "this session already proved consent" (proxy gate). */
 export const AGREED_COOKIE = "pfi_agreed";
 
-export function agreedCookieValue(): string {
-  return `${TERMS_VERSION}|${PRIVACY_VERSION}`;
+export function agreedCookieValue(userId: string): string {
+  return `${userId}:${TERMS_VERSION}|${PRIVACY_VERSION}`;
 }

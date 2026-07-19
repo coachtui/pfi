@@ -29,7 +29,7 @@ describe("missingAgreements", () => {
 });
 
 describe("agreedCookieValue", () => {
-  it("encodes both current versions", () => {
-    expect(agreedCookieValue()).toBe(`${TERMS_VERSION}|${PRIVACY_VERSION}`);
+  it("encodes the user id and both current versions", () => {
+    expect(agreedCookieValue("user-123")).toBe(`user-123:${TERMS_VERSION}|${PRIVACY_VERSION}`);
   });
 });

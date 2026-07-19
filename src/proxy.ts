@@ -44,7 +44,7 @@ export async function proxy(request: NextRequest) {
   // Consent gate: one DB query per session (cookie-cached), not per request.
   // The cookie only skips the *check* — proof of consent is the DB rows.
   if (user && !isPublic && !path.startsWith("/consent")) {
-    if (request.cookies.get(AGREED_COOKIE)?.value !== agreedCookieValue()) {
+    if (request.cookies.get(AGREED_COOKIE)?.value !== agreedCookieValue(user.id)) {
       const { data: rows } = await supabase
         .from("user_agreements")
         .select("document, version")
@@ -54,7 +54,7 @@ export async function proxy(request: NextRequest) {
         url.pathname = "/consent";
         return NextResponse.redirect(url);
       }
-      response.cookies.set(AGREED_COOKIE, agreedCookieValue(), {
+      response.cookies.set(AGREED_COOKIE, agreedCookieValue(user.id), {
         httpOnly: true,
         sameSite: "lax",
         maxAge: 60 * 60 * 24 * 30,
