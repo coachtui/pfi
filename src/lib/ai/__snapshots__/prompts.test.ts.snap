@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`policy prompt > embeds the input metrics verbatim and nothing else 1`] = `
+"Narrate this performance brief covering the last 30 days. Verified metrics:
+
+{
+  "surface": "performance_brief",
+  "companyName": "Test Co",
+  "periodDays": 30,
+  "availableCapital": 8000,
+  "cushion": 1200,
+  "vsBaseline": "below",
+  "vsWaterline": "above",
+  "momentum": {
+    "direction": "declining",
+    "delta": -1.8,
+    "windowDays": 7
+  },
+  "drivers": [
+    {
+      "id": "d1",
+      "kind": "large_purchase",
+      "date": "2026-07-12",
+      "impact": -2400,
+      "buildsEquity": false
+    }
+  ],
+  "score": null
+}"
+`;
