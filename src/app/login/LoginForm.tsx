@@ -1,13 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
+import { PasswordInput } from "@/components/ui/PasswordInput";
+import { signInWithPassword, type AuthFormState } from "@/app/actions/auth";
+
+const inputCls =
+  "rounded-xl border border-border-subtle bg-inset px-4 py-3 text-sm text-primary placeholder:text-tertiary focus:border-border-strong focus:outline-none";
 
 export function LoginForm() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error" | "authenticating">("idle");
+  const [state, formAction, pending] = useActionState<AuthFormState, FormData>(
+    signInWithPassword,
+    {},
+  );
+  const [status, setStatus] = useState<"idle" | "authenticating">("idle");
   const [hashError, setHashError] = useState<string | null>(null);
   const params = useSearchParams();
   const router = useRouter();
@@ -56,17 +65,6 @@ export function LoginForm() {
     });
   }, [router]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setStatus("sending");
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${location.origin}/auth/callback` },
-    });
-    setStatus(error ? "error" : "sent");
-  }
-
   if (status === "authenticating") {
     return (
       <Card className="p-6">
@@ -79,39 +77,61 @@ export function LoginForm() {
 
   return (
     <Card className="p-6">
-      {status === "sent" ? (
-        <p className="text-sm text-primary" role="status">
-          Check your email — we sent a sign-in link to <span className="font-medium">{email}</span>.
-        </p>
-      ) : (
-        <form onSubmit={submit} className="flex flex-col gap-3">
-          <label htmlFor="email" className="text-sm font-medium text-primary">
-            Sign in with your email
+      <form action={formAction} className="flex flex-col gap-3">
+        <label htmlFor="identifier" className="text-sm font-medium text-primary">
+          Email or username
+        </label>
+        <input
+          id="identifier"
+          name="identifier"
+          type="text"
+          required
+          autoComplete="username"
+          placeholder="you@example.com or IslandBuilder"
+          className={inputCls}
+        />
+        <div className="flex items-baseline justify-between">
+          <label htmlFor="password" className="text-sm font-medium text-primary">
+            Password
           </label>
-          <input
-            id="email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            className="rounded-xl border border-border-subtle bg-inset px-4 py-3 text-sm text-primary placeholder:text-tertiary focus:border-border-strong focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={status === "sending"}
-            className="rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base transition-opacity disabled:opacity-60"
+          <Link
+            href="/auth/reset"
+            className="text-xs text-secondary underline underline-offset-4 hover:text-primary"
           >
-            {status === "sending" ? "Sending…" : "Send magic link"}
-          </button>
-          {(status === "error" || linkError || hashError) && (
-            <p className="text-sm text-negative" role="alert">
-              {hashError ?? (linkError ? "That sign-in link expired or was invalid. Try again." : "Could not send the link. Check the address and try again.")}
-            </p>
-          )}
-        </form>
-      )}
+            Forgot password?
+          </Link>
+        </div>
+        <PasswordInput id="password" name="password" required autoComplete="current-password" />
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base transition-opacity disabled:opacity-60"
+        >
+          {pending ? "Signing in…" : "Sign in"}
+        </button>
+        {(state.error || linkError || hashError) && (
+          <p className="text-sm text-negative" role="alert">
+            {hashError ??
+              state.error ??
+              "That sign-in link expired or was invalid. Try again."}
+          </p>
+        )}
+      </form>
+      <p className="mt-4 text-center text-sm text-secondary">
+        New here?{" "}
+        <Link href="/signup" className="text-primary underline underline-offset-4">
+          Create account
+        </Link>
+      </p>
+      <p className="mt-3 text-center text-xs text-tertiary">
+        <Link href="/terms" className="underline underline-offset-4 hover:text-secondary">
+          Terms of Service
+        </Link>
+        {" · "}
+        <Link href="/privacy" className="underline underline-offset-4 hover:text-secondary">
+          Privacy Policy
+        </Link>
+      </p>
     </Card>
   );
 }

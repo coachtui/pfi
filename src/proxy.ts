@@ -1,8 +1,22 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/config/env";
+import { AGREED_COOKIE, agreedCookieValue } from "@/lib/legal/versions";
+import { missingAgreements } from "@/lib/legal/consent";
 
-const PUBLIC_PREFIXES = ["/login", "/auth"];
+const PUBLIC_PREFIXES = ["/login", "/signup", "/auth", "/terms", "/privacy"];
+
+/**
+ * Redirects lose any cookies set on `response` (e.g. a refresh-token
+ * rotation from supabase.auth.getUser()'s setAll callback) unless those
+ * cookies are copied onto the redirect response explicitly — a known
+ * Supabase SSR middleware footgun that can otherwise cause a spurious logout.
+ */
+function redirectWithCookies(url: URL, response: NextResponse): NextResponse {
+  const redirect = NextResponse.redirect(url);
+  response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+  return redirect;
+}
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -31,13 +45,36 @@ export async function proxy(request: NextRequest) {
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url, response);
   }
-  if (user && path === "/login") {
+  if (user && (path === "/login" || path === "/signup")) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
-    return NextResponse.redirect(url);
+    return redirectWithCookies(url, response);
   }
+
+  // Consent gate: one DB query per session (cookie-cached), not per request.
+  // The cookie only skips the *check* — proof of consent is the DB rows.
+  if (user && !isPublic && !path.startsWith("/consent")) {
+    if (request.cookies.get(AGREED_COOKIE)?.value !== agreedCookieValue(user.id)) {
+      const { data: rows } = await supabase
+        .from("user_agreements")
+        .select("document, version")
+        .eq("user_id", user.id);
+      if (missingAgreements(rows ?? []).length > 0) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/consent";
+        return redirectWithCookies(url, response);
+      }
+      response.cookies.set(AGREED_COOKIE, agreedCookieValue(user.id), {
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30,
+        path: "/",
+      });
+    }
+  }
+
   return response;
 }
 

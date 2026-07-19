@@ -177,7 +177,7 @@ test("sign out returns to login", async () => {
   await page.goto("/");
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/, { timeout: 15_000 });
-  await expect(page.getByText("Send magic link")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 });
 
 test("no console errors across the whole journey", () => {

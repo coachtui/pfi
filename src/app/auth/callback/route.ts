@@ -4,10 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  // Only same-site relative paths — never an absolute, protocol-relative, or backslash-containing URL (open-redirect guard; backslashes can be normalized to `/` by some URL parsers).
+  const next = searchParams.get("next");
+  const safeNext =
+    next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/";
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(`${origin}/`);
+    if (!error) return NextResponse.redirect(`${origin}${safeNext}`);
   }
   return NextResponse.redirect(`${origin}/login?error=link`);
 }
