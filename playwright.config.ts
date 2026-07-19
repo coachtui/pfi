@@ -17,6 +17,7 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], viewport: { width: 390, height: 844 } } }],
   webServer: {
     command: `pnpm dev --port ${PORT}`,
+    env: { ...process.env, AI_GATEWAY_API_KEY: "" },
     url: `http://localhost:${PORT}/login`,
     reuseExistingServer: false,
     timeout: 120_000,
