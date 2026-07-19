@@ -1,5 +1,15 @@
 project_id = "dgkcmvjfvdlsyuhuewkx"
 
 [auth]
-site_url = "http://localhost:3000"
+# Site URL feeds {{ .SiteURL }} in email templates — the base every emailed
+# link (reset/signup confirm) is built against, project-wide (one value, not
+# per-request). Set to production since the project is live and this is the
+# environment real users hit. Consequence: a password reset requested from a
+# LOCAL dev server still emails a link pointing at production, not
+# localhost — real (non-admin-API) email-link testing against local dev was
+# already unexercised before this change (KNOWN_LIMITATIONS: transactional
+# email deliverability is unverified); local/e2e testing goes through the
+# admin API's generateLink/hashed_token directly instead, which is
+# unaffected by this setting.
+site_url = "https://pfi-one.vercel.app"
 additional_redirect_urls = ["http://localhost:3000/auth/callback", "http://localhost:3000/**", "https://pfi-one.vercel.app/auth/callback", "https://pfi-one.vercel.app/**"]
