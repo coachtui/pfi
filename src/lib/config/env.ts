@@ -10,6 +10,12 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  // Phase 4 AI (optional — absent disables AI features; empty string = unset).
+  AI_GATEWAY_API_KEY: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().min(1).optional(),
+  ),
+  PFI_AI_MODEL: z.string().min(1).default("anthropic/claude-haiku-4-5"),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -24,6 +30,8 @@ const defaultSource = {
   NODE_ENV: process.env.NODE_ENV,
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY,
+  PFI_AI_MODEL: process.env.PFI_AI_MODEL,
 } as NodeJS.ProcessEnv;
 
 export function validateEnv(source: NodeJS.ProcessEnv = defaultSource): Env {
