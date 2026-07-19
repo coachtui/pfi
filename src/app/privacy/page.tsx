@@ -14,7 +14,7 @@ export default function PrivacyPage() {
         <p>
           Your email address and password hash (for authentication); the profile answers you give at
           onboarding (broad cohorts like age range and income band — never exact salary); and the
-          financial account, balance, and transaction data you enter or import.
+          financial account, balance, and transaction data you enter or import into {name}.
         </p>
       </section>
       <section>
