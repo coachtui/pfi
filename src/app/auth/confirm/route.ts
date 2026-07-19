@@ -12,14 +12,26 @@ import { safeRedirectPath } from "@/lib/auth/safe-redirect";
  * and the emailed link is opened in a different one (e.g. Safari, since
  * email links never deep-link into installed PWAs on iOS). token_hash
  * carries the credential in the URL itself, so it redeems correctly
- * regardless of which browser opens it. Password-reset and signup-
- * confirmation emails must be configured (Supabase dashboard → Email
- * Templates) to link here instead of the default ConfirmationURL.
+ * regardless of which browser opens it.
+ *
+ * NOT YET WIRED UP: password-reset and signup-confirmation emails still use
+ * Supabase's default template (built from the app's redirectTo/
+ * emailRedirectTo values, landing on /auth/callback). To switch a flow over,
+ * edit its template in the Supabase dashboard (Auth → Email Templates) to:
+ *   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/auth/reset/update
+ * (type=email for "Confirm signup", next=/ or omit it there). The next=
+ * value must be a HARDCODED relative path, not {{ .RedirectTo }} — that
+ * variable resolves to an absolute URL, which safeRedirectPath() below
+ * rejects (open-redirect guard), stranding the user on "/" after a
+ * successful verify instead of reaching the intended page.
  */
+const VALID_TYPES: EmailOtpType[] = ["signup", "invite", "magiclink", "recovery", "email_change", "email"];
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
+  const typeParam = searchParams.get("type");
+  const type = VALID_TYPES.find((t) => t === typeParam) ?? null;
   const safeNext = safeRedirectPath(searchParams.get("next"));
 
   if (token_hash && type) {
