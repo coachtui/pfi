@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/config/env";
 
-const PUBLIC_PREFIXES = ["/login", "/auth"];
+const PUBLIC_PREFIXES = ["/login", "/signup", "/auth", "/terms", "/privacy"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
