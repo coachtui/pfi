@@ -80,6 +80,7 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **No session-management UI.** A user can't view or revoke other active sessions/devices; the only way to end a session elsewhere is a password reset (which Supabase invalidates existing sessions for) or waiting out refresh-token expiry.
 - **Usernames aren't changeable after onboarding.** No settings surface exists yet to edit `user_profiles.username` once set.
 - **`e2e/global-setup.ts` and `e2e/fixtures/password-user.ts` hardcode the `"2026-07-19"` version literal** for both `terms` and `privacy` consent rows rather than importing `TERMS_VERSION`/`PRIVACY_VERSION` from `src/lib/legal/versions.ts` (test files can't easily import app source in this project's current test setup). Any future version bump must update these two literals by hand, or e2e's pre-seeded "consented" fixture users will silently fail the consent gate.
+- **Login-time identifier resolution has an inherent timing side-channel.** A known username triggers a real password comparison against Supabase (slower) while an unknown username short-circuits immediately in `emailForIdentifier` before ever calling Supabase (faster); a similar fast/known vs slow/unknown split exists at the Supabase layer itself for email identifiers. This is inherent to the auth stack, not something this feature introduced or can fully close — noted for completeness rather than as an actionable gap.
 
 ## Infrastructure (2026-07-15)
 
