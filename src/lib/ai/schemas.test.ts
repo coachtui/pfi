@@ -1,0 +1,91 @@
+import { describe, expect, it } from "vitest";
+import {
+  NARRATION_SURFACE,
+  narrationInputSchema,
+  narrationOutputSchema,
+  referencesOnlyKnownDrivers,
+} from "./schemas";
+
+const validInput = {
+  surface: NARRATION_SURFACE,
+  companyName: "Blue Reef Partners",
+  periodDays: 30,
+  availableCapital: 12450.75,
+  cushion: 3200.5,
+  vsBaseline: "above",
+  vsWaterline: "above",
+  momentum: { direction: "improving", delta: 2.3, windowDays: 7 },
+  drivers: [
+    { id: "d1", kind: "paycheck", date: "2026-07-15", impact: 4200, buildsEquity: false },
+    { id: "d2", kind: "investment_contribution", date: "2026-07-10", impact: -500, buildsEquity: true },
+  ],
+  score: { overall: 612, band: "Solid", momentum: "improving" },
+};
+
+describe("narrationInputSchema", () => {
+  it("accepts a valid input", () => {
+    expect(narrationInputSchema.parse(validInput)).toEqual(validInput);
+  });
+
+  it("rejects unknown fields (raw-data smuggling)", () => {
+    expect(
+      narrationInputSchema.safeParse({ ...validInput, transactions: [] }).success,
+    ).toBe(false);
+    expect(
+      narrationInputSchema.safeParse({
+        ...validInput,
+        drivers: [{ ...validInput.drivers[0], label: "ACME PAYROLL" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a driver kind outside the event-type enum", () => {
+    expect(
+      narrationInputSchema.safeParse({
+        ...validInput,
+        drivers: [{ ...validInput.drivers[0], kind: "merchant_purchase" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("allows a null score", () => {
+    expect(narrationInputSchema.safeParse({ ...validInput, score: null }).success).toBe(true);
+  });
+});
+
+describe("narrationOutputSchema", () => {
+  it("accepts a valid output", () => {
+    const out = {
+      body: "Blue Reef Partners is trading above its baseline with $12,451 of available capital, lifted mainly by a $4,200 paycheck on Jul 15.",
+      referencedDriverIds: ["d1"],
+    };
+    expect(narrationOutputSchema.parse(out)).toEqual(out);
+  });
+
+  it("rejects extra fields and out-of-bounds body length", () => {
+    expect(
+      narrationOutputSchema.safeParse({ body: "short", referencedDriverIds: [] }).success,
+    ).toBe(false);
+    expect(
+      narrationOutputSchema.safeParse({
+        body: "x".repeat(50),
+        referencedDriverIds: [],
+        advice: "buy stocks",
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("referencesOnlyKnownDrivers", () => {
+  const input = narrationInputSchema.parse(validInput);
+  it("passes when all referenced ids exist", () => {
+    expect(
+      referencesOnlyKnownDrivers(input, { body: "x".repeat(50), referencedDriverIds: ["d1", "d2"] }),
+    ).toBe(true);
+  });
+  it("fails on an invented driver id", () => {
+    expect(
+      referencesOnlyKnownDrivers(input, { body: "x".repeat(50), referencedDriverIds: ["d9"] }),
+    ).toBe(false);
+  });
+});

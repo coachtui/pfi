@@ -1,0 +1,86 @@
+import { z } from "zod";
+
+/**
+ * The AI data boundary. NarrationInput is the ONLY thing the model ever
+ * sees about a user: derived metrics with dollar values, never raw
+ * transaction rows, merchant names, account identifiers, or event labels
+ * (labels may embed user-entered text — drivers carry the type enum only).
+ * `.strict()` everywhere makes smuggling extra fields a runtime error.
+ * See docs/AI_RECOMMENDATION_POLICY.md.
+ */
+
+export const NARRATION_SURFACE = "performance_brief" as const;
+
+/** Mirrors FinancialEventType in src/lib/financial-engine/types.ts. */
+const driverKindSchema = z.enum([
+  "paycheck",
+  "bonus",
+  "mortgage_payment",
+  "large_purchase",
+  "insurance_payment",
+  "investment_contribution",
+  "debt_payment",
+  "debt_payoff",
+  "tax_payment",
+  "unexpected_expense",
+]);
+
+const narrationDriverSchema = z
+  .object({
+    id: z.string().regex(/^d\d+$/),
+    kind: driverKindSchema,
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    /** Signed dollar impact on available position (+ improves, − reduces). */
+    impact: z.number(),
+    buildsEquity: z.boolean(),
+  })
+  .strict();
+
+export const narrationInputSchema = z
+  .object({
+    surface: z.literal(NARRATION_SURFACE),
+    companyName: z.string().min(1),
+    periodDays: z.number().int().positive(),
+    availableCapital: z.number(),
+    cushion: z.number(),
+    vsBaseline: z.enum(["above", "below", "at", "unknown"]),
+    vsWaterline: z.enum(["above", "below", "at"]),
+    momentum: z
+      .object({
+        direction: z.enum(["improving", "stable", "declining"]),
+        delta: z.number(),
+        windowDays: z.number().int().positive(),
+      })
+      .strict(),
+    drivers: z.array(narrationDriverSchema).max(4),
+    score: z
+      .object({
+        overall: z.number().nullable(),
+        band: z.string().nullable(),
+        momentum: z.string(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+export const narrationOutputSchema = z
+  .object({
+    /** The narrated brief. Bounds keep it a paragraph, not an essay. */
+    body: z.string().min(40).max(700),
+    /** Every driver the narration mentions, by input id — traceability. */
+    referencedDriverIds: z.array(z.string()),
+  })
+  .strict();
+
+export type NarrationInput = z.infer<typeof narrationInputSchema>;
+export type NarrationOutput = z.infer<typeof narrationOutputSchema>;
+
+/** Policy check: AI may not invent a driver (AI_RECOMMENDATION_POLICY.md). */
+export function referencesOnlyKnownDrivers(
+  input: NarrationInput,
+  output: NarrationOutput,
+): boolean {
+  const known = new Set(input.drivers.map((d) => d.id));
+  return output.referencedDriverIds.every((id) => known.has(id));
+}
