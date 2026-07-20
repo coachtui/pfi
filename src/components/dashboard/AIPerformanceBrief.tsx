@@ -4,7 +4,6 @@ import { use, type ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
 import { EVENT_TYPE_LABELS, formatDollars } from "@/lib/financial-engine";
 import type { BriefNarrationResult } from "@/lib/data/narration";
-import type { BriefInput } from "@/lib/ai/schemas";
 
 export function AIPerformanceBrief({
   narration,
