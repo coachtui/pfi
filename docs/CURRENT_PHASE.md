@@ -217,7 +217,7 @@ _Last updated: 2026-07-19 (password auth — Tasks 1–14 complete on `worktree-
 
 1. **Consider a transactional email provider** before real (non-demo) users onboard at any volume — Supabase's default SMTP has low rate limits and no deliverability guarantees, even though both the reset and sign-up-confirmation flows now work correctly on it. This is now the highest-value remaining auth-infrastructure item: with "Confirm email" on, every new user is gated behind a delivered email, so deliverability moved from a convenience concern to a sign-up blocker.
 2. **Add regression coverage for the Vercel env gap Task 12 exposed.** `SUPABASE_SERVICE_ROLE_KEY` was missing in production for the entire life of the password-auth slice and no test, build step, or deploy check caught it — the failure only surfaced at runtime, on a user-facing path. Worth a deploy-time assertion (or a smoke check against the deployed URL) that the server-only env vars an auth action needs are actually present in the target environment.
-3. **Decide on `% Today` (index-point change)** — see KNOWN_LIMITATIONS and "Decisions needed" below.
+3. ~~Decide on `% Today` (index-point change)~~ — **resolved 2026-07-20** (DECISIONS #30): the Today stat now shows index-point change with percent in parens; calculation moved into the engine (`indexDayChange`).
 
 ## Known blockers
 
@@ -225,7 +225,6 @@ _Last updated: 2026-07-19 (password auth — Tasks 1–14 complete on `worktree-
 
 ## Decisions needed
 
-- Whether `% Today` should become index-point change (see KNOWN_LIMITATIONS).
 - Transactional email provider choice before real (non-demo) users onboard — now scoped to password-reset and sign-up-verification emails (both live as of Task 12) rather than magic-link sign-in.
 
 ## Test status
