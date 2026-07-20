@@ -27,7 +27,7 @@ const driverKindSchema = z.enum([
   "unexpected_expense",
 ]);
 
-const narrationDriverSchema = z
+export const narrationDriverSchema = z
   .object({
     id: z.string().regex(/^d\d+$/),
     kind: driverKindSchema,
@@ -77,6 +77,49 @@ export const briefOutputSchema = z
 
 export type BriefInput = z.infer<typeof briefInputSchema>;
 export type BriefOutput = z.infer<typeof briefOutputSchema>;
+
+export const driverExplanationsInputSchema = z
+  .object({
+    surface: z.literal(DRIVER_EXPLANATIONS_SURFACE),
+    companyName: z.string().min(1),
+    periodDays: z.number().int().positive(),
+    /** Sum of positive driver impacts (dollars). */
+    totalInflow: z.number().min(0),
+    /** Sum of negative driver impact magnitudes (dollars). */
+    totalOutflow: z.number().min(0),
+    /** Signed net of all driver impacts. */
+    netImpact: z.number(),
+    drivers: z.array(narrationDriverSchema).min(1).max(4),
+  })
+  .strict();
+
+/** All AI inputs, discriminated on surface — the one type hash/narrator accept. */
+export const narrationInputSchema = z.discriminatedUnion("surface", [
+  briefInputSchema,
+  driverExplanationsInputSchema,
+]);
+
+export type DriverExplanationsInput = z.infer<typeof driverExplanationsInputSchema>;
+export type NarrationInput = z.infer<typeof narrationInputSchema>;
+
+export const driverExplanationsOutputSchema = z
+  .object({
+    /** One short explanation per input driver, keyed by its internal id. */
+    explanations: z
+      .array(
+        z
+          .object({
+            driverId: z.string().regex(/^d\d+$/),
+            body: z.string().min(20).max(280),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(4),
+  })
+  .strict();
+
+export type DriverExplanationsOutput = z.infer<typeof driverExplanationsOutputSchema>;
 
 /** Policy check: AI may not invent a driver (AI_RECOMMENDATION_POLICY.md). */
 export function referencesOnlyKnownDrivers(
@@ -165,4 +208,36 @@ export function textDoesNotMislabelScore(text: string): boolean {
 
 export function bodyDoesNotMislabelScore(output: BriefOutput): boolean {
   return textDoesNotMislabelScore(output.body);
+}
+
+/**
+ * Policy check: exactly one explanation per known driver — none invented,
+ * none missing, no duplicates. A missing driver invalidates the whole set
+ * (the UI would otherwise show a mixed AI/deterministic accordion for one
+ * generation, which reads as inconsistency, not graceful degradation).
+ */
+export function explanationsCoverExactlyKnownDrivers(
+  input: DriverExplanationsInput,
+  output: DriverExplanationsOutput,
+): boolean {
+  const known = input.drivers.map((d) => d.id).sort();
+  const got = output.explanations.map((e) => e.driverId).sort();
+  return known.length === got.length && known.every((id, i) => id === got[i]);
+}
+
+/** Policy check: every dollar figure in every body is a known amount. */
+export function explanationAmountsAreKnown(
+  input: DriverExplanationsInput,
+  output: DriverExplanationsOutput,
+): boolean {
+  const known = driverAmountSet(input.drivers);
+  known.add(Math.round(input.totalInflow));
+  known.add(Math.round(input.totalOutflow));
+  known.add(Math.round(Math.abs(input.netImpact)));
+  return output.explanations.every((e) => textOnlyReferencesKnownAmounts(e.body, known));
+}
+
+/** Policy check: no body mislabels the PFI Score (defense-in-depth). */
+export function explanationsDoNotMislabelScore(output: DriverExplanationsOutput): boolean {
+  return output.explanations.every((e) => textDoesNotMislabelScore(e.body));
 }

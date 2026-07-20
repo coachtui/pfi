@@ -188,3 +188,125 @@ describe("bodyDoesNotMislabelScore", () => {
     expect(bodyDoesNotMislabelScore({ body, referencedDriverIds: [] })).toBe(true);
   });
 });
+
+import {
+  driverExplanationsInputSchema,
+  driverExplanationsOutputSchema,
+  explanationsCoverExactlyKnownDrivers,
+  explanationAmountsAreKnown,
+  explanationsDoNotMislabelScore,
+  narrationInputSchema,
+  type DriverExplanationsInput,
+  type DriverExplanationsOutput,
+} from "./schemas";
+
+const driverInput: DriverExplanationsInput = {
+  surface: "driver_explanations",
+  companyName: "Test Co",
+  periodDays: 30,
+  totalInflow: 6900,
+  totalOutflow: 2200,
+  netImpact: 4700,
+  drivers: [
+    { id: "d1", kind: "paycheck", date: "2026-07-03", impact: 3450, buildsEquity: false },
+    { id: "d2", kind: "mortgage_payment", date: "2026-07-01", impact: -2200, buildsEquity: false },
+  ],
+};
+
+const goodOutput: DriverExplanationsOutput = {
+  explanations: [
+    { driverId: "d1", body: "A paycheck added $3,450 to available capital this period." },
+    { driverId: "d2", body: "The mortgage payment reduced available capital by $2,200." },
+  ],
+};
+
+describe("driverExplanationsInputSchema", () => {
+  it("accepts a valid input", () => {
+    expect(driverExplanationsInputSchema.parse(driverInput)).toEqual(driverInput);
+  });
+  it("rejects an empty driver array (no drivers means no call)", () => {
+    expect(
+      driverExplanationsInputSchema.safeParse({ ...driverInput, drivers: [] }).success,
+    ).toBe(false);
+  });
+  it("rejects unknown fields (strict boundary)", () => {
+    expect(
+      driverExplanationsInputSchema.safeParse({ ...driverInput, label: "smuggled" }).success,
+    ).toBe(false);
+  });
+  it("round-trips through the discriminated union", () => {
+    expect(narrationInputSchema.parse(driverInput)).toEqual(driverInput);
+  });
+});
+
+describe("driverExplanationsOutputSchema", () => {
+  it("accepts a valid output", () => {
+    expect(driverExplanationsOutputSchema.parse(goodOutput)).toEqual(goodOutput);
+  });
+  it("rejects a body under 20 chars", () => {
+    const short = { explanations: [{ driverId: "d1", body: "too short" }] };
+    expect(driverExplanationsOutputSchema.safeParse(short).success).toBe(false);
+  });
+  it("rejects a body over 280 chars", () => {
+    const long = { explanations: [{ driverId: "d1", body: "x".repeat(281) }] };
+    expect(driverExplanationsOutputSchema.safeParse(long).success).toBe(false);
+  });
+});
+
+describe("explanationsCoverExactlyKnownDrivers", () => {
+  it("passes when ids match exactly", () => {
+    expect(explanationsCoverExactlyKnownDrivers(driverInput, goodOutput)).toBe(true);
+  });
+  it("fails when a driver is missing (whole set falls back)", () => {
+    const missing = { explanations: [goodOutput.explanations[0]] };
+    expect(explanationsCoverExactlyKnownDrivers(driverInput, missing)).toBe(false);
+  });
+  it("fails on an invented driver id", () => {
+    const invented = {
+      explanations: [...goodOutput.explanations, { driverId: "d9", body: "x".repeat(30) }],
+    };
+    expect(explanationsCoverExactlyKnownDrivers(driverInput, invented)).toBe(false);
+  });
+  it("fails on duplicate ids", () => {
+    const dupes = {
+      explanations: [goodOutput.explanations[0], { ...goodOutput.explanations[0] }],
+    };
+    expect(explanationsCoverExactlyKnownDrivers(driverInput, dupes)).toBe(false);
+  });
+});
+
+describe("explanationAmountsAreKnown", () => {
+  it("passes when every figure is a driver magnitude or aggregate", () => {
+    expect(explanationAmountsAreKnown(driverInput, goodOutput)).toBe(true);
+  });
+  it("accepts the aggregate figures (inflow/outflow/net)", () => {
+    const agg = {
+      explanations: [
+        { driverId: "d1", body: "Inflows totaling $6,900 outweighed $2,200 of outflows." },
+        { driverId: "d2", body: "Net driver movement this period came to $4,700." },
+      ],
+    };
+    expect(explanationAmountsAreKnown(driverInput, agg)).toBe(true);
+  });
+  it("fails on a hallucinated figure", () => {
+    const bad = {
+      explanations: [
+        { driverId: "d1", body: "A paycheck added $9,999 to available capital." },
+        goodOutput.explanations[1],
+      ],
+    };
+    expect(explanationAmountsAreKnown(driverInput, bad)).toBe(false);
+  });
+});
+
+describe("explanationsDoNotMislabelScore", () => {
+  it("fails when any body says credit score", () => {
+    const bad = {
+      explanations: [
+        { driverId: "d1", body: "This paycheck should help your credit score improve." },
+        goodOutput.explanations[1],
+      ],
+    };
+    expect(explanationsDoNotMislabelScore(bad)).toBe(false);
+  });
+});

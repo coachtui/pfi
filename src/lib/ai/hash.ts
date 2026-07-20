@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { BriefInput } from "./schemas";
+import type { NarrationInput } from "./schemas";
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -15,7 +15,7 @@ function canonicalize(value: unknown): unknown {
 }
 
 /** Cache key for ai_narrations: any input change invalidates naturally. */
-export function narrationInputHash(input: BriefInput): string {
+export function narrationInputHash(input: NarrationInput): string {
   return createHash("sha256")
     .update(JSON.stringify(canonicalize(input)))
     .digest("hex");
