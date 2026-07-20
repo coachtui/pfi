@@ -73,6 +73,19 @@ export function WhatMovedYourLine({
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // Reset the open panel whenever the drivers list changes (e.g. the user
+  // switches chart range). Without this, an event id that disappears and
+  // later reappears (a different range containing the same event) would
+  // silently reopen its panel with no further tap. Adjusted during render
+  // (React's recommended pattern for resetting state on a prop change)
+  // rather than in a useEffect, which would call setState after an extra
+  // commit and trip this project's set-state-in-effect lint rule.
+  const [prevDrivers, setPrevDrivers] = useState(drivers);
+  if (drivers !== prevDrivers) {
+    setPrevDrivers(drivers);
+    setExpandedId(null);
+  }
+
   if (drivers.length === 0) {
     return (
       <p className="rounded-card border border-border-subtle bg-elevated p-4 text-sm text-secondary">

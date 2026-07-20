@@ -26,15 +26,13 @@ export interface DriverExplanationsResult {
   input: DriverExplanationsInput;
 }
 
-/** Per-surface wiring: input assembly + the schema cached rows must satisfy. */
+/** Per-surface wiring: input assembly for each surface. */
 const SURFACES = {
   [BRIEF_SURFACE]: {
     buildInput: buildBriefInput,
-    outputSchema: briefOutputSchema,
   },
   [DRIVER_EXPLANATIONS_SURFACE]: {
     buildInput: buildDriverExplanationsInput,
-    outputSchema: driverExplanationsOutputSchema,
   },
 } as const;
 

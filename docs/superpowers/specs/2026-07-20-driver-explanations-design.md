@@ -27,13 +27,13 @@ Drivers keep coming from `computeDrivers`. One addition: a pure, framework-free 
 ### AI module (`src/lib/ai/`) — per-surface generalization
 
 - **`schemas.ts`:** `narrationInputSchema` becomes `z.discriminatedUnion("surface", [briefInputSchema, driverExplanationsInputSchema])`. The `driver_explanations` input carries: `companyName`, `periodDays`, the same type-only driver array (`id`/`kind`/`date`/`impact`/`buildsEquity` — labels and event ids never cross the boundary), plus minimal period context: total inflows, total outflows, net driver impact. No score and no baseline/waterline — this surface explains events, not position.
-- **New output schema:** a `.strict()` record keyed by driver id → `{ body: z.string() }` with per-body bounds (~20–280 chars).
+- **New output schema:** a `.strict()` array of `{ driverId: z.string(), body: z.string() }` objects, one entry per driver, with per-body bounds (~20–280 chars).
 - **`prompts.ts`:** per-surface prompt table. The driver-explanations prompt forbids advice (explains what happened; recommendations are the next slice, governed by AI_RECOMMENDATION_POLICY.md), forbids internal ids in prose, requires no-shame language and equity-vs-spend framing.
 - **`narrator.ts` / `input.ts`:** `generateNarration(surface, input)`; `buildBriefInput` + `buildDriverExplanationsInput`, each ending in a runtime `.parse()`.
 
 ### Cache
 
-Migration `0010`: extend the `ai_narrations.surface` check constraint to `('performance_brief', 'driver_explanations')`. Same table, same `(user_id, surface, input_hash)` uniqueness and input-hash keying, RLS untouched.
+Migration `0011`: extend the `ai_narrations.surface` check constraint to `('performance_brief', 'driver_explanations')`. Same table, same `(user_id, surface, input_hash)` uniqueness and input-hash keying, RLS untouched.
 
 ### Data flow
 
