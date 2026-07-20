@@ -2,11 +2,13 @@ import type {
   DailySnapshot,
   Driver,
   FinancialEvent,
+  FinancialEventType,
   ISODate,
   Momentum,
   PositionStatus,
 } from "./types";
 import { availablePosition, waterline } from "./position";
+import { formatDollars, formatShortDate } from "./format";
 
 /**
  * Deterministic driver calculation: which financial events moved the
@@ -94,4 +96,46 @@ export function computeStatus(
     vsBaseline: baselineDollars === null ? "at" : compare(pos, baselineDollars),
     vsWaterline: compare(pos, wl),
   };
+}
+
+/** Type-derived display names. Shared by the AI disclosure UI and the
+ * deterministic explanations so wording can't drift between the two paths. */
+export const EVENT_TYPE_LABELS: Record<FinancialEventType, string> = {
+  paycheck: "Paycheck",
+  bonus: "Bonus",
+  mortgage_payment: "Mortgage payment",
+  large_purchase: "Large purchase",
+  insurance_payment: "Insurance payment",
+  investment_contribution: "Investment contribution",
+  debt_payment: "Debt payment",
+  debt_payoff: "Debt payoff",
+  tax_payment: "Tax payment",
+  unexpected_expense: "Unexpected expense",
+};
+
+/**
+ * Deterministic per-driver explanation — the keyless/fallback counterpart of
+ * the AI-narrated version. Type-derived wording only (parity with the AI
+ * data boundary); the card above it already shows the user's own label.
+ */
+export function driverExplanationText(
+  driver: Driver,
+  context: { totalMovement: number },
+): string {
+  const display = driverDisplay(driver);
+  const name = EVENT_TYPE_LABELS[driver.event.type];
+  const when = formatShortDate(driver.event.date);
+  const amount = formatDollars(Math.abs(driver.impact));
+  const share =
+    context.totalMovement > 0
+      ? Math.round((Math.abs(driver.impact) / context.totalMovement) * 100)
+      : 0;
+  const shareText = share > 0 ? ` — ${share}% of this period's driver movement` : "";
+  if (display.buildsEquity) {
+    return `${name} on ${when} moved ${amount} from cash into owner-created equity${shareText}. It reduces cash on hand but builds equity you own.`;
+  }
+  if (driver.impact >= 0) {
+    return `${name} on ${when} added ${amount} to available capital${shareText}.`;
+  }
+  return `${name} on ${when} reduced available capital by ${amount}${shareText}.`;
 }

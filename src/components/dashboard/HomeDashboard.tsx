@@ -6,6 +6,7 @@ import { ArrowUpRight, ArrowRight, ArrowDownRight, Info } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { FinancialChart, type ChartMarker, type StemMarker } from "@/components/chart/FinancialChart";
 import { AIPerformanceBrief } from "@/components/dashboard/AIPerformanceBrief";
+import { AIWhatMovedYourLine } from "@/components/dashboard/AIWhatMovedYourLine";
 import { CompanyHeader } from "@/components/dashboard/CompanyHeader";
 import { MetricCard, type MetricTone } from "@/components/dashboard/MetricCard";
 import { PerformanceBrief } from "@/components/dashboard/PerformanceBrief";
@@ -13,7 +14,7 @@ import { ScoreCard } from "@/components/dashboard/ScoreCard";
 import { Segmented } from "@/components/ui/Segmented";
 import { StaleDataBanner } from "@/components/dashboard/StaleDataBanner";
 import { WhatMovedYourLine } from "@/components/dashboard/WhatMovedYourLine";
-import type { NarrationResult } from "@/lib/data/narration";
+import type { BriefNarrationResult, DriverExplanationsResult } from "@/lib/data/narration";
 import type { ScoreSummary } from "@/lib/data/queries";
 import {
   availablePosition,
@@ -71,10 +72,20 @@ interface HomeDashboardProps {
   /** True when a snapshot rebuild is pending/failed and the chart may lag recent edits. */
   staleIndex?: boolean;
   freshness: { currentThrough: string | null; showNudge: boolean };
-  narration: Promise<NarrationResult | null>;
+  narration: Promise<BriefNarrationResult | null>;
+  driverNarration: Promise<DriverExplanationsResult | null>;
 }
 
-export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleIndex, freshness, narration }: HomeDashboardProps) {
+export function HomeDashboard({
+  profile,
+  snapshots,
+  events,
+  scoreSummary,
+  staleIndex,
+  freshness,
+  narration,
+  driverNarration,
+}: HomeDashboardProps) {
   const [range, setRange] = useState<RangeKey>("30D");
 
   // The index is anchored on full history once; ranges only slice the view.
@@ -199,7 +210,8 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
         <MomentumCard momentum={momentum} />
       </section>
 
-      {/* Drivers */}
+      {/* Drivers: AI supplies per-driver wording; the cards, amounts, and
+          deterministic explanations are always code-calculated. */}
       <section aria-labelledby="what-moved">
         <div className="mb-3 flex items-baseline justify-between">
           <h2 id="what-moved" className="text-base font-semibold text-primary">
@@ -207,7 +219,9 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
           </h2>
           <span className="text-xs text-tertiary">Largest events · {range}</span>
         </div>
-        <WhatMovedYourLine drivers={view.drivers} />
+        <Suspense fallback={<WhatMovedYourLine drivers={view.drivers} aiResult={null} />}>
+          <AIWhatMovedYourLine drivers={view.drivers} narration={driverNarration} />
+        </Suspense>
       </section>
 
       {/* Performance brief: AI narrates the wording; the numbers are always

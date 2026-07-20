@@ -2,29 +2,14 @@
 
 import { use, type ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
-import { formatDollars } from "@/lib/financial-engine";
-import type { NarrationResult } from "@/lib/data/narration";
-import type { NarrationInput } from "@/lib/ai/schemas";
-
-/** Type-derived display names — never event labels (data boundary). */
-const KIND_LABELS: Record<NarrationInput["drivers"][number]["kind"], string> = {
-  paycheck: "Paycheck",
-  bonus: "Bonus",
-  mortgage_payment: "Mortgage payment",
-  large_purchase: "Large purchase",
-  insurance_payment: "Insurance payment",
-  investment_contribution: "Investment contribution",
-  debt_payment: "Debt payment",
-  debt_payoff: "Debt payoff",
-  tax_payment: "Tax payment",
-  unexpected_expense: "Unexpected expense",
-};
+import { EVENT_TYPE_LABELS, formatDollars } from "@/lib/financial-engine";
+import type { BriefNarrationResult } from "@/lib/data/narration";
 
 export function AIPerformanceBrief({
   narration,
   fallback,
 }: {
-  narration: Promise<NarrationResult | null>;
+  narration: Promise<BriefNarrationResult | null>;
   fallback: ReactNode;
 }) {
   const result = use(narration);
@@ -62,7 +47,7 @@ export function AIPerformanceBrief({
             </li>
             {input.drivers.map((d) => (
               <li key={d.id}>
-                {KIND_LABELS[d.kind]} on {d.date}: {formatDollars(d.impact)}
+                {EVENT_TYPE_LABELS[d.kind]} on {d.date}: {formatDollars(d.impact)}
                 {d.buildsEquity ? " (builds equity)" : ""}
               </li>
             ))}

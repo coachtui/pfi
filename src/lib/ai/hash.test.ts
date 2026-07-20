@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { narrationInputHash } from "./hash";
-import { NARRATION_SURFACE, narrationInputSchema, type NarrationInput } from "./schemas";
+import { BRIEF_SURFACE, briefInputSchema, type BriefInput } from "./schemas";
 
-function makeInput(overrides: Partial<NarrationInput> = {}): NarrationInput {
-  return narrationInputSchema.parse({
-    surface: NARRATION_SURFACE,
+function makeInput(overrides: Partial<BriefInput> = {}): BriefInput {
+  return briefInputSchema.parse({
+    surface: BRIEF_SURFACE,
     companyName: "Test Co",
     periodDays: 30,
     availableCapital: 100,
@@ -24,7 +24,7 @@ describe("narrationInputHash", () => {
     const reordered = JSON.parse(
       // @ts-expect-error - intentionally reordering keys to test independence
       JSON.stringify({ score: a.score, drivers: a.drivers, ...a }),
-    ) as NarrationInput;
+    ) as BriefInput;
     expect(narrationInputHash(a)).toBe(narrationInputHash(reordered));
     expect(narrationInputHash(a)).toMatch(/^[a-f0-9]{64}$/);
   });

@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV4 } from "ai/test";
 import { generateNarration } from "./narrator";
-import { NARRATION_SURFACE, narrationInputSchema } from "./schemas";
+import {
+  BRIEF_SURFACE,
+  briefInputSchema,
+  DRIVER_EXPLANATIONS_SURFACE,
+  driverExplanationsInputSchema,
+  type DriverExplanationsInput,
+} from "./schemas";
 
-const input = narrationInputSchema.parse({
-  surface: NARRATION_SURFACE,
+const input = briefInputSchema.parse({
+  surface: BRIEF_SURFACE,
   companyName: "Test Co",
   periodDays: 30,
   availableCapital: 8000,
@@ -32,6 +38,24 @@ function mockModel(text: string) {
     }),
   });
 }
+
+/** Same mock-model helper as above, for tests that build the object directly. */
+function mockModelReturning(object: unknown) {
+  return mockModel(JSON.stringify(object));
+}
+
+const driverInput: DriverExplanationsInput = driverExplanationsInputSchema.parse({
+  surface: DRIVER_EXPLANATIONS_SURFACE,
+  companyName: "Test Co",
+  periodDays: 30,
+  totalInflow: 3450,
+  totalOutflow: 2200,
+  netImpact: 1250,
+  drivers: [
+    { id: "d1", kind: "paycheck", date: "2026-07-03", impact: 3450, buildsEquity: false },
+    { id: "d2", kind: "mortgage_payment", date: "2026-07-01", impact: -2200, buildsEquity: false },
+  ],
+});
 
 describe("generateNarration", () => {
   it("returns validated output from a well-formed response", async () => {
@@ -78,5 +102,45 @@ describe("generateNarration", () => {
   it("returns null with no API key and no model override", async () => {
     // Vitest env stubs AI_GATEWAY_API_KEY as absent (env.ts test branch).
     expect(await generateNarration(input)).toBeNull();
+  });
+});
+
+describe("generateNarration (driver_explanations)", () => {
+  it("returns validated explanations from a well-behaved model", async () => {
+    const model = mockModelReturning({
+      explanations: [
+        { driverId: "d1", body: "A paycheck added $3,450 to available capital." },
+        { driverId: "d2", body: "The mortgage payment reduced available capital by $2,200." },
+      ],
+    });
+    const result = await generateNarration(driverInput, { model });
+    expect(result?.explanations).toHaveLength(2);
+  });
+
+  it("returns null when a driver is missing from the output", async () => {
+    const model = mockModelReturning({
+      explanations: [{ driverId: "d1", body: "A paycheck added $3,450 to available capital." }],
+    });
+    expect(await generateNarration(driverInput, { model })).toBeNull();
+  });
+
+  it("returns null on a hallucinated dollar figure", async () => {
+    const model = mockModelReturning({
+      explanations: [
+        { driverId: "d1", body: "A paycheck added $7,777 to available capital." },
+        { driverId: "d2", body: "The mortgage payment reduced available capital by $2,200." },
+      ],
+    });
+    expect(await generateNarration(driverInput, { model })).toBeNull();
+  });
+
+  it("returns null when a body mislabels the score", async () => {
+    const model = mockModelReturning({
+      explanations: [
+        { driverId: "d1", body: "This paycheck is great for your credit score overall." },
+        { driverId: "d2", body: "The mortgage payment reduced available capital by $2,200." },
+      ],
+    });
+    expect(await generateNarration(driverInput, { model })).toBeNull();
   });
 });

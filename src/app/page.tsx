@@ -25,12 +25,9 @@ export default async function HomePage() {
   const { snapshots, events, staleIndex, scoreSummary } = data;
   const freshness = await getFreshnessData(supabase);
 
-  // Not awaited: HomeDashboard unwraps this inside a Suspense boundary via
-  // React's use(), falling back to the deterministic brief while it resolves
-  // (or forever, if AI is unavailable — the promise never rejects).
-  const narration =
+  const narrationSource =
     snapshots.length > 0
-      ? getOrGenerateNarration(supabase, {
+      ? {
           companyName: company.name,
           snapshots,
           events,
@@ -38,8 +35,17 @@ export default async function HomePage() {
             scoreSummary.overall !== null
               ? { overall: scoreSummary.overall, band: scoreSummary.band, momentum: scoreSummary.momentum }
               : null,
-        })
-      : Promise.resolve(null);
+        }
+      : null;
+
+  // Not awaited: unwrapped inside Suspense boundaries via React use(); the
+  // promises never reject (null = deterministic fallback).
+  const narration = narrationSource
+    ? getOrGenerateNarration(supabase, "performance_brief", narrationSource)
+    : Promise.resolve(null);
+  const driverNarration = narrationSource
+    ? getOrGenerateNarration(supabase, "driver_explanations", narrationSource)
+    : Promise.resolve(null);
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,6 +60,7 @@ export default async function HomePage() {
           staleIndex={staleIndex}
           freshness={freshness}
           narration={narration}
+          driverNarration={driverNarration}
         />
       )}
       <div className="flex justify-end">

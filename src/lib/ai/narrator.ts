@@ -1,14 +1,22 @@
 import { generateObject } from "ai";
 import type { LanguageModel } from "ai";
+import type { z } from "zod";
 import { env } from "@/lib/config/env";
-import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
+import { SYSTEM_PROMPTS, buildUserPrompt } from "./prompts";
 import {
-  narrationOutputSchema,
+  briefOutputSchema,
+  driverExplanationsOutputSchema,
   referencesOnlyKnownDrivers,
   bodyOnlyReferencesKnownAmounts,
   bodyDoesNotMislabelScore,
+  explanationsCoverExactlyKnownDrivers,
+  explanationAmountsAreKnown,
+  explanationsDoNotMislabelScore,
+  type BriefInput,
+  type BriefOutput,
+  type DriverExplanationsInput,
+  type DriverExplanationsOutput,
   type NarrationInput,
-  type NarrationOutput,
 } from "./schemas";
 
 export interface NarratorOptions {
@@ -18,33 +26,63 @@ export interface NarratorOptions {
 }
 
 /**
- * Provider-agnostic narration call. Returns null on EVERY failure —
- * missing key, provider error, timeout, schema violation, invented
- * driver, hallucinated dollar figure, or a narration that mislabels the
- * PFI Score as a credit score — so callers fall back to the deterministic
- * brief and unvalidated text is never rendered.
+ * Provider-agnostic narration call, dispatched per surface. Returns null on
+ * EVERY failure — missing key, provider error, timeout, schema violation,
+ * or any deterministic policy-guard failure — so callers fall back to the
+ * deterministic rendering and unvalidated text is never shown.
  */
+export async function generateNarration(
+  input: BriefInput,
+  opts?: NarratorOptions,
+): Promise<BriefOutput | null>;
+export async function generateNarration(
+  input: DriverExplanationsInput,
+  opts?: NarratorOptions,
+): Promise<DriverExplanationsOutput | null>;
 export async function generateNarration(
   input: NarrationInput,
   opts: NarratorOptions = {},
-): Promise<NarrationOutput | null> {
+): Promise<BriefOutput | DriverExplanationsOutput | null> {
   const model =
     opts.model ?? (env.AI_GATEWAY_API_KEY ? env.PFI_AI_MODEL : undefined);
   if (!model) return null;
+  if (input.surface === "performance_brief") {
+    const output = await generate(model, input, briefOutputSchema, opts);
+    if (!output) return null;
+    if (!referencesOnlyKnownDrivers(input, output)) return null;
+    if (!bodyOnlyReferencesKnownAmounts(input, output)) return null;
+    if (!bodyDoesNotMislabelScore(output)) return null;
+    return output;
+  }
+  const output = await generate(model, input, driverExplanationsOutputSchema, opts);
+  if (!output) return null;
+  if (!explanationsCoverExactlyKnownDrivers(input, output)) return null;
+  if (!explanationAmountsAreKnown(input, output)) return null;
+  if (!explanationsDoNotMislabelScore(output)) return null;
+  return output;
+}
+
+async function generate<Schema extends z.ZodType>(
+  model: LanguageModel,
+  input: NarrationInput,
+  schema: Schema,
+  opts: NarratorOptions,
+): Promise<z.infer<Schema> | null> {
   try {
     const { object } = await generateObject({
       model,
-      schema: narrationOutputSchema,
-      system: SYSTEM_PROMPT,
+      schema,
+      system: SYSTEM_PROMPTS[input.surface],
       prompt: buildUserPrompt(input),
       maxRetries: 1,
       abortSignal: AbortSignal.timeout(opts.timeoutMs ?? 8_000),
       temperature: 0.4,
     });
-    if (!referencesOnlyKnownDrivers(input, object)) return null;
-    if (!bodyOnlyReferencesKnownAmounts(input, object)) return null;
-    if (!bodyDoesNotMislabelScore(object)) return null;
-    return object;
+    // generateObject's return type is a conditional type keyed on a
+    // default-inferred OUTPUT parameter that doesn't collapse against a
+    // generic `Schema extends z.ZodType` here; the runtime shape is exactly
+    // z.infer<Schema> because `schema` is always passed directly.
+    return object as z.infer<Schema>;
   } catch {
     return null;
   }

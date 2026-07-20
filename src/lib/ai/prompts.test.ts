@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
-import { NARRATION_SURFACE, narrationInputSchema } from "./schemas";
+import { SYSTEM_PROMPTS, BRIEF_SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
+import { BRIEF_SURFACE, briefInputSchema } from "./schemas";
 
-const input = narrationInputSchema.parse({
-  surface: NARRATION_SURFACE,
+const input = briefInputSchema.parse({
+  surface: BRIEF_SURFACE,
   companyName: "Test Co",
   periodDays: 30,
   availableCapital: 8000,
@@ -25,7 +25,7 @@ describe("policy prompt", () => {
       "referencedDriverIds",
       "not a credit score",
     ]) {
-      expect(SYSTEM_PROMPT.toLowerCase()).toContain(phrase.toLowerCase());
+      expect(BRIEF_SYSTEM_PROMPT.toLowerCase()).toContain(phrase.toLowerCase());
     }
   });
 
@@ -34,5 +34,27 @@ describe("policy prompt", () => {
     expect(prompt).toContain('"availableCapital": 8000');
     expect(prompt).toContain('"kind": "large_purchase"');
     expect(prompt).toMatchSnapshot();
+  });
+});
+
+describe("driver_explanations prompt", () => {
+  it("brief entry is the unchanged brief prompt", () => {
+    expect(SYSTEM_PROMPTS.performance_brief).toBe(BRIEF_SYSTEM_PROMPT);
+  });
+  it("snapshot makes wording changes deliberate", () => {
+    expect(SYSTEM_PROMPTS.driver_explanations).toMatchSnapshot();
+  });
+  it("user prompt embeds the input JSON and period", () => {
+    const prompt = buildUserPrompt({
+      surface: "driver_explanations",
+      companyName: "Test Co",
+      periodDays: 30,
+      totalInflow: 100,
+      totalOutflow: 0,
+      netImpact: 100,
+      drivers: [{ id: "d1", kind: "paycheck", date: "2026-07-03", impact: 100, buildsEquity: false }],
+    });
+    expect(prompt).toContain("last 30 days");
+    expect(prompt).toContain('"d1"');
   });
 });

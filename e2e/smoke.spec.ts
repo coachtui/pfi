@@ -51,6 +51,27 @@ test("onboarding completes with sample data and lands on the dashboard", async (
   await expect(page.getByText("Calculated", { exact: true })).toBeVisible();
 });
 
+test("driver card expands to the calculated explanation", async () => {
+  await page.goto("/");
+  const firstCard = page.getByRole("button", { name: /Show explanation/ }).first();
+  await firstCard.click();
+  // The "What moved your line" section itself is also role="region" (aria-labelledby
+  // "what-moved"), so scope to the driver panel's own region by its id prefix rather
+  // than getByRole("region"), which would match both ancestor and panel.
+  const panel = page.locator('[id^="driver-panel-"]');
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText("How is this generated?")).toBeVisible();
+  // Keyless run: deterministic path, chip scoped to the panel ("Calculated"
+  // also appears on the performance brief).
+  await expect(panel.getByText("Calculated", { exact: true })).toBeVisible();
+  // The relocated drill-down keeps its filtered URL.
+  const link = panel.getByRole("link", { name: /View transactions/ });
+  await expect(link).toHaveAttribute("href", /\/transactions\?from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&label=/);
+  // Collapse works.
+  await page.getByRole("button", { name: /Hide explanation/ }).click();
+  await expect(panel).not.toBeVisible();
+});
+
 test("score screen renders the breakdown", async () => {
   await page.goto("/score");
   await expect(page.getByText("/ 900")).toBeVisible();

@@ -9,7 +9,15 @@ import {
   type DailySnapshot,
   type FinancialEvent,
 } from "@/lib/financial-engine";
-import { NARRATION_SURFACE, narrationInputSchema, type NarrationInput } from "./schemas";
+import {
+  BRIEF_SURFACE,
+  briefInputSchema,
+  DRIVER_EXPLANATIONS_SURFACE,
+  driverExplanationsInputSchema,
+  type BriefInput,
+  type DriverExplanationsInput,
+  type NarrationInput,
+} from "./schemas";
 
 /** Matches the dashboard's default 30D view. */
 const NARRATION_WINDOW_DAYS = 30;
@@ -21,35 +29,67 @@ export interface NarrationSource {
   score: { overall: number | null; band: string | null; momentum: string } | null;
 }
 
+interface WindowDrivers {
+  periodDays: number;
+  driverInputs: NarrationInput["drivers"];
+}
+
+/**
+ * Shared 30-day window + driver mapping used by BOTH builders. Positional
+ * ids over computeDrivers' sorted order — the accordion UI matches its own
+ * computeDrivers output to these by index, which is only sound because both
+ * surfaces derive from this single function.
+ */
+function windowDrivers(source: NarrationSource): WindowDrivers | null {
+  const { snapshots, events } = source;
+  if (snapshots.length === 0) return null;
+  const { points } = buildIndexSeries(snapshots);
+  if (points.length === 0) return null;
+  const visible = points.slice(-NARRATION_WINDOW_DAYS);
+  const drivers = computeDrivers(events, {
+    start: visible[0].date,
+    end: visible[visible.length - 1].date,
+  });
+  const cents = (n: number) => Math.round(n * 100) / 100;
+  return {
+    periodDays: visible.length,
+    driverInputs: drivers.map((d, i) => ({
+      id: `d${i + 1}`,
+      kind: d.event.type,
+      date: d.event.date,
+      impact: cents(d.impact),
+      buildsEquity: driverDisplay(d).buildsEquity,
+    })),
+  };
+}
+
 /**
  * Deterministic assembly of the AI data boundary from engine outputs.
  * Deliberately maps drivers to event TYPE only — FinancialEvent.label and
  * event ids never cross the boundary. Final .parse() guarantees the result
  * conforms to the strict schema at runtime, not just at the type level.
  */
-export function buildNarrationInput(source: NarrationSource): NarrationInput | null {
-  const { snapshots, events } = source;
+export function buildBriefInput(source: NarrationSource): BriefInput | null {
+  const { snapshots } = source;
   if (snapshots.length === 0) return null;
   const { points } = buildIndexSeries(snapshots);
   if (points.length === 0) return null;
 
+  const window = windowDrivers(source);
+  if (!window) return null;
+
   const latest = snapshots[snapshots.length - 1];
   const latestPoint = points[points.length - 1];
-  const visible = points.slice(-NARRATION_WINDOW_DAYS);
   const momentum = computeMomentum(points.map((p) => p.actual));
-  const drivers = computeDrivers(events, {
-    start: visible[0].date,
-    end: visible[visible.length - 1].date,
-  });
 
   const compare = (a: number, b: number): "above" | "below" | "at" =>
     a > b ? "above" : a < b ? "below" : "at";
   const cents = (n: number) => Math.round(n * 100) / 100;
 
-  return narrationInputSchema.parse({
-    surface: NARRATION_SURFACE,
+  return briefInputSchema.parse({
+    surface: BRIEF_SURFACE,
     companyName: source.companyName,
-    periodDays: visible.length,
+    periodDays: window.periodDays,
     availableCapital: cents(availablePosition(latest)),
     cushion: cents(cushion(latest)),
     vsBaseline:
@@ -62,13 +102,38 @@ export function buildNarrationInput(source: NarrationSource): NarrationInput | n
       delta: Math.round(momentum.delta * 10) / 10,
       windowDays: momentum.windowDays,
     },
-    drivers: drivers.map((d, i) => ({
-      id: `d${i + 1}`,
-      kind: d.event.type,
-      date: d.event.date,
-      impact: cents(d.impact),
-      buildsEquity: driverDisplay(d).buildsEquity,
-    })),
+    drivers: window.driverInputs,
     score: source.score,
+  });
+}
+
+/**
+ * Deterministic assembly of the AI data boundary for the driver_explanations
+ * surface. Shares its 30-day window and positional driver ids with
+ * buildBriefInput via windowDrivers so the dashboard's driver-card-to-
+ * explanation matching (by index) can never silently drift between the two
+ * surfaces.
+ */
+export function buildDriverExplanationsInput(
+  source: NarrationSource,
+): DriverExplanationsInput | null {
+  const window = windowDrivers(source);
+  if (!window || window.driverInputs.length === 0) return null;
+  const cents = (n: number) => Math.round(n * 100) / 100;
+  const totalInflow = window.driverInputs
+    .filter((d) => d.impact > 0)
+    .reduce((s, d) => s + d.impact, 0);
+  const totalOutflow = window.driverInputs
+    .filter((d) => d.impact < 0)
+    .reduce((s, d) => s + Math.abs(d.impact), 0);
+  const netImpact = window.driverInputs.reduce((s, d) => s + d.impact, 0);
+  return driverExplanationsInputSchema.parse({
+    surface: DRIVER_EXPLANATIONS_SURFACE,
+    companyName: source.companyName,
+    periodDays: window.periodDays,
+    totalInflow: cents(totalInflow),
+    totalOutflow: cents(totalOutflow),
+    netImpact: cents(netImpact),
+    drivers: window.driverInputs,
   });
 }
