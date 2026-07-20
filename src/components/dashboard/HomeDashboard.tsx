@@ -13,7 +13,7 @@ import { ScoreCard } from "@/components/dashboard/ScoreCard";
 import { Segmented } from "@/components/ui/Segmented";
 import { StaleDataBanner } from "@/components/dashboard/StaleDataBanner";
 import { WhatMovedYourLine } from "@/components/dashboard/WhatMovedYourLine";
-import type { NarrationResult } from "@/lib/data/narration";
+import type { BriefNarrationResult } from "@/lib/data/narration";
 import type { ScoreSummary } from "@/lib/data/queries";
 import {
   availablePosition,
@@ -71,7 +71,7 @@ interface HomeDashboardProps {
   /** True when a snapshot rebuild is pending/failed and the chart may lag recent edits. */
   staleIndex?: boolean;
   freshness: { currentThrough: string | null; showNudge: boolean };
-  narration: Promise<NarrationResult | null>;
+  narration: Promise<BriefNarrationResult | null>;
 }
 
 export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleIndex, freshness, narration }: HomeDashboardProps) {

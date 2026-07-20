@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { MockLanguageModelV4 } from "ai/test";
 import { generateNarration } from "./narrator";
-import { NARRATION_SURFACE, narrationInputSchema } from "./schemas";
+import { BRIEF_SURFACE, briefInputSchema } from "./schemas";
 
-const input = narrationInputSchema.parse({
-  surface: NARRATION_SURFACE,
+const input = briefInputSchema.parse({
+  surface: BRIEF_SURFACE,
   companyName: "Test Co",
   periodDays: 30,
   availableCapital: 8000,

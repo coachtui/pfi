@@ -9,7 +9,7 @@ import {
   type DailySnapshot,
   type FinancialEvent,
 } from "@/lib/financial-engine";
-import { NARRATION_SURFACE, narrationInputSchema, type NarrationInput } from "./schemas";
+import { BRIEF_SURFACE, briefInputSchema, type BriefInput } from "./schemas";
 
 /** Matches the dashboard's default 30D view. */
 const NARRATION_WINDOW_DAYS = 30;
@@ -27,7 +27,7 @@ export interface NarrationSource {
  * event ids never cross the boundary. Final .parse() guarantees the result
  * conforms to the strict schema at runtime, not just at the type level.
  */
-export function buildNarrationInput(source: NarrationSource): NarrationInput | null {
+export function buildBriefInput(source: NarrationSource): BriefInput | null {
   const { snapshots, events } = source;
   if (snapshots.length === 0) return null;
   const { points } = buildIndexSeries(snapshots);
@@ -46,8 +46,8 @@ export function buildNarrationInput(source: NarrationSource): NarrationInput | n
     a > b ? "above" : a < b ? "below" : "at";
   const cents = (n: number) => Math.round(n * 100) / 100;
 
-  return narrationInputSchema.parse({
-    surface: NARRATION_SURFACE,
+  return briefInputSchema.parse({
+    surface: BRIEF_SURFACE,
     companyName: source.companyName,
     periodDays: visible.length,
     availableCapital: cents(availablePosition(latest)),

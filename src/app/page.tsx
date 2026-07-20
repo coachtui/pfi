@@ -30,7 +30,7 @@ export default async function HomePage() {
   // (or forever, if AI is unavailable — the promise never rejects).
   const narration =
     snapshots.length > 0
-      ? getOrGenerateNarration(supabase, {
+      ? getOrGenerateNarration(supabase, "performance_brief", {
           companyName: company.name,
           snapshots,
           events,

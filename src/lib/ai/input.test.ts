@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DailySnapshot, FinancialEvent } from "@/lib/financial-engine";
-import { buildNarrationInput } from "./input";
+import { buildBriefInput } from "./input";
 
 /**
  * Fixture helpers mirror the convention established in
@@ -38,10 +38,10 @@ function buildSnapshots(): DailySnapshot[] {
   });
 }
 
-describe("buildNarrationInput", () => {
+describe("buildBriefInput", () => {
   it("returns null with no snapshots", () => {
     expect(
-      buildNarrationInput({ companyName: "T", snapshots: [], events: [], score: null }),
+      buildBriefInput({ companyName: "T", snapshots: [], events: [], score: null }),
     ).toBeNull();
   });
 
@@ -50,7 +50,7 @@ describe("buildNarrationInput", () => {
     const events = [
       event({ id: "e1", date: snapshots[35].date, type: "paycheck", amount: 4_200, direction: "inflow" }),
     ];
-    const input = buildNarrationInput({
+    const input = buildBriefInput({
       companyName: "Test Co",
       snapshots,
       events,
@@ -80,7 +80,7 @@ describe("buildNarrationInput", () => {
         label: "RAW LABEL — MUST NOT LEAK",
       }),
     ];
-    const input = buildNarrationInput({ companyName: "T", snapshots, events, score: null });
+    const input = buildBriefInput({ companyName: "T", snapshots, events, score: null });
     const serialized = JSON.stringify(input);
     expect(serialized).not.toContain("RAW LABEL");
     expect(serialized).not.toContain('"e1"');
@@ -97,7 +97,7 @@ describe("buildNarrationInput", () => {
       const date = d.toISOString().slice(0, 10);
       return snapshot({ date, liquidAssets: 10_000 + i * 25 });
     });
-    const input = buildNarrationInput({ companyName: "T", snapshots, events: [], score: null });
+    const input = buildBriefInput({ companyName: "T", snapshots, events: [], score: null });
     expect(input!.vsBaseline).toBe("unknown");
   });
 
@@ -112,7 +112,7 @@ describe("buildNarrationInput", () => {
         direction: "outflow",
       }),
     ];
-    const input = buildNarrationInput({ companyName: "T", snapshots, events, score: null });
+    const input = buildBriefInput({ companyName: "T", snapshots, events, score: null });
     expect(input!.drivers[0]).toMatchObject({ impact: -500, buildsEquity: true });
   });
 });

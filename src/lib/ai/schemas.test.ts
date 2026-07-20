@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  NARRATION_SURFACE,
-  narrationInputSchema,
-  narrationOutputSchema,
+  BRIEF_SURFACE,
+  briefInputSchema,
+  briefOutputSchema,
   referencesOnlyKnownDrivers,
   bodyOnlyReferencesKnownAmounts,
   bodyDoesNotMislabelScore,
 } from "./schemas";
 
 const validInput = {
-  surface: NARRATION_SURFACE,
+  surface: BRIEF_SURFACE,
   companyName: "Blue Reef Partners",
   periodDays: 30,
   availableCapital: 12450.75,
@@ -24,17 +24,17 @@ const validInput = {
   score: { overall: 612, band: "Solid", momentum: "improving" },
 };
 
-describe("narrationInputSchema", () => {
+describe("briefInputSchema", () => {
   it("accepts a valid input", () => {
-    expect(narrationInputSchema.parse(validInput)).toEqual(validInput);
+    expect(briefInputSchema.parse(validInput)).toEqual(validInput);
   });
 
   it("rejects unknown fields (raw-data smuggling)", () => {
     expect(
-      narrationInputSchema.safeParse({ ...validInput, transactions: [] }).success,
+      briefInputSchema.safeParse({ ...validInput, transactions: [] }).success,
     ).toBe(false);
     expect(
-      narrationInputSchema.safeParse({
+      briefInputSchema.safeParse({
         ...validInput,
         drivers: [{ ...validInput.drivers[0], label: "ACME PAYROLL" }],
       }).success,
@@ -43,7 +43,7 @@ describe("narrationInputSchema", () => {
 
   it("rejects a driver kind outside the event-type enum", () => {
     expect(
-      narrationInputSchema.safeParse({
+      briefInputSchema.safeParse({
         ...validInput,
         drivers: [{ ...validInput.drivers[0], kind: "merchant_purchase" }],
       }).success,
@@ -51,38 +51,38 @@ describe("narrationInputSchema", () => {
   });
 
   it("allows a null score", () => {
-    expect(narrationInputSchema.safeParse({ ...validInput, score: null }).success).toBe(true);
+    expect(briefInputSchema.safeParse({ ...validInput, score: null }).success).toBe(true);
   });
 });
 
-describe("narrationOutputSchema", () => {
+describe("briefOutputSchema", () => {
   it("accepts a valid output", () => {
     const out = {
       body: "Blue Reef Partners is trading above its baseline with $12,451 of available capital, lifted mainly by a $4,200 paycheck on Jul 15.",
       referencedDriverIds: ["d1"],
     };
-    expect(narrationOutputSchema.parse(out)).toEqual(out);
+    expect(briefOutputSchema.parse(out)).toEqual(out);
   });
 
   it("rejects extra fields and out-of-bounds body length", () => {
     expect(
-      narrationOutputSchema.safeParse({ body: "short", referencedDriverIds: [] }).success,
+      briefOutputSchema.safeParse({ body: "short", referencedDriverIds: [] }).success,
     ).toBe(false);
     expect(
-      narrationOutputSchema.safeParse({
+      briefOutputSchema.safeParse({
         body: "x".repeat(50),
         referencedDriverIds: [],
         advice: "buy stocks",
       }).success,
     ).toBe(false);
     expect(
-      narrationOutputSchema.safeParse({ body: "x".repeat(701), referencedDriverIds: [] }).success,
+      briefOutputSchema.safeParse({ body: "x".repeat(701), referencedDriverIds: [] }).success,
     ).toBe(false);
   });
 });
 
 describe("referencesOnlyKnownDrivers", () => {
-  const input = narrationInputSchema.parse(validInput);
+  const input = briefInputSchema.parse(validInput);
   it("passes when all referenced ids exist", () => {
     expect(
       referencesOnlyKnownDrivers(input, { body: "x".repeat(50), referencedDriverIds: ["d1", "d2"] }),
@@ -96,7 +96,7 @@ describe("referencesOnlyKnownDrivers", () => {
 });
 
 describe("bodyOnlyReferencesKnownAmounts", () => {
-  const input = narrationInputSchema.parse(validInput);
+  const input = briefInputSchema.parse(validInput);
 
   it("passes when every dollar figure in the body matches a known input value", () => {
     const body =
@@ -112,7 +112,7 @@ describe("bodyOnlyReferencesKnownAmounts", () => {
   });
 
   it("passes a rounding-consistent figure (input cents round to whole dollars)", () => {
-    const centsInput = narrationInputSchema.parse({ ...validInput, availableCapital: 8000.49 });
+    const centsInput = briefInputSchema.parse({ ...validInput, availableCapital: 8000.49 });
     const body = "Available capital stands at $8,000 this period.";
     expect(bodyOnlyReferencesKnownAmounts(centsInput, { body, referencedDriverIds: [] })).toBe(
       true,
@@ -132,7 +132,7 @@ describe("bodyOnlyReferencesKnownAmounts", () => {
   });
 
   it("passes a body that sums two same-direction driver impacts (observed live: a real model summarized two paychecks as a total rather than citing each)", () => {
-    const twoPaychecks = narrationInputSchema.parse({
+    const twoPaychecks = briefInputSchema.parse({
       ...validInput,
       drivers: [
         { id: "d1", kind: "paycheck", date: "2026-07-01", impact: 3450, buildsEquity: false },

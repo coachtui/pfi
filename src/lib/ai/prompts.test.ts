@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
-import { NARRATION_SURFACE, narrationInputSchema } from "./schemas";
+import { BRIEF_SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
+import { BRIEF_SURFACE, briefInputSchema } from "./schemas";
 
-const input = narrationInputSchema.parse({
-  surface: NARRATION_SURFACE,
+const input = briefInputSchema.parse({
+  surface: BRIEF_SURFACE,
   companyName: "Test Co",
   periodDays: 30,
   availableCapital: 8000,
@@ -25,7 +25,7 @@ describe("policy prompt", () => {
       "referencedDriverIds",
       "not a credit score",
     ]) {
-      expect(SYSTEM_PROMPT.toLowerCase()).toContain(phrase.toLowerCase());
+      expect(BRIEF_SYSTEM_PROMPT.toLowerCase()).toContain(phrase.toLowerCase());
     }
   });
 

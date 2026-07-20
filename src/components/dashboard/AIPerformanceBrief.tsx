@@ -3,11 +3,11 @@
 import { use, type ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
 import { formatDollars } from "@/lib/financial-engine";
-import type { NarrationResult } from "@/lib/data/narration";
-import type { NarrationInput } from "@/lib/ai/schemas";
+import type { BriefNarrationResult } from "@/lib/data/narration";
+import type { BriefInput } from "@/lib/ai/schemas";
 
 /** Type-derived display names — never event labels (data boundary). */
-const KIND_LABELS: Record<NarrationInput["drivers"][number]["kind"], string> = {
+const KIND_LABELS: Record<BriefInput["drivers"][number]["kind"], string> = {
   paycheck: "Paycheck",
   bonus: "Bonus",
   mortgage_payment: "Mortgage payment",
@@ -24,7 +24,7 @@ export function AIPerformanceBrief({
   narration,
   fallback,
 }: {
-  narration: Promise<NarrationResult | null>;
+  narration: Promise<BriefNarrationResult | null>;
   fallback: ReactNode;
 }) {
   const result = use(narration);

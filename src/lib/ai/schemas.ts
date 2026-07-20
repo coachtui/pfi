@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * The AI data boundary. NarrationInput is the ONLY thing the model ever
+ * The AI data boundary. BriefInput is the ONLY thing the model ever
  * sees about a user: derived metrics with dollar values, never raw
  * transaction rows, merchant names, account identifiers, or event labels
  * (labels may embed user-entered text — drivers carry the type enum only).
@@ -9,7 +9,9 @@ import { z } from "zod";
  * See docs/AI_RECOMMENDATION_POLICY.md.
  */
 
-export const NARRATION_SURFACE = "performance_brief" as const;
+export const BRIEF_SURFACE = "performance_brief" as const;
+export const DRIVER_EXPLANATIONS_SURFACE = "driver_explanations" as const;
+export type NarrationSurface = typeof BRIEF_SURFACE | typeof DRIVER_EXPLANATIONS_SURFACE;
 
 /** Mirrors FinancialEventType in src/lib/financial-engine/types.ts. */
 const driverKindSchema = z.enum([
@@ -36,9 +38,9 @@ const narrationDriverSchema = z
   })
   .strict();
 
-export const narrationInputSchema = z
+export const briefInputSchema = z
   .object({
-    surface: z.literal(NARRATION_SURFACE),
+    surface: z.literal(BRIEF_SURFACE),
     companyName: z.string().min(1),
     periodDays: z.number().int().positive(),
     availableCapital: z.number(),
@@ -64,7 +66,7 @@ export const narrationInputSchema = z
   })
   .strict();
 
-export const narrationOutputSchema = z
+export const briefOutputSchema = z
   .object({
     /** The narrated brief. Bounds keep it a paragraph, not an essay. */
     body: z.string().min(40).max(700),
@@ -73,13 +75,13 @@ export const narrationOutputSchema = z
   })
   .strict();
 
-export type NarrationInput = z.infer<typeof narrationInputSchema>;
-export type NarrationOutput = z.infer<typeof narrationOutputSchema>;
+export type BriefInput = z.infer<typeof briefInputSchema>;
+export type BriefOutput = z.infer<typeof briefOutputSchema>;
 
 /** Policy check: AI may not invent a driver (AI_RECOMMENDATION_POLICY.md). */
 export function referencesOnlyKnownDrivers(
-  input: NarrationInput,
-  output: NarrationOutput,
+  input: BriefInput,
+  output: BriefOutput,
 ): boolean {
   const known = new Set(input.drivers.map((d) => d.id));
   return output.referencedDriverIds.every((id) => known.has(id));
@@ -101,40 +103,45 @@ export function referencesOnlyKnownDrivers(
  * passes trivially: this check only fires when the AI actually asserts a
  * number.
  */
-export function bodyOnlyReferencesKnownAmounts(
-  input: NarrationInput,
-  output: NarrationOutput,
+export function textOnlyReferencesKnownAmounts(
+  text: string,
+  known: ReadonlySet<number>,
 ): boolean {
   try {
-    const matches = output.body.match(/\$[\d,]+(?:\.\d{2})?/g);
+    const matches = text.match(/\$[\d,]+(?:\.\d{2})?/g);
     if (!matches) return true;
-
-    const round = (n: number) => Math.round(n);
-    const totalInflow = input.drivers
-      .filter((d) => d.impact > 0)
-      .reduce((sum, d) => sum + d.impact, 0);
-    const totalOutflow = input.drivers
-      .filter((d) => d.impact < 0)
-      .reduce((sum, d) => sum + Math.abs(d.impact), 0);
-    const netImpact = input.drivers.reduce((sum, d) => sum + d.impact, 0);
-
-    const known = new Set<number>([
-      round(input.availableCapital),
-      round(input.cushion),
-      ...input.drivers.map((d) => round(Math.abs(d.impact))),
-      round(totalInflow),
-      round(totalOutflow),
-      round(Math.abs(netImpact)),
-    ]);
-
     return matches.every((match) => {
       const value = Number.parseFloat(match.replace(/[$,]/g, ""));
       if (Number.isNaN(value)) return false;
-      return known.has(round(value));
+      return known.has(Math.round(value));
     });
   } catch {
     return false;
   }
+}
+
+/** Known-amount set for a driver array: magnitudes plus natural aggregates. */
+export function driverAmountSet(drivers: ReadonlyArray<{ impact: number }>): Set<number> {
+  const round = (n: number) => Math.round(n);
+  const totalInflow = drivers.filter((d) => d.impact > 0).reduce((s, d) => s + d.impact, 0);
+  const totalOutflow = drivers.filter((d) => d.impact < 0).reduce((s, d) => s + Math.abs(d.impact), 0);
+  const netImpact = drivers.reduce((s, d) => s + d.impact, 0);
+  return new Set<number>([
+    ...drivers.map((d) => round(Math.abs(d.impact))),
+    round(totalInflow),
+    round(totalOutflow),
+    round(Math.abs(netImpact)),
+  ]);
+}
+
+export function bodyOnlyReferencesKnownAmounts(
+  input: BriefInput,
+  output: BriefOutput,
+): boolean {
+  const known = driverAmountSet(input.drivers);
+  known.add(Math.round(input.availableCapital));
+  known.add(Math.round(input.cushion));
+  return textOnlyReferencesKnownAmounts(output.body, known);
 }
 
 /** Phrases that mislabel the PFI Score as a credit product, case-insensitive. */
@@ -152,6 +159,10 @@ const SCORE_MISLABEL_PATTERNS = [/credit\s+score/i, /credit\s+rating/i, /fico/i]
  * blocks the specific mislabeling phrases — ordinary mentions of "credit
  * card" or "debt" pass through untouched.
  */
-export function bodyDoesNotMislabelScore(output: NarrationOutput): boolean {
-  return !SCORE_MISLABEL_PATTERNS.some((pattern) => pattern.test(output.body));
+export function textDoesNotMislabelScore(text: string): boolean {
+  return !SCORE_MISLABEL_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+export function bodyDoesNotMislabelScore(output: BriefOutput): boolean {
+  return textDoesNotMislabelScore(output.body);
 }
