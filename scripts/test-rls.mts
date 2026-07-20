@@ -261,6 +261,22 @@ try {
   const { data: nDel } = await b.client.from("ai_narrations")
     .delete().eq("user_id", a.id).select("id");
   check("B cannot delete A's narrations", (nDel?.length ?? 0) === 0);
+
+  // Phase 4 slice 2: the driver_explanations surface is accepted; junk is not.
+  const { error: nDriverIns } = await a.client.from("ai_narrations").insert({
+    ...narrationRow,
+    surface: "driver_explanations",
+    input_hash: "v".repeat(64),
+    output_json: { explanations: [{ driverId: "d1", body: "x".repeat(40) }] },
+  });
+  check("A can insert a driver_explanations narration", !nDriverIns, nDriverIns?.message);
+
+  const { error: nBadSurface } = await a.client.from("ai_narrations").insert({
+    ...narrationRow,
+    surface: "not_a_surface",
+    input_hash: "w".repeat(64),
+  });
+  check("unknown surface value rejected by check constraint", !!nBadSurface);
 } finally {
   if (a) {
     try {
