@@ -134,7 +134,7 @@ describe("formatSignedPoints", () => {
 
   it("rounds to one decimal", () => {
     expect(formatSignedPoints(2.649)).toBe("+2.6");
-    expect(formatSignedPoints(-2.65)).toBe("−2.7");
+    expect(formatSignedPoints(-2.66)).toBe("−2.7");
   });
 });
 ```

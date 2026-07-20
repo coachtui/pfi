@@ -23,6 +23,8 @@ import {
   cushion,
   formatDollars,
   formatSignedPercent,
+  formatSignedPoints,
+  indexDayChange,
   waterline,
   type DailySnapshot,
   type FinancialEvent,
@@ -93,10 +95,8 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
   const latest = snapshots[snapshots.length - 1];
   const latestPoint = points[points.length - 1];
   const prevPoint = points[points.length - 2];
-  const todayChangePct =
-    prevPoint && prevPoint.actual !== 0
-      ? ((latestPoint.actual - prevPoint.actual) / Math.abs(prevPoint.actual)) * 100
-      : 0;
+  const todayChange = indexDayChange(latestPoint.actual, prevPoint?.actual);
+  const todayPoints = todayChange.points ?? 0;
 
   const momentum = useMemo(() => computeMomentum(points.map((p) => p.actual)), [points]);
 
@@ -126,9 +126,10 @@ export function HomeDashboard({ profile, snapshots, events, scoreSummary, staleI
             </p>
             <p className="mt-1 text-sm">
               <span
-                className={`tabular font-medium ${todayChangePct >= 0 ? "text-positive" : "text-negative"}`}
+                className={`tabular font-medium ${todayPoints >= 0 ? "text-positive" : "text-negative"}`}
               >
-                {formatSignedPercent(todayChangePct)}
+                {formatSignedPoints(todayPoints)}
+                {todayChange.pct !== null && <> ({formatSignedPercent(todayChange.pct)})</>}
               </span>{" "}
               <span className="text-tertiary">Today</span>
             </p>

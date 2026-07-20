@@ -18,6 +18,12 @@ export function formatSignedPercent(n: number): string {
   return `${sign}${Math.abs(n).toFixed(1)}%`;
 }
 
+/** Signed index points with one decimal, e.g. "+1.3" / "−0.4". */
+export function formatSignedPoints(n: number): string {
+  const sign = n < 0 ? "−" : "+";
+  return `${sign}${Math.abs(n).toFixed(1)}`;
+}
+
 /** "May 15" style short date from an ISO date string. */
 export function formatShortDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
