@@ -91,3 +91,20 @@ export function buildIndexSeries(snapshots: DailySnapshot[]): {
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+/**
+ * Day-over-day index change. `points` is the raw index-point delta; `pct` is
+ * the percent change of the index level, kept as secondary context only
+ * (see DECISIONS #30 — points are the primary display unit).
+ * `points` is null when there is no previous point; `pct` is additionally
+ * null when `previous` is 0 (no divide-by-zero, no fake 0.0%).
+ */
+export function indexDayChange(
+  latest: number,
+  previous: number | undefined,
+): { points: number | null; pct: number | null } {
+  if (previous === undefined) return { points: null, pct: null };
+  const points = latest - previous;
+  const pct = previous === 0 ? null : (points / Math.abs(previous)) * 100;
+  return { points, pct };
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildIndexSeries, deriveAnchor, rollingBaseline, toIndex } from "./indexing";
+import { buildIndexSeries, deriveAnchor, indexDayChange, rollingBaseline, toIndex } from "./indexing";
 import type { DailySnapshot } from "./types";
 
 /** Build a snapshot whose available position equals `position` exactly. */
@@ -87,5 +87,29 @@ describe("buildIndexSeries", () => {
     expect(points[39].baseline).toBeCloseTo(100);
     // waterline = 1500 dollars → indexed relative to the 10k anchor
     expect(points[39].waterline).toBeCloseTo(toIndex(1_500, anchor), 1);
+  });
+});
+
+describe("indexDayChange", () => {
+  it("returns point delta and percent for a normal day-over-day move", () => {
+    const change = indexDayChange(104.2, 102.9);
+    expect(change.points).toBeCloseTo(1.3, 10);
+    expect(change.pct).toBeCloseTo((1.3 / 102.9) * 100, 10);
+  });
+
+  it("uses the absolute previous value as the percent denominator", () => {
+    const change = indexDayChange(-90, -100);
+    expect(change.points).toBeCloseTo(10, 10);
+    expect(change.pct).toBeCloseTo(10, 10);
+  });
+
+  it("returns null pct (but real points) when previous is exactly 0", () => {
+    const change = indexDayChange(4.2, 0);
+    expect(change.points).toBeCloseTo(4.2, 10);
+    expect(change.pct).toBeNull();
+  });
+
+  it("returns all-null when there is no previous point", () => {
+    expect(indexDayChange(104.2, undefined)).toEqual({ points: null, pct: null });
   });
 });
