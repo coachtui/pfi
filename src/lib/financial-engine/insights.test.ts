@@ -109,3 +109,56 @@ describe("computeStatus", () => {
     expect(computeStatus(snapshot, null).vsBaseline).toBe("at");
   });
 });
+
+import { driverExplanationText, EVENT_TYPE_LABELS } from "./insights";
+import type { Driver, FinancialEventType } from "./types";
+
+describe("driverExplanationText", () => {
+  const paycheck: Driver = {
+    event: { id: "e1", date: "2026-07-03", type: "paycheck", label: "Acme payroll", amount: 3450, direction: "inflow" },
+    impact: 3450,
+  };
+  const mortgage: Driver = {
+    event: { id: "e2", date: "2026-07-01", type: "mortgage_payment", label: "Home loan", amount: 2200, direction: "outflow" },
+    impact: -2200,
+  };
+  const investment: Driver = {
+    event: { id: "e3", date: "2026-07-10", type: "investment_contribution", label: "401k", amount: 500, direction: "outflow" },
+    impact: -500,
+  };
+  const total = 3450 + 2200 + 500;
+
+  it("describes an inflow with amount, date, and share of movement", () => {
+    const text = driverExplanationText(paycheck, { totalMovement: total });
+    expect(text).toContain("Paycheck");
+    expect(text).toContain("$3,450");
+    expect(text).toContain("Jul 3");
+    expect(text).toContain("56%");
+    expect(text).not.toContain("Acme payroll"); // type-derived, parity with the AI path
+  });
+
+  it("describes an outflow as reducing available capital", () => {
+    const text = driverExplanationText(mortgage, { totalMovement: total });
+    expect(text).toContain("reduced available capital");
+    expect(text).toContain("$2,200");
+  });
+
+  it("frames equity-building outflows constructively, never as losses", () => {
+    const text = driverExplanationText(investment, { totalMovement: total });
+    expect(text).toContain("equity");
+    expect(text).not.toMatch(/loss(?!\w)/i);
+  });
+
+  it("omits the share clause when totalMovement is zero", () => {
+    const text = driverExplanationText(paycheck, { totalMovement: 0 });
+    expect(text).not.toContain("%");
+  });
+
+  it("has a label for every event type", () => {
+    const types: FinancialEventType[] = [
+      "paycheck", "bonus", "mortgage_payment", "large_purchase", "insurance_payment",
+      "investment_contribution", "debt_payment", "debt_payoff", "tax_payment", "unexpected_expense",
+    ];
+    for (const t of types) expect(EVENT_TYPE_LABELS[t]).toBeTruthy();
+  });
+});
