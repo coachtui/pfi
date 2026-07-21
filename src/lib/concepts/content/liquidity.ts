@@ -25,10 +25,10 @@ export const liquidity: FinancialConcept = {
     calculation: {
       formula: "Liquid assets ÷ monthly essential expenses = emergency runway (months)",
       walkthrough:
-        "PFI's main liquidity gauge asks: if income stopped today, how many months could this household cover its essential costs using only what's already liquid? Take the household's liquid assets — cash readily available in checking and savings — and divide by its typical monthly essential expenses. The result is emergency runway, expressed in months.",
+        "PFI's main liquidity gauge asks: if income stopped today, how many months could this household cover its essential costs using only what's already liquid? Essential expenses are a must-pay subset of total spending — PFI counts only the spending flagged essential, not every dollar spent. Take the household's liquid assets — cash readily available in checking and savings — and divide by its typical monthly essential expenses. The result is emergency runway, expressed in months.",
     },
     genericExample:
-      "Sample figures: the Rivera household has $9,300 in liquid assets (checking and savings) and typical monthly essential expenses of $4,750. Their emergency runway is $9,300 ÷ $4,750 ≈ 2.0 months in this sample scenario — the length of time they could cover essential costs from liquid cash alone if income stopped.",
+      "Sample figures: the Rivera household's total monthly operating expenses are $4,750, but not all of that is must-pay. Their monthly essential expenses — rent, utilities, groceries, insurance, and minimum debt payments — come to $3,100, a subset of the $4,750 total. With $9,300 in liquid assets (checking and savings), their emergency runway is $9,300 ÷ $3,100 = 3.0 months in this sample scenario — the length of time they could cover essential costs from liquid cash alone if income stopped.",
     personalApplication: {
       metricKey: "metric:liquid_runway_months",
       interpretationRules:

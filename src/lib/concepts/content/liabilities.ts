@@ -27,7 +27,7 @@ export const liabilities: FinancialConcept = {
         "List every debt your household owes: the remaining balance on a mortgage, any car or student loans, and any credit-card or other revolving balances. Use the full remaining balance owed for each, not the monthly payment. Add them together and you have total liabilities.",
     },
     genericExample:
-      "Sample figures: the Rivera household has a $195,000 mortgage balance, a $12,000 car loan, and an $1,800 revolving credit-card balance, along with smaller amounts elsewhere. Added together, their total liabilities come to $212,000 in this sample scenario — the figure this module's net worth lesson subtracts from their assets.",
+      "Sample figures: the Rivera household has a $195,000 mortgage balance, a $12,000 car loan, a $3,200 student loan, and an $1,800 revolving credit-card balance. Added together, their total liabilities come to $212,000 in this sample scenario — the figure this module's net worth lesson subtracts from their assets.",
     commonMisunderstanding:
       "A monthly payment is not the liability — the payment services the liability. The Rivera household's $12,000 car loan might carry a $280 monthly payment, but the liability on their balance sheet is the full $12,000 remaining balance, not the $280 installment. Confusing the two understates how much is actually owed.",
     knowledgeCheck: [
