@@ -392,81 +392,93 @@ export async function uploadStatementPdf(formData: FormData): Promise<{ error: s
   });
 
   await supabase.from("import_batches").update({ status: "extracting" }).eq("id", importId);
-  const extracted = extractPdfText(bytes);
-  if (extracted.scanned) {
+  try {
+    const extracted = extractPdfText(bytes);
+    if (extracted.scanned) {
+      await supabase.from("import_batches").update({
+        status: "failed",
+        extraction_method: "ocr",
+        confidence: "low",
+        failure_reason: "Scanned document could not be read. OCR is detected but not enabled for this importer yet.",
+        validation_results: ["No usable embedded text was found."],
+      }).eq("id", importId);
+      const review = await readPdfReview(importId);
+      return review.data ? { error: "", review: review.data } : { error: review.error };
+    }
+
+    const parsed = parseStatementWithRegistry(extracted.text);
+    const status = parsed.unsupportedReason
+      ? "unsupported"
+      : parsed.transactions.length === 0
+        ? "failed"
+        : parsed.reconciliation.status === "does_not_reconcile" || parsed.confidence === "low"
+          ? "needs_review"
+          : "ready_for_review";
+    const failureReason = parsed.transactions.length === 0 && !parsed.unsupportedReason ? "No financial transaction data was detected." : null;
+
     await supabase.from("import_batches").update({
-      status: "failed",
-      extraction_method: "ocr",
-      confidence: "low",
-      failure_reason: "Scanned document could not be read. OCR is detected but not enabled for this importer yet.",
-      validation_results: ["No usable embedded text was found."],
+      status,
+      detected_institution: parsed.metadata.institution,
+      detected_account_type: parsed.metadata.accountType,
+      statement_start_date: parsed.metadata.statementStartDate,
+      statement_end_date: parsed.metadata.statementEndDate,
+      extraction_method: parsed.extractionMethod,
+      confidence: parsed.confidence,
+      validation_results: parsed.issues,
+      reconciliation_results: parsed.reconciliation,
+      failure_reason: failureReason,
+      unsupported_reason: parsed.unsupportedReason,
     }).eq("id", importId);
-    const review = await readPdfReview(importId);
-    return review.data ? { error: "", review: review.data } : { error: review.error };
-  }
-
-  const parsed = parseStatementWithRegistry(extracted.text);
-  const status = parsed.unsupportedReason
-    ? "unsupported"
-    : parsed.transactions.length === 0
-      ? "failed"
-      : parsed.reconciliation.status === "does_not_reconcile" || parsed.confidence === "low"
-        ? "needs_review"
-        : "ready_for_review";
-  const failureReason = parsed.transactions.length === 0 && !parsed.unsupportedReason ? "No financial transaction data was detected." : null;
-
-  await supabase.from("import_batches").update({
-    status,
-    detected_institution: parsed.metadata.institution,
-    detected_account_type: parsed.metadata.accountType,
-    statement_start_date: parsed.metadata.statementStartDate,
-    statement_end_date: parsed.metadata.statementEndDate,
-    extraction_method: parsed.extractionMethod,
-    confidence: parsed.confidence,
-    validation_results: parsed.issues,
-    reconciliation_results: parsed.reconciliation,
-    failure_reason: failureReason,
-    unsupported_reason: parsed.unsupportedReason,
-  }).eq("id", importId);
-  await supabase.from("staged_statement_metadata").insert({
-    import_batch_id: importId,
-    user_id: user.id,
-    institution: parsed.metadata.institution,
-    account_name: parsed.metadata.accountName,
-    account_type: parsed.metadata.accountType,
-    masked_account_number: parsed.metadata.maskedAccountNumber,
-    statement_start_date: parsed.metadata.statementStartDate,
-    statement_end_date: parsed.metadata.statementEndDate,
-    beginning_balance: parsed.metadata.beginningBalance,
-    ending_balance: parsed.metadata.endingBalance,
-    available_balance: parsed.metadata.availableBalance,
-    credit_limit: parsed.metadata.creditLimit,
-    minimum_payment: parsed.metadata.minimumPayment,
-    payment_due_date: parsed.metadata.paymentDueDate,
-    raw_text_excerpt: parsed.rawTextExcerpt,
-    parser_metadata: { adapterId: parsed.adapterId, parserVersion: PDF_IMPORT_PARSER_VERSION },
-    field_confidence: parsed.fieldConfidence,
-  });
-  if (parsed.transactions.length > 0) {
-    await insertChunked(supabase, "staged_transactions", parsed.transactions.map((t) => ({
+    await supabase.from("staged_statement_metadata").insert({
       import_batch_id: importId,
       user_id: user.id,
-      posted_date: t.postedDate,
-      transaction_date: t.transactionDate,
-      description: t.description,
-      amount: t.amount,
-      direction: t.direction,
-      category: t.category,
-      reference_number: t.referenceNumber,
-      source_page: t.sourcePage,
-      confidence: t.confidence,
-      field_confidence: t.fieldConfidence,
-      issues: t.issues,
-      original_values: t,
-    })));
+      institution: parsed.metadata.institution,
+      account_name: parsed.metadata.accountName,
+      account_type: parsed.metadata.accountType,
+      masked_account_number: parsed.metadata.maskedAccountNumber,
+      statement_start_date: parsed.metadata.statementStartDate,
+      statement_end_date: parsed.metadata.statementEndDate,
+      beginning_balance: parsed.metadata.beginningBalance,
+      ending_balance: parsed.metadata.endingBalance,
+      available_balance: parsed.metadata.availableBalance,
+      credit_limit: parsed.metadata.creditLimit,
+      minimum_payment: parsed.metadata.minimumPayment,
+      payment_due_date: parsed.metadata.paymentDueDate,
+      raw_text_excerpt: parsed.rawTextExcerpt,
+      parser_metadata: { adapterId: parsed.adapterId, parserVersion: PDF_IMPORT_PARSER_VERSION },
+      field_confidence: parsed.fieldConfidence,
+    });
+    if (parsed.transactions.length > 0) {
+      await insertChunked(supabase, "staged_transactions", parsed.transactions.map((t) => ({
+        import_batch_id: importId,
+        user_id: user.id,
+        posted_date: t.postedDate,
+        transaction_date: t.transactionDate,
+        description: t.description,
+        amount: t.amount,
+        direction: t.direction,
+        category: t.category,
+        reference_number: t.referenceNumber,
+        source_page: t.sourcePage,
+        confidence: t.confidence,
+        field_confidence: t.fieldConfidence,
+        issues: t.issues,
+        original_values: t,
+      })));
+    }
+    const review = await readPdfReview(importId);
+    return review.data ? { error: "", review: review.data } : { error: review.error };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "PDF extraction failed.";
+    await supabase.from("import_batches").update({
+      status: "failed",
+      confidence: "low",
+      failure_reason: "PDF extraction failed before review. Try a CSV export if available, or upload a different statement PDF.",
+      validation_results: [message.slice(0, 180)],
+    }).eq("id", importId);
+    const review = await readPdfReview(importId);
+    return review.data ? { error: "", review: review.data } : { error: "PDF extraction failed before review." };
   }
-  const review = await readPdfReview(importId);
-  return review.data ? { error: "", review: review.data } : { error: review.error };
 }
 
 export async function getPdfImportReview(importId: string): Promise<{ error: string; review?: PdfReviewData }> {

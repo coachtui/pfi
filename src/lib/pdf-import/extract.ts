@@ -16,9 +16,15 @@ function extractTextOperators(src: string): string[] {
   const literal = /\(((?:\\.|[^\\)])*)\)\s*T[jJ]/g;
   for (const m of src.matchAll(literal)) out.push(decodePdfString(m[1]));
 
-  const array = /\[((?:\s*(?:\((?:\\.|[^\\)])*\)|-?\d+(?:\.\d+)?))*\s*)\]\s*TJ/g;
-  for (const m of src.matchAll(array)) {
-    const pieces = [...m[1].matchAll(/\((?:\\.|[^\\)])*\)/g)].map((p) => decodePdfString(p[0].slice(1, -1)));
+  let searchFrom = 0;
+  while (true) {
+    const tj = src.indexOf("TJ", searchFrom);
+    if (tj === -1) break;
+    const start = src.lastIndexOf("[", tj);
+    searchFrom = tj + 2;
+    if (start === -1 || tj - start > 10_000) continue;
+    const snippet = src.slice(start + 1, tj);
+    const pieces = [...snippet.matchAll(/\((?:\\.|[^\\)])*\)/g)].map((p) => decodePdfString(p[0].slice(1, -1)));
     if (pieces.length) out.push(pieces.join(""));
   }
 
