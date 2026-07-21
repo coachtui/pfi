@@ -236,7 +236,7 @@ describe("buildManagementCommentary", () => {
     expect(commentary).not.toMatch(/reducing\s+−/);
   });
 
-  it('uses "shortfall" instead of "surplus" when free cash flow is negative', () => {
+  it("keeps 'free cash flow' as the noun when free cash flow is negative", () => {
     const negativeFcfStatement: PeriodStatement = {
       period: junePeriod,
       revenue: 3000,
@@ -254,11 +254,12 @@ describe("buildManagementCommentary", () => {
     };
     const commentary = buildManagementCommentary(negativeFcfStatement, "Test Corp").join(" ");
 
-    expect(commentary).toContain("shortfall");
+    expect(commentary).toContain("free cash flow");
     expect(commentary).not.toContain("surplus");
+    expect(commentary).toContain("posted");
   });
 
-  it('uses "surplus" (not "shortfall") when free cash flow is positive', () => {
+  it("keeps 'free cash flow' as the noun when free cash flow is positive", () => {
     const positiveFcfStatement: PeriodStatement = {
       period: junePeriod,
       revenue: 6400,
@@ -276,8 +277,9 @@ describe("buildManagementCommentary", () => {
     };
     const commentary = buildManagementCommentary(positiveFcfStatement, "Test Corp").join(" ");
 
-    expect(commentary).toContain("surplus");
-    expect(commentary).not.toContain("shortfall");
+    expect(commentary).toContain("free cash flow");
+    expect(commentary).not.toContain("surplus");
+    expect(commentary).toContain("produced");
   });
 });
 
