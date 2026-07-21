@@ -34,7 +34,7 @@ export const assets: FinancialConcept = {
       {
         kind: "identify-figure",
         prompt: "Sample figures: which of the following is an asset for a household?",
-        choices: ["A $9,300 savings account balance", "An $1,800 credit-card balance", "A $1,400 monthly rent payment", "A $6,200 monthly salary"],
+        choices: ["A $9,300 savings account balance", "A $1,800 credit-card balance", "A $1,400 monthly rent payment", "A $6,200 monthly salary"],
         correctIndex: 0,
         explanation:
           "A savings balance is money the household owns, so it's an asset. A credit-card balance is owed to someone else (a liability), rent is an expense, and salary is revenue — none of those are things the household owns.",

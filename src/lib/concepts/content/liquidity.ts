@@ -67,6 +67,6 @@ export const liquidity: FinancialConcept = {
       },
     ],
     reinforcementPreview:
-      "Liquidity is measured by the Emergency runway metric inside your PFI Score's Liquidity & Resilience dimension, and will connect to short-term obligations and available capital as this module's Task 4 content expands.",
+      "Liquidity is measured by the Emergency runway metric inside your PFI Score's Liquidity & Resilience dimension, and connects to short-term obligations and available capital — both defined in the glossary wherever they appear in PFI.",
   },
 };
