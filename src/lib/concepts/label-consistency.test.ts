@@ -45,3 +45,26 @@ describe("canonical labels", () => {
     expect(src).not.toContain('label="Available Capital"');
   });
 });
+
+describe("FinancialTerm wiring coverage (slice 2)", () => {
+  const wiring: Array<[file: string, conceptIds: string[]]> = [
+    ["src/app/report/ReportView.tsx", ["revenue", "operating-expenses", "free-cash-flow", "retained-cash", "savings-rate"]],
+    ["src/components/dashboard/HomeDashboard.tsx", ["available-capital", "short-term-obligations", "financial-flexibility"]],
+  ];
+
+  it("each wired call site references its published concept ids", () => {
+    for (const [file, ids] of wiring) {
+      const src = read(file);
+      for (const id of ids) {
+        expect(CONCEPT_REGISTRY.byId(id)?.status, `${id} not published`).toBe("published");
+        expect(src, `${file} missing conceptId="${id}"`).toContain(`conceptId="${id}"`);
+      }
+    }
+  });
+
+  it("report still uses the canonical free-cash-flow row label alongside its term wiring", () => {
+    const src = read("src/app/report/ReportView.tsx");
+    expect(src).toContain(`label="${FREE_CASH_FLOW_TITLE}"`);
+    expect(src).toContain(`conceptId="free-cash-flow"`);
+  });
+});
