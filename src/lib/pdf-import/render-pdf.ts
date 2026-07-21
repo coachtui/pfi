@@ -1,14 +1,5 @@
-import { createCanvas, DOMMatrix, ImageData, Path2D } from "@napi-rs/canvas";
-import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
-
-// PDF.js still uses browser geometry globals when rendering in Node.
-if (!globalThis.DOMMatrix) globalThis.DOMMatrix = DOMMatrix as typeof globalThis.DOMMatrix;
-if (!globalThis.ImageData) globalThis.ImageData = ImageData as typeof globalThis.ImageData;
-if (!globalThis.Path2D) globalThis.Path2D = Path2D as typeof globalThis.Path2D;
-
-// An empty workerSrc makes PDF.js 6 fail while setting up its Node fake worker.
-// A package specifier keeps the worker bundled with the installed PDF.js version.
-pdfjs.GlobalWorkerOptions.workerSrc = "pdfjs-dist/legacy/build/pdf.worker.mjs";
+import { createCanvas } from "@napi-rs/canvas";
+import { pdfjs } from "./pdfjs-node";
 
 export async function renderPdfPagesWithPdfjs(
   bytes: Uint8Array,

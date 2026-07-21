@@ -478,7 +478,7 @@ async function processPdfImport(
 ): Promise<{ error: string; review?: PdfReviewData }> {
   await supabase.from("import_batches").update({ status: "extracting" }).eq("id", input.importId);
   try {
-    const extracted = extractPdfText(input.bytes);
+    const extracted = await extractPdfText(input.bytes);
     if (extracted.scanned) {
       await supabase.from("import_batches").update({
         status: "ocr_processing",
