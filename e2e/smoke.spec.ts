@@ -80,6 +80,32 @@ test("score screen renders the breakdown", async () => {
   await expect(page.getByLabel("Score dimensions").getByText("Cash Flow Health", { exact: true })).toBeVisible();
 });
 
+test("tapping a financial term opens its definition sheet with related navigation", async () => {
+  await page.goto("/report");
+  await page.getByRole("button", { name: "Free cash flow — show definition" }).first().click();
+
+  const sheet = page.getByRole("dialog", { name: "Free cash flow" });
+  await expect(sheet).toBeVisible();
+  await expect(
+    sheet.getByText("The money remaining after the expenses required to operate your household have been paid."),
+  ).toBeVisible();
+  await expect(sheet.getByText("Revenue − operating expenses")).toBeVisible();
+
+  // Related navigation: tap a related concept chip, content swaps, Back returns.
+  await sheet.getByRole("button", { name: "Capital allocation" }).click();
+  const relatedSheet = page.getByRole("dialog", { name: "Capital allocation" });
+  await expect(relatedSheet).toBeVisible();
+  await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(sheet).toBeVisible();
+
+  // Close. Scope to the dialog itself: the sheet's backdrop button also has
+  // an accessible name of "Close" but sits behind the panel visually, so an
+  // unscoped click can hit the panel instead of the backdrop.
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
 test("accounts screen shows the demo data card with Koa active", async () => {
   await page.goto("/accounts");
   await expect(page.getByText("Demo data", { exact: true })).toBeVisible();
