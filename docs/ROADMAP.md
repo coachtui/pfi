@@ -57,7 +57,7 @@ Four slices, each its own spec → plan → implementation cycle:
    canonical glossary (docs/TERMINOLOGY.md), framework-free `src/lib/concepts/`
    (15 typed concept records: 10 full lessons across 3 modules + 5 glossary-only),
    approved renames applied (spec: docs/superpowers/specs/2026-07-20-academy-slice1-terminology-concepts-design.md).
-2. ✅ **`FinancialTerm` interaction system** — landed 2026-07-20: a framework-free
+2. ✅/⏳ **`FinancialTerm` interaction system** — a framework-free
    term-sheet view-model builder (`src/lib/concepts/term-sheet.ts`) and score-metric
    label→concept map (`src/lib/concepts/score-term-map.ts`), a React interaction
    layer (`TermSheetProvider` stack API, `FinancialTerm` tappable dashed-underline

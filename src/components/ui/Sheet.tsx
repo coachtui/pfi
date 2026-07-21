@@ -11,15 +11,26 @@ export function Sheet({
   open,
   onClose,
   title,
+  contentKey,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
+  /**
+   * Identifies the content currently shown inside the sheet. Defaults to `title`.
+   * Pass a value that changes whenever the sheet's content is swapped out while
+   * `open` stays `true` (e.g. navigating between related concepts) so focus is
+   * re-anchored inside the panel and the Tab-trap can't be escaped by a stale
+   * `document.activeElement` left on `<body>` after the previously-focused
+   * element unmounts.
+   */
+  contentKey?: string;
   children: ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const resolvedContentKey = contentKey ?? title;
 
   useEffect(() => {
     if (!open) return;
@@ -46,16 +57,31 @@ export function Sheet({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Capture the pre-open trigger element once (on the closed→open transition) and
+  // restore focus to it once (on the open→closed transition). Deliberately keyed
+  // only on `open`, not `contentKey`: the element that should regain focus on
+  // close is the one that opened the sheet, not whichever related-concept chip
+  // was tapped most recently inside it.
   useEffect(() => {
     if (open) {
       previouslyFocused.current = document.activeElement as HTMLElement | null;
-      const focusable = panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
-      (focusable?.[0] ?? panelRef.current)?.focus();
     } else {
       previouslyFocused.current?.focus();
       previouslyFocused.current = null;
     }
   }, [open]);
+
+  // Re-anchor focus inside the panel whenever it opens AND whenever its content
+  // changes while it stays open (e.g. related-concept navigation). Without the
+  // `contentKey` dependency, swapping content unmounts the previously-focused
+  // element, the browser moves `document.activeElement` to `<body>`, and the
+  // Tab-trap above (which only checks against `first`/`last`) never matches — so
+  // the next Tab escapes to background content instead of cycling the panel.
+  useEffect(() => {
+    if (!open) return;
+    const focusable = panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+    (focusable?.[0] ?? panelRef.current)?.focus();
+  }, [open, resolvedContentKey]);
 
   if (!open) return null;
   return (

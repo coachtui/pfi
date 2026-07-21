@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CONCEPT_REGISTRY } from "./index";
+import { SCORE_METRIC_CONCEPT_IDS } from "./score-term-map";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
@@ -66,5 +67,20 @@ describe("FinancialTerm wiring coverage (slice 2)", () => {
     const src = read("src/app/report/ReportView.tsx");
     expect(src).toContain(`label="${FREE_CASH_FLOW_TITLE}"`);
     expect(src).toContain(`conceptId="free-cash-flow"`);
+  });
+
+  // Score wiring uses a conditional lookup (SCORE_METRIC_CONCEPT_IDS[m.id]) rather
+  // than a literal conceptId="..." string, since the concept id is derived per
+  // metric row rather than fixed per call site — so it's checked separately from
+  // the literal-string wiring table above. score-term-map.test.ts already asserts
+  // every SCORE_METRIC_CONCEPT_IDS value is a published concept; this test only
+  // needs to confirm the source actually wires that map into FinancialTerm.
+  it("score view wires FinancialTerm via SCORE_METRIC_CONCEPT_IDS for every wired metric id", () => {
+    const src = read("src/app/score/ScoreView.tsx");
+    expect(src).toContain("SCORE_METRIC_CONCEPT_IDS[m.id]");
+    expect(src).toContain("<FinancialTerm conceptId={SCORE_METRIC_CONCEPT_IDS[m.id]}>");
+    for (const id of Object.values(SCORE_METRIC_CONCEPT_IDS)) {
+      expect(CONCEPT_REGISTRY.byId(id)?.status, `${id} not published`).toBe("published");
+    }
   });
 });

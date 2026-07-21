@@ -19,7 +19,12 @@ export function TermDefinitionSheet({
   onRelated: (id: ConceptId) => void;
 }) {
   return (
-    <Sheet open={model !== null} onClose={onClose} title={model?.title ?? ""}>
+    <Sheet
+      open={model !== null}
+      onClose={onClose}
+      title={model?.title ?? ""}
+      contentKey={model?.id}
+    >
       {model && (
         <div className="flex flex-col gap-4">
           {canGoBack && (
@@ -36,12 +41,18 @@ export function TermDefinitionSheet({
           <p className="text-base leading-relaxed text-primary">{model.shortDefinition}</p>
           <p className="text-sm leading-relaxed text-secondary">{model.fullDefinition}</p>
 
-          {model.formula && (
+          {(model.formula || model.householdAdaptation) && (
             <div className="rounded-xl border border-border-subtle bg-inset p-3">
-              <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">Formula</p>
-              <p className="font-mono text-sm text-primary">{model.formula}</p>
+              {model.formula && (
+                <>
+                  <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">Formula</p>
+                  <p className="font-mono text-sm text-primary">{model.formula}</p>
+                </>
+              )}
               {model.householdAdaptation && (
-                <p className="mt-2 text-xs text-tertiary">Household: {model.householdAdaptation}</p>
+                <p className={model.formula ? "mt-2 text-xs text-tertiary" : "text-xs text-tertiary"}>
+                  Household: {model.householdAdaptation}
+                </p>
               )}
             </div>
           )}

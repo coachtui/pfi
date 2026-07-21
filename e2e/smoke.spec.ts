@@ -80,6 +80,36 @@ test("score screen renders the breakdown", async () => {
   await expect(page.getByLabel("Score dimensions").getByText("Cash Flow Health", { exact: true })).toBeVisible();
 });
 
+test("tapping a financial term on the score screen opens its definition sheet", async () => {
+  // Confirms the score surface's FinancialTerm wiring (a conditional
+  // SCORE_METRIC_CONCEPT_IDS[m.id] lookup, unlike report/dashboard's literal
+  // conceptId="...") actually works end-to-end, not just that the source
+  // contains the right strings (see label-consistency.test.ts for that check).
+  // "Emergency runway" → liquidity is the only score metric mapped to the
+  // liquidity concept, so its "Liquidity — show definition" button is unique
+  // on the page (free-cash-flow is wired from two different metric rows).
+  await page.goto("/score");
+  // Metric rows render inside a collapsed <details> per dimension; expand the
+  // "Liquidity & Resilience" dimension (whose summary carries the dimension's
+  // own score text, not the term) before its metric rows become clickable.
+  await page
+    .getByLabel("Score dimensions")
+    .getByText("Liquidity & Resilience", { exact: true })
+    .click();
+  await page.getByRole("button", { name: "Liquidity — show definition" }).click();
+
+  const sheet = page.getByRole("dialog", { name: "Liquidity" });
+  await expect(sheet).toBeVisible();
+  await expect(
+    sheet.getByText(
+      "How quickly your household's money can be used — cash you can spend now versus value that takes time to unlock.",
+    ),
+  ).toBeVisible();
+
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
 test("tapping a financial term opens its definition sheet with related navigation", async () => {
   await page.goto("/report");
   await page.getByRole("button", { name: "Free cash flow — show definition" }).first().click();
