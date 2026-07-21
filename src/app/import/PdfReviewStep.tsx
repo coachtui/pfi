@@ -67,6 +67,7 @@ export function PdfReviewStep({
   const issueCount = rows.reduce((n, r) => n + r.issues.length, 0);
   const lowConfidence = rows.filter((r) => r.confidence === "low").length;
   const blocked = review.status === "unsupported" || review.status === "failed";
+  const usedOcr = review.extractionMethod === "ocr" || review.extractionMethod === "hybrid";
 
   function updateMeta<K extends keyof StatementMetadata>(key: K, value: StatementMetadata[K]) {
     setMetadata((cur) => ({ ...cur, [key]: value }));
@@ -153,6 +154,20 @@ export function PdfReviewStep({
 
       {review.unsupportedReason && <p role="alert" className="rounded-card border border-warning bg-elevated p-3 text-sm text-warning"><ShieldAlert size={16} className="mr-1 inline" aria-hidden />{review.unsupportedReason}</p>}
       {review.failureReason && <p role="alert" className="rounded-card border border-negative bg-elevated p-3 text-sm text-negative">{review.failureReason}</p>}
+      {usedOcr && !blocked && (
+        <p role="status" className="rounded-card border border-warning bg-elevated p-3 text-sm text-warning">
+          <AlertTriangle size={16} className="mr-1 inline" aria-hidden />
+          This statement was scanned using OCR. Review all balances, dates, and transaction amounts before importing.
+        </p>
+      )}
+      {review.validationResults.length > 0 && (
+        <div className="rounded-card border border-border-subtle bg-elevated p-3 text-sm text-secondary">
+          <p className="font-medium text-primary">Extraction notes</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {review.validationResults.map((result) => <li key={result}>{result}</li>)}
+          </ul>
+        </div>
+      )}
 
       <div className="grid gap-3 md:grid-cols-2">
         <div>
@@ -170,6 +185,7 @@ export function PdfReviewStep({
         <div>
           <p className={labelCls}>Extraction</p>
           <p className="mt-1 text-sm text-primary">{review.extractionMethod ?? "Unknown"} · {confidenceLabel(review.confidence)}</p>
+          {review.ocrProvider && <p className="text-xs text-secondary">OCR: {review.ocrProvider}{review.ocrAverageConfidence === null ? "" : ` · ${review.ocrAverageConfidence.toFixed(1)}% quality`}</p>}
           <p className="text-xs text-secondary">Reconciliation: {reconText(review)}</p>
         </div>
       </div>

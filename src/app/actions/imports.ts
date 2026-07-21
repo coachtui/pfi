@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { dedupeKey } from "@/lib/csv-import/dedupe";
 import { dayGap, TRANSFER_MAX_DAY_GAP } from "@/lib/csv-import/transfers";
@@ -26,10 +27,15 @@ import { parseStatementWithRegistry } from "@/lib/pdf-import/registry";
 import {
   PDF_IMPORT_BUCKET,
   PDF_IMPORT_PARSER_VERSION,
+  type OcrDocument,
+  type OcrFailureCode,
+  type ParsedStatement,
   type PdfReviewData,
   type StatementMetadata,
 } from "@/lib/pdf-import/types";
 import { validatePdfUpload } from "@/lib/pdf-import/validate";
+import { defaultOcrProvider, OcrImportError } from "@/lib/pdf-import/ocr";
+import { ocrFailureMessage } from "@/lib/pdf-import/ocr-utils";
 
 // PostgREST caps unbounded selects at 1000 rows (see DECISIONS #18); the
 // dedupe/transfer re-check below needs every existing transaction, not just
@@ -301,6 +307,10 @@ async function readPdfReview(importId: string): Promise<{ data: PdfReviewData | 
       statementEndDate: batch.statement_end_date ?? null,
       extractionMethod: batch.extraction_method ?? null,
       confidence: batch.confidence ?? null,
+      ocrProvider: batch.ocr_provider ?? null,
+      ocrAverageConfidence: batch.ocr_average_confidence === null || batch.ocr_average_confidence === undefined
+        ? null
+        : Number(batch.ocr_average_confidence),
       failureReason: batch.failure_reason ?? null,
       unsupportedReason: batch.unsupported_reason ?? null,
       validationResults: asStringArray(batch.validation_results),
@@ -327,6 +337,207 @@ async function readPdfReview(importId: string): Promise<{ data: PdfReviewData | 
       suggestedAccountId: suggested,
     },
   };
+}
+
+function sourcePageFor(text: string, ocr: OcrDocument | null): number | null {
+  if (!ocr) return null;
+  const needle = text.trim().toLowerCase();
+  if (!needle) return null;
+  const token = needle.split(/\s+/).slice(0, 4).join(" ");
+  return ocr.pages.find((p) => p.text.toLowerCase().includes(token))?.pageNumber ?? null;
+}
+
+function ocrIssueSummary(ocr: OcrDocument | null): string[] {
+  if (!ocr) return [];
+  const issues = [`OCR provider: ${ocr.provider}${ocr.averageConfidence === undefined ? "" : `, average confidence ${ocr.averageConfidence.toFixed(1)}%`}.`];
+  if ((ocr.averageConfidence ?? 100) < 65) issues.push("OCR quality is low. Verify each date, amount, and debit/credit direction.");
+  return issues;
+}
+
+async function stageParsedPdfImport(
+  supabase: SupabaseClient,
+  input: {
+    importId: string;
+    userId: string;
+    parsed: ParsedStatement & { adapterId: string };
+    ocr: OcrDocument | null;
+    nativeTextPageCount?: number | null;
+  },
+): Promise<{ status: string; failureReason: string | null }> {
+  await Promise.all([
+    supabase.from("staged_statement_metadata").delete().eq("import_batch_id", input.importId),
+    supabase.from("staged_transactions").delete().eq("import_batch_id", input.importId),
+  ]);
+
+  const parsed = input.parsed;
+  const ocrLowQuality = input.ocr !== null && (input.ocr.averageConfidence ?? 100) < 45;
+  const status = parsed.unsupportedReason
+    ? "unsupported"
+    : parsed.transactions.length === 0
+      ? "failed"
+      : parsed.reconciliation.status === "does_not_reconcile" || parsed.confidence === "low" || input.ocr !== null
+        ? "needs_review"
+        : "ready_for_review";
+  const failureReason = parsed.transactions.length === 0 && !parsed.unsupportedReason
+    ? ocrLowQuality
+      ? "OCR quality was too low to extract reliable financial transaction data."
+      : "No financial transaction data was detected."
+    : null;
+
+  await supabase.from("import_batches").update({
+    status,
+    detected_institution: parsed.metadata.institution,
+    detected_account_type: parsed.metadata.accountType,
+    statement_start_date: parsed.metadata.statementStartDate,
+    statement_end_date: parsed.metadata.statementEndDate,
+    extraction_method: parsed.extractionMethod,
+    confidence: input.ocr ? (parsed.confidence === "high" ? "medium" : parsed.confidence) : parsed.confidence,
+    validation_results: [...ocrIssueSummary(input.ocr), ...parsed.issues],
+    reconciliation_results: parsed.reconciliation,
+    failure_reason: failureReason,
+    unsupported_reason: parsed.unsupportedReason,
+    ocr_provider: input.ocr?.provider ?? null,
+    ocr_provider_version: input.ocr?.providerVersion ?? null,
+    ocr_average_confidence: input.ocr?.averageConfidence ?? null,
+    ocr_completed_at: input.ocr ? new Date().toISOString() : null,
+    ocr_failure_code: null,
+    ocr_failure_detail: null,
+    native_text_page_count: input.nativeTextPageCount ?? null,
+    ocr_page_count: input.ocr?.pages.length ?? null,
+  }).eq("id", input.importId);
+
+  await supabase.from("staged_statement_metadata").insert({
+    import_batch_id: input.importId,
+    user_id: input.userId,
+    institution: parsed.metadata.institution,
+    account_name: parsed.metadata.accountName,
+    account_type: parsed.metadata.accountType,
+    masked_account_number: parsed.metadata.maskedAccountNumber,
+    statement_start_date: parsed.metadata.statementStartDate,
+    statement_end_date: parsed.metadata.statementEndDate,
+    beginning_balance: parsed.metadata.beginningBalance,
+    ending_balance: parsed.metadata.endingBalance,
+    available_balance: parsed.metadata.availableBalance,
+    credit_limit: parsed.metadata.creditLimit,
+    minimum_payment: parsed.metadata.minimumPayment,
+    payment_due_date: parsed.metadata.paymentDueDate,
+    raw_text_excerpt: parsed.rawTextExcerpt,
+    parser_metadata: {
+      adapterId: parsed.adapterId,
+      parserVersion: PDF_IMPORT_PARSER_VERSION,
+      ocrProvider: input.ocr?.provider ?? null,
+      ocrAverageConfidence: input.ocr?.averageConfidence ?? null,
+    },
+    field_confidence: parsed.fieldConfidence,
+  });
+  if (parsed.transactions.length > 0) {
+    await insertChunked(supabase, "staged_transactions", parsed.transactions.map((t) => ({
+      import_batch_id: input.importId,
+      user_id: input.userId,
+      posted_date: t.postedDate,
+      transaction_date: t.transactionDate,
+      description: t.description,
+      amount: t.amount,
+      direction: t.direction,
+      category: t.category,
+      reference_number: t.referenceNumber,
+      source_page: t.sourcePage ?? sourcePageFor(t.description, input.ocr),
+      confidence: input.ocr && t.confidence === "high" ? "medium" : t.confidence,
+      field_confidence: input.ocr
+        ? { ...t.fieldConfidence, amounts: t.fieldConfidence.amounts === "high" ? "medium" : t.fieldConfidence.amounts }
+        : t.fieldConfidence,
+      issues: input.ocr ? [...t.issues, "OCR-derived transaction. Verify before importing."] : t.issues,
+      original_values: t,
+    })));
+  }
+
+  return { status, failureReason };
+}
+
+async function failPdfOcrImport(
+  supabase: SupabaseClient,
+  importId: string,
+  code: OcrFailureCode,
+  detail?: string | null,
+) {
+  await supabase.from("import_batches").update({
+    status: "failed",
+    extraction_method: "ocr",
+    confidence: "low",
+    failure_reason: ocrFailureMessage(code, detail),
+    validation_results: [ocrFailureMessage(code, null)],
+    ocr_failure_code: code,
+    ocr_failure_detail: detail ? detail.slice(0, 300) : null,
+    ocr_completed_at: new Date().toISOString(),
+  }).eq("id", importId);
+}
+
+async function processPdfImport(
+  supabase: SupabaseClient,
+  input: { importId: string; userId: string; bytes: Uint8Array },
+): Promise<{ error: string; review?: PdfReviewData }> {
+  await supabase.from("import_batches").update({ status: "extracting" }).eq("id", input.importId);
+  try {
+    const extracted = extractPdfText(input.bytes);
+    if (extracted.scanned) {
+      await supabase.from("import_batches").update({
+        status: "ocr_processing",
+        extraction_method: "ocr",
+        confidence: "low",
+        ocr_started_at: new Date().toISOString(),
+        processing_retry_count: 1,
+      }).eq("id", input.importId);
+      const ocr = await defaultOcrProvider().extract({
+        pdfBytes: input.bytes,
+        importId: input.importId,
+        ownerId: input.userId,
+        pageCount: extracted.pageCount,
+      });
+      if (ocr.fullText.trim().length < 40) {
+        await failPdfOcrImport(supabase, input.importId, "ocr_low_quality");
+        const review = await readPdfReview(input.importId);
+        return review.data ? { error: "", review: review.data } : { error: review.error };
+      }
+      const parsed = parseStatementWithRegistry(ocr.fullText, "ocr");
+      await stageParsedPdfImport(supabase, {
+        importId: input.importId,
+        userId: input.userId,
+        parsed,
+        ocr,
+        nativeTextPageCount: extracted.nativeTextPageCount ?? 0,
+      });
+      const review = await readPdfReview(input.importId);
+      return review.data ? { error: "", review: review.data } : { error: review.error };
+    }
+
+    const parsed = parseStatementWithRegistry(extracted.text, extracted.method);
+    await stageParsedPdfImport(supabase, {
+      importId: input.importId,
+      userId: input.userId,
+      parsed,
+      ocr: null,
+      nativeTextPageCount: extracted.pageCount,
+    });
+    const review = await readPdfReview(input.importId);
+    return review.data ? { error: "", review: review.data } : { error: review.error };
+  } catch (e) {
+    if (e instanceof OcrImportError) {
+      await failPdfOcrImport(supabase, input.importId, e.code, e.message);
+      const review = await readPdfReview(input.importId);
+      return review.data ? { error: "", review: review.data } : { error: review.error };
+    }
+    const message = e instanceof Error ? e.message : "PDF extraction failed.";
+    await supabase.from("import_batches").update({
+      status: "failed",
+      confidence: "low",
+      failure_reason: "PDF extraction failed before review. Try a CSV export if available, or upload a different statement PDF.",
+      validation_results: [message.slice(0, 180)],
+      ocr_failure_code: "parser_failed",
+      ocr_failure_detail: message.slice(0, 300),
+    }).eq("id", input.importId);
+    const review = await readPdfReview(input.importId);
+    return review.data ? { error: "", review: review.data } : { error: "PDF extraction failed before review." };
+  }
 }
 
 export async function uploadStatementPdf(formData: FormData): Promise<{ error: string; review?: PdfReviewData }> {
@@ -364,9 +575,7 @@ export async function uploadStatementPdf(formData: FormData): Promise<{ error: s
       return { error: "This statement PDF was already confirmed and added to your financial record." };
     }
     if (duplicate.status === "failed") {
-      return {
-        error: `This statement PDF was already uploaded, but extraction failed: ${duplicate.failure_reason ?? "No financial data was extracted."}`,
-      };
+      return processPdfImport(supabase, { importId: duplicate.id, userId: user.id, bytes });
     }
     if (duplicate.status === "unsupported") {
       return {
@@ -411,94 +620,7 @@ export async function uploadStatementPdf(formData: FormData): Promise<{ error: s
     file_sha256: sha,
   });
 
-  await supabase.from("import_batches").update({ status: "extracting" }).eq("id", importId);
-  try {
-    const extracted = extractPdfText(bytes);
-    if (extracted.scanned) {
-      await supabase.from("import_batches").update({
-        status: "failed",
-        extraction_method: "ocr",
-        confidence: "low",
-        failure_reason: "Scanned document could not be read. OCR is detected but not enabled for this importer yet.",
-        validation_results: ["No usable embedded text was found."],
-      }).eq("id", importId);
-      const review = await readPdfReview(importId);
-      return review.data ? { error: "", review: review.data } : { error: review.error };
-    }
-
-    const parsed = parseStatementWithRegistry(extracted.text);
-    const status = parsed.unsupportedReason
-      ? "unsupported"
-      : parsed.transactions.length === 0
-        ? "failed"
-        : parsed.reconciliation.status === "does_not_reconcile" || parsed.confidence === "low"
-          ? "needs_review"
-          : "ready_for_review";
-    const failureReason = parsed.transactions.length === 0 && !parsed.unsupportedReason ? "No financial transaction data was detected." : null;
-
-    await supabase.from("import_batches").update({
-      status,
-      detected_institution: parsed.metadata.institution,
-      detected_account_type: parsed.metadata.accountType,
-      statement_start_date: parsed.metadata.statementStartDate,
-      statement_end_date: parsed.metadata.statementEndDate,
-      extraction_method: parsed.extractionMethod,
-      confidence: parsed.confidence,
-      validation_results: parsed.issues,
-      reconciliation_results: parsed.reconciliation,
-      failure_reason: failureReason,
-      unsupported_reason: parsed.unsupportedReason,
-    }).eq("id", importId);
-    await supabase.from("staged_statement_metadata").insert({
-      import_batch_id: importId,
-      user_id: user.id,
-      institution: parsed.metadata.institution,
-      account_name: parsed.metadata.accountName,
-      account_type: parsed.metadata.accountType,
-      masked_account_number: parsed.metadata.maskedAccountNumber,
-      statement_start_date: parsed.metadata.statementStartDate,
-      statement_end_date: parsed.metadata.statementEndDate,
-      beginning_balance: parsed.metadata.beginningBalance,
-      ending_balance: parsed.metadata.endingBalance,
-      available_balance: parsed.metadata.availableBalance,
-      credit_limit: parsed.metadata.creditLimit,
-      minimum_payment: parsed.metadata.minimumPayment,
-      payment_due_date: parsed.metadata.paymentDueDate,
-      raw_text_excerpt: parsed.rawTextExcerpt,
-      parser_metadata: { adapterId: parsed.adapterId, parserVersion: PDF_IMPORT_PARSER_VERSION },
-      field_confidence: parsed.fieldConfidence,
-    });
-    if (parsed.transactions.length > 0) {
-      await insertChunked(supabase, "staged_transactions", parsed.transactions.map((t) => ({
-        import_batch_id: importId,
-        user_id: user.id,
-        posted_date: t.postedDate,
-        transaction_date: t.transactionDate,
-        description: t.description,
-        amount: t.amount,
-        direction: t.direction,
-        category: t.category,
-        reference_number: t.referenceNumber,
-        source_page: t.sourcePage,
-        confidence: t.confidence,
-        field_confidence: t.fieldConfidence,
-        issues: t.issues,
-        original_values: t,
-      })));
-    }
-    const review = await readPdfReview(importId);
-    return review.data ? { error: "", review: review.data } : { error: review.error };
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "PDF extraction failed.";
-    await supabase.from("import_batches").update({
-      status: "failed",
-      confidence: "low",
-      failure_reason: "PDF extraction failed before review. Try a CSV export if available, or upload a different statement PDF.",
-      validation_results: [message.slice(0, 180)],
-    }).eq("id", importId);
-    const review = await readPdfReview(importId);
-    return review.data ? { error: "", review: review.data } : { error: "PDF extraction failed before review." };
-  }
+  return processPdfImport(supabase, { importId, userId: user.id, bytes });
 }
 
 export async function getPdfImportReview(importId: string): Promise<{ error: string; review?: PdfReviewData }> {

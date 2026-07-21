@@ -159,6 +159,13 @@ function parseTransactions(text: string, accountType: PdfAccountType): Extracted
   return rows;
 }
 
+function detectMultipleAccounts(text: string): boolean {
+  const matches = [...text.matchAll(/(?:account|card)\s*(?:number|no\.?)?\s*[:#\-]?\s*(?:x{2,}|\*{2,}|ending\s+in)?\s*([*\dxX-]{2,20})/gi)]
+    .map((m) => m[1].replace(/\D/g, "").slice(-4))
+    .filter((v) => v.length >= 2);
+  return new Set(matches).size > 1;
+}
+
 export function reconcileStatement(metadata: StatementMetadata, transactions: ExtractedTransaction[]): ReconciliationResult {
   const tolerance = 0.01;
   if (metadata.beginningBalance === null || metadata.endingBalance === null) {
@@ -192,25 +199,49 @@ export function reconcileStatement(metadata: StatementMetadata, transactions: Ex
   };
 }
 
-function confidence(metadata: StatementMetadata, txns: ExtractedTransaction[], recon: ReconciliationResult): ConfidenceLevel {
+function confidence(
+  metadata: StatementMetadata,
+  txns: ExtractedTransaction[],
+  recon: ReconciliationResult,
+  extractionMethod: "native_text" | "ocr" | "hybrid",
+): ConfidenceLevel {
   if (txns.length === 0) return "low";
-  if (metadata.accountType && metadata.statementEndDate && metadata.endingBalance !== null && recon.status === "reconciled") return "high";
+  if (
+    extractionMethod === "native_text"
+    && metadata.accountType
+    && metadata.statementEndDate
+    && metadata.endingBalance !== null
+    && recon.status === "reconciled"
+  ) return "high";
   if (metadata.accountType && metadata.statementEndDate && metadata.endingBalance !== null) return "medium";
   return "low";
 }
 
-export function parseGenericStatement(text: string): ParsedStatement {
+export function parseGenericStatement(text: string, extractionMethod: "native_text" | "ocr" | "hybrid" = "native_text"): ParsedStatement {
   const cls = classifyStatement(text);
   if (cls.unsupportedReason || !cls.accountType) {
     return {
       metadata: blankMetadata(),
       transactions: [],
-      extractionMethod: "native_text",
+      extractionMethod,
       confidence: "low",
       fieldConfidence: {},
       reconciliation: { status: "not_enough_information", difference: null, tolerance: 0.01, equation: null },
       issues: [],
       unsupportedReason: cls.unsupportedReason,
+      rawTextExcerpt: text.slice(0, 4000),
+    };
+  }
+  if (detectMultipleAccounts(text)) {
+    return {
+      metadata: blankMetadata(),
+      transactions: [],
+      extractionMethod,
+      confidence: "low",
+      fieldConfidence: {},
+      reconciliation: { status: "not_enough_information", difference: null, tolerance: 0.01, equation: null },
+      issues: ["Multiple masked account identifiers were detected."],
+      unsupportedReason: "This statement appears to contain multiple accounts. Multi-account PDFs are not supported yet.",
       rawTextExcerpt: text.slice(0, 4000),
     };
   }
@@ -222,16 +253,19 @@ export function parseGenericStatement(text: string): ParsedStatement {
     amounts: transactions.length > 0 ? "high" : "low",
     direction: transactions.some((t) => t.issues.length) ? "medium" : "high",
     endingBalance: metadata.endingBalance !== null ? "high" : "low",
-    accountIdentification: metadata.maskedAccountNumber || metadata.institution ? "medium" : "low",
+      accountIdentification: metadata.maskedAccountNumber || metadata.institution ? "medium" : "low",
   };
+  const ocrIssues = extractionMethod === "ocr" || extractionMethod === "hybrid"
+    ? ["OCR was used. Review balances and transaction amounts before importing."]
+    : [];
   return {
     metadata,
     transactions,
-    extractionMethod: "native_text",
-    confidence: confidence(metadata, transactions, reconciliation),
+    extractionMethod,
+    confidence: confidence(metadata, transactions, reconciliation, extractionMethod),
     fieldConfidence,
     reconciliation,
-    issues: transactions.length === 0 ? ["No transaction table rows were detected."] : [],
+    issues: transactions.length === 0 ? [...ocrIssues, "No transaction table rows were detected."] : ocrIssues,
     unsupportedReason: null,
     rawTextExcerpt: text.slice(0, 4000),
   };
