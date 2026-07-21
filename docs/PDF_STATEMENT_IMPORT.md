@@ -51,7 +51,7 @@ Native embedded text extraction always runs first. OCR triggers only when the ex
 
 The current provider is `local-tesseract`:
 
-- Rendering: Poppler `pdftoppm`, default command `pdftoppm`
+- Rendering: `pdfjs-dist` + `@napi-rs/canvas` in-process server rendering
 - OCR: `tesseract.js`
 - Default DPI: `250`
 - Default max rendered page dimension: `3200`
@@ -60,7 +60,7 @@ The current provider is `local-tesseract`:
 
 Environment/configuration:
 
-- `PDF_IMPORT_RENDER_COMMAND`: optional path/name for the Poppler renderer, defaults to `pdftoppm`
+- `PDF_IMPORT_RENDER_COMMAND`: optional path/name for a Poppler renderer fallback. Leave unset to use the Vercel-compatible pdf.js/canvas renderer.
 - `PDF_IMPORT_OCR_DPI`: optional OCR render DPI
 - `PDF_IMPORT_OCR_MAX_DIMENSION`: optional max image dimension
 - `PDF_IMPORT_RENDER_TIMEOUT_MS`: optional render timeout
@@ -68,7 +68,7 @@ Environment/configuration:
 - `PDF_IMPORT_OCR_LANG_PATH`: optional Tesseract language-data path
 - `PDF_IMPORT_OCR_CACHE_PATH`: optional Tesseract cache path
 
-No external OCR provider is used by default and statement images are not sent to an external service. Production must include Poppler rendering support and allow `tesseract.js` worker/wasm/language assets. The language assets should be pinned locally through `PDF_IMPORT_OCR_LANG_PATH` for restricted network environments. If rendering or OCR is unavailable, the import fails safely with `ocr_not_configured`, `pdf_render_failed`, `ocr_provider_failed`, or `ocr_timeout`.
+No external OCR provider is used by default and statement images are not sent to an external service. Production must include the Node canvas native package and allow `tesseract.js` worker/wasm/language assets. The language assets should be pinned locally through `PDF_IMPORT_OCR_LANG_PATH` for restricted network environments. If rendering or OCR is unavailable, the import fails safely with `ocr_not_configured`, `pdf_render_failed`, `ocr_provider_failed`, or `ocr_timeout`.
 
 OCR-derived imports are forced into review (`needs_review`) even when parsing succeeds. The review screen displays an OCR notice, provider name, average confidence, extraction notes, reconciliation, duplicate warnings, and editable staged transactions.
 
