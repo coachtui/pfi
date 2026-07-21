@@ -18,8 +18,13 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.afterAll(async () => {
-  await page.close();
-  await deletePasswordUser(user.userId);
+  // deletePasswordUser must run even if page.close() throws (e.g. a crashed
+  // browser/page) — otherwise the ephemeral Supabase test user leaks.
+  try {
+    await page.close();
+  } finally {
+    await deletePasswordUser(user.userId);
+  }
 });
 
 test("academy tab routes to the zero-progress home with no locks", async () => {
@@ -60,14 +65,30 @@ test("the report's Revenue term offers Take the lesson and deep-links into it", 
 test("answering all checks completes the lesson — right or wrong", async () => {
   const groups = page.getByRole("group", { name: /Knowledge check/ });
   const count = await groups.count();
-  expect(count).toBeGreaterThanOrEqual(1);
-  for (let i = 0; i < count; i++) {
+  // revenue.ts has two knowledge checks, both with correctIndex: 0 — pick a
+  // genuinely wrong choice for the first so this test actually exercises the
+  // "wrong answer still completes the lesson" behavior it claims to prove.
+  expect(count).toBeGreaterThanOrEqual(2);
+
+  // Check 1 ("Which of these is revenue?"): answer WRONG on purpose.
+  // Choice 1 ("A transfer from savings into checking") is not correctIndex 0.
+  const wrongGroup = groups.nth(0);
+  await wrongGroup.getByRole("button").nth(1).click();
+  await expect(wrongGroup.getByText("Your answer")).toBeVisible(); // chosen-but-incorrect marker
+  await expect(wrongGroup.getByText("Correct answer")).toBeVisible(); // correct choice still revealed
+  await expect(
+    wrongGroup.getByText(/A paycheck is new money from an outside source/),
+  ).toBeVisible(); // explanation still renders even though the answer was wrong
+
+  // Any remaining checks: answer correctly, to confirm the "right" path also completes.
+  for (let i = 1; i < count; i++) {
     const group = groups.nth(i);
-    await group.getByRole("button").first().click(); // first choice, correctness never gates
-    await expect(group.getByText("Correct answer")).toBeVisible(); // marker + explanation appear
+    await group.getByRole("button").first().click(); // correctIndex: 0 for both revenue checks
+    await expect(group.getByText("Correct answer")).toBeVisible();
   }
+
   const complete = page.getByRole("status").filter({ hasText: "Lesson complete" });
-  await expect(complete).toBeVisible();
+  await expect(complete).toBeVisible(); // lesson completes despite the wrong answer above
 });
 
 test("home reflects the completion", async () => {
