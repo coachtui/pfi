@@ -111,6 +111,42 @@ Found and fixed by this slice's Available Capital rewrite:
 6. **Classification assigned to all 15 concepts now** (cheap, mechanical),
    even though only 2 get full content rewrites this slice — otherwise 13
    concepts would render an undefined classification badge mid-rollout.
+7. **`Lesson` keeps fixed named fields; the generic `sections: LessonSection[]`
+   array is dropped** (approved 2026-07-21, revising the earlier schema
+   sketch). Mapping the sections model onto real content showed every
+   proposed section kind already has a dedicated field doing the job
+   (`fullDefinition`, `whyItMattersExtended`, `calculation.walkthrough`,
+   `personalApplication` + `genericExample`) — the array would ship as
+   unused machinery, and fixed fields are what lets `content.test.ts`/
+   `validateRegistry` mechanically validate every lesson. All
+   `FinancialConcept`-level additions stand unchanged.
+8. **Migration-compat softening of two Lesson fields** (consequence of
+   renaming types over 10 already-authored lessons that Slice B, not this
+   slice, rewrites): `completionSummary` is optional (the completion card
+   falls back to generic fluency copy naming the concept), and
+   `calculation.formula` stays as an optional legacy field so the 9
+   unmigrated lessons keep displaying their existing formula strings
+   verbatim; renderer precedence is `concept.formulaRows` →
+   `lesson.calculation.formula` → `concept.formula`. `reinforcementPreview`
+   likewise becomes optional (superseded by `whereUsed` on migrated
+   concepts; renderer prefers `whereUsed` when present). The three
+   structurally-identical `KnowledgeCheck` union arms collapse into one
+   interface with a `kind` union field — equivalent type, less noise.
+9. **The definition sheet needs in-progress awareness** for the
+   "Continue lesson" CTA: the root layout's completed-ids fetch widens to
+   one query returning both started and completed concept ids
+   (`getAcademyStatusIds`), replacing `getCompletedConceptIds`.
+10. **Completed-state live data is fetched lazily, not at layout time.** A
+   shared resolver (`src/lib/data/concept-live.ts`) turns a
+   `report:*` metric key into display-ready strings (current period label +
+   formatted value, prior period + signed delta) using the existing
+   `getReportData` → `enumeratePeriods` → `computePeriodStatement` chain.
+   The lesson page calls it server-side; the definition sheet calls it via
+   a small `getConceptLive(conceptId)` server action only when opened on a
+   completed concept. Slice A implements the `report:` namespace only
+   (sufficient for Revenue — the only concept that can be Completed with
+   live data this slice); `metric:`/`snapshot:`/`position:` keys return
+   null and are picked up by Slices B/C as their concepts migrate.
 
 | Concept | Classification |
 |---|---|
@@ -172,37 +208,42 @@ export interface Module {
 ```
 
 `reinforcementPreview` (Lesson) is superseded by concept-level `whereUsed`
-for migrated concepts, but stays in the type — unmigrated in Slices B/C
+for migrated concepts, but stays in the type (as optional) — unmigrated
 concepts still use it — until the final rollout slice retires it once every
-concept has `whereUsed` populated.
+concept has `whereUsed` populated. Sheet summary fallback chain for
+unmigrated concepts: `plainEnglishSummary` when present; otherwise the sheet
+shows `shortDefinition` + `fullDefinition` as today. Migrated concepts fold
+anything essential from `fullDefinition` into `plainEnglishSummary`/
+`whyItMatters`, and the sheet shows the summary alone.
 
 ```ts
-export type LessonSectionKind = "meaning" | "why-it-matters" | "calculation" | "apply-household";
-
-export interface LessonSection {
-  kind: LessonSectionKind;
-  body?: string;   // omit to reuse the concept-level field (plainEnglishSummary/whyItMatters); present
-                    // when the lesson needs to say more than the sheet's terser version
-}
-
 export interface Lesson {
   opening: string;                  // household scenario, then names the standard term (was `intro`)
   standardTerm: string;
   whyItMattersExtended?: string;
-  sections: LessonSection[];        // ordered: meaning, why-it-matters, calculation, apply-household
-  calculation?: { walkthrough: string };  // formula itself now lives on the concept
+  calculation?: { formula?: string; walkthrough: string };
+                                    // formula is legacy-optional: unmigrated lessons keep their
+                                    // strings; migrated concepts use concept.formulaRows instead
   genericExample: string;
   personalApplication?: PersonalApplication;
   commonMisunderstanding: string;
   knowledgeChecks: KnowledgeCheck[]; // renamed plural; each check gains a stable id
-  completionSummary: string;        // NEW — feeds the completion card's fluency-framed copy
+  completionSummary?: string;       // NEW — completion-card copy; generic fluency fallback when absent
+  reinforcementPreview?: string;    // legacy; superseded by concept.whereUsed on migrated concepts
 }
 
-export type KnowledgeCheck =
-  | { id: string; kind: "interpretation"; prompt: string; choices: string[]; correctIndex: number; explanation: string }
-  | { id: string; kind: "identify-figure"; prompt: string; choices: string[]; correctIndex: number; explanation: string }
-  | { id: string; kind: "which-action"; prompt: string; choices: string[]; correctIndex: number; explanation: string };
+export interface KnowledgeCheck {
+  id: string;                       // stable, e.g. "revenue-check-1" — persistence key
+  kind: "interpretation" | "identify-figure" | "which-action";
+  prompt: string;
+  choices: string[];
+  correctIndex: number;
+  explanation: string;
+}
 ```
+
+(Decision #7: no generic `sections` array — fixed named fields, mechanically
+validatable. Decision #8: the optional/legacy fields above.)
 
 `PersonalApplication` (unchanged from Slice 1):
 
