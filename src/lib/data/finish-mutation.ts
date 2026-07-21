@@ -19,6 +19,9 @@ export async function finishWithRebuild(supabase: SupabaseClient): Promise<Mutat
   revalidatePath("/transactions");
   revalidatePath("/accounts");
   revalidatePath("/report");
+  revalidatePath("/score");
+  revalidatePath("/data");
+  revalidatePath("/rankings");
   revalidatePath("/import");
   return error ? { error: "", warning: REBUILD_WARNING } : { error: "" };
 }

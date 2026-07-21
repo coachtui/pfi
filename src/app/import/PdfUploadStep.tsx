@@ -72,7 +72,7 @@ export function PdfUploadStep({
       {pending && <p role="status" className="text-sm text-secondary">Extracting statement text. This may take a moment.</p>}
       {error && <p role="alert" className="text-sm text-negative">x {error}</p>}
       <p className="text-xs text-tertiary">
-        Statements are stored privately for your account. PFI does not publish or expose statement files.
+        Statements are stored privately for your account. Keep this screen open until review appears; background uploads are not enabled yet.
       </p>
     </section>
   );
