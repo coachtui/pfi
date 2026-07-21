@@ -5,6 +5,8 @@ import { Share2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
 import { FinancialChart } from "@/components/chart/FinancialChart";
+import { FinancialTerm } from "@/components/concepts/FinancialTerm";
+import type { ConceptId } from "@/lib/concepts";
 import {
   buildIndexSeries,
   buildManagementCommentary,
@@ -118,18 +120,18 @@ export function ReportView({ companyName, ticker, snapshots, transactions, event
       <Card className="p-5">
         <h2 className="mb-3 text-base font-semibold text-primary">Statement · {selectedPeriod.label}</h2>
         <dl className="flex flex-col">
-          <StatementRow label="Revenue" value={formatDollars(statement.revenue)} tone="positive" />
-          <StatementRow label="Operating expenses" value={`− ${formatDollars(statement.operatingExpenses)}`} tone="negative" />
-          <StatementRow label="Free cash flow" value={formatSignedDollars(statement.freeCashFlow)} tone={statement.freeCashFlow >= 0 ? "positive" : "negative"} emphasized />
+          <StatementRow label="Revenue" conceptId="revenue" value={formatDollars(statement.revenue)} tone="positive" />
+          <StatementRow label="Operating expenses" conceptId="operating-expenses" value={`− ${formatDollars(statement.operatingExpenses)}`} tone="negative" />
+          <StatementRow label="Free cash flow" conceptId="free-cash-flow" value={formatSignedDollars(statement.freeCashFlow)} tone={statement.freeCashFlow >= 0 ? "positive" : "negative"} emphasized />
           <p className="mt-3 mb-1 text-xs font-medium text-secondary">Allocated to</p>
-          <StatementRow label="Savings (retained cash)" value={formatSignedDollars(statement.savings)} indent />
+          <StatementRow label="Savings (retained cash)" conceptId="retained-cash" value={formatSignedDollars(statement.savings)} indent />
           <StatementRow label="Investments (contributions)" value={formatDollars(statement.investments)} indent />
           <StatementRow label="Debt reduction" value={formatSignedDollars(statement.debtReduction)} indent />
           <StatementRow label="Owner-created equity" value={formatSignedDollars(statement.ownerCreatedEquity)} tone={statement.ownerCreatedEquity >= 0 ? "positive" : "negative"} emphasized indent />
           <StatementRow label="Market appreciation" value="n/a — no market data yet" muted indent />
           <div className="my-2 border-t border-border-subtle" />
           <StatementRow label="Index movement" value={`${statement.indexChange >= 0 ? "+" : "−"}${Math.abs(statement.indexChange).toFixed(1)} pts`} tone={statement.indexChange >= 0 ? "positive" : "negative"} />
-          <StatementRow label="Savings rate" value={`${statement.savingsRatePct.toFixed(1)}%`} />
+          <StatementRow label="Savings rate" conceptId="savings-rate" value={`${statement.savingsRatePct.toFixed(1)}%`} />
         </dl>
       </Card>
 
@@ -154,10 +156,11 @@ export function ReportView({ companyName, ticker, snapshots, transactions, event
 }
 
 function StatementRow({
-  label, value, tone = "neutral", emphasized = false, indent = false, muted = false,
+  label, value, conceptId, tone = "neutral", emphasized = false, indent = false, muted = false,
 }: {
   label: string;
   value: string;
+  conceptId?: ConceptId;
   tone?: "positive" | "negative" | "neutral";
   emphasized?: boolean;
   indent?: boolean;
@@ -170,7 +173,9 @@ function StatementRow({
     : "text-primary";
   return (
     <div className={`flex items-baseline justify-between py-1.5 ${emphasized ? "font-semibold" : ""} ${indent ? "pl-3" : ""}`}>
-      <dt className={`text-sm ${emphasized ? "text-primary" : "text-secondary"}`}>{label}</dt>
+      <dt className={`text-sm ${emphasized ? "text-primary" : "text-secondary"}`}>
+        {conceptId ? <FinancialTerm conceptId={conceptId}>{label}</FinancialTerm> : label}
+      </dt>
       <dd className={`tabular text-sm ${valueColor}`}>{value}</dd>
     </div>
   );

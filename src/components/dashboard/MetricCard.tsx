@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Sparkline } from "@/components/chart/Sparkline";
+import { FinancialTerm } from "@/components/concepts/FinancialTerm";
+import type { ConceptId } from "@/lib/concepts";
 
 export type MetricTone = "positive" | "negative" | "warning" | "neutral";
 
@@ -23,6 +25,8 @@ interface MetricCardProps {
   footer?: ReactNode;
   /** When present, wraps the card in a link to a drill-down screen. */
   href?: string;
+  /** When set, the label becomes a tappable FinancialTerm. */
+  conceptId?: ConceptId;
 }
 
 /** Compact stat card with an optional decorative sparkline. */
@@ -34,6 +38,7 @@ export function MetricCard({
   trendDescription,
   footer,
   href,
+  conceptId,
 }: MetricCardProps) {
   const card = (
     <Card
@@ -41,7 +46,9 @@ export function MetricCard({
         href ? "transition-colors hover:border-border-strong" : ""
       }`}
     >
-      <p className="text-[11px] leading-tight font-medium text-secondary sm:text-xs">{label}</p>
+      <p className="text-[11px] leading-tight font-medium text-secondary sm:text-xs">
+        {conceptId ? <FinancialTerm conceptId={conceptId}>{label}</FinancialTerm> : label}
+      </p>
       <p className={`tabular mt-1 text-base font-semibold sm:text-xl ${toneText[tone]}`}>{value}</p>
       {trend && trend.length > 1 && (
         <>

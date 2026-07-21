@@ -186,6 +186,7 @@ export function HomeDashboard({
       <section aria-label="Key metrics" className="grid grid-cols-4 gap-2 md:gap-3">
         <MetricCard
           label="Available capital"
+          conceptId="available-capital"
           value={formatDollars(availableNow)}
           tone="neutral"
           trend={trendOf(availablePosition)}
@@ -194,6 +195,7 @@ export function HomeDashboard({
         />
         <MetricCard
           label="Obligations"
+          conceptId="short-term-obligations"
           value={formatDollars(latest.nearTermObligations)}
           tone="neutral"
           trend={trendOf((s) => -s.nearTermObligations)}
@@ -202,6 +204,7 @@ export function HomeDashboard({
         />
         <MetricCard
           label="Cushion"
+          conceptId="financial-flexibility"
           value={formatDollars(cushionNow)}
           tone={cushionNow >= 0 ? "positive" : "negative"}
           trend={trendOf(cushion)}

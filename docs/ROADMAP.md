@@ -57,8 +57,14 @@ Four slices, each its own spec → plan → implementation cycle:
    canonical glossary (docs/TERMINOLOGY.md), framework-free `src/lib/concepts/`
    (15 typed concept records: 10 full lessons across 3 modules + 5 glossary-only),
    approved renames applied (spec: docs/superpowers/specs/2026-07-20-academy-slice1-terminology-concepts-design.md).
-2. **`FinancialTerm` interaction system** — reusable tappable-term component +
-   pre-completion definition sheets, wired into report/dashboard.
+2. ✅/⏳ **`FinancialTerm` interaction system** — a framework-free
+   term-sheet view-model builder (`src/lib/concepts/term-sheet.ts`) and score-metric
+   label→concept map (`src/lib/concepts/score-term-map.ts`), a React interaction
+   layer (`TermSheetProvider` stack API, `FinancialTerm` tappable dashed-underline
+   button, `TermDefinitionSheet` bottom-sheet/dialog with related-concept
+   navigation and back/close), wired into report statement rows, dashboard
+   metric-card labels, and score dimension-metric names (spec:
+   docs/superpowers/specs/2026-07-20-academy-slice2-financial-term-design.md).
 3. **Academy home + lesson experience** — lesson template UI, knowledge checks,
    DB-backed progress (Supabase + RLS), unlocked analytical term sheets.
 4. **Personalization + reinforcement + analytics** — lessons bound to live

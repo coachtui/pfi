@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
 import { momentumLabel, type ConfidenceLevel, type MomentumState } from "@/lib/financial-engine";
 import { branding } from "@/lib/config/branding";
+import { FinancialTerm } from "@/components/concepts/FinancialTerm";
+import { SCORE_METRIC_CONCEPT_IDS } from "@/lib/concepts/score-term-map";
 import type { ScoreData, ScoreRange } from "@/lib/data/queries";
 
 const RANGE_OPTIONS: Array<{ key: ScoreRange; label: string }> = [
@@ -197,7 +199,11 @@ export function ScoreView({ data }: { data: ScoreData }) {
                   <div key={m.id} className="text-sm">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-primary">
-                        {m.name}
+                        {SCORE_METRIC_CONCEPT_IDS[m.id] ? (
+                          <FinancialTerm conceptId={SCORE_METRIC_CONCEPT_IDS[m.id]}>{m.name}</FinancialTerm>
+                        ) : (
+                          m.name
+                        )}
                         {!m.scored && <span className="ml-1 text-xs text-tertiary">(context only)</span>}
                       </span>
                       <span className="tabular text-secondary">
