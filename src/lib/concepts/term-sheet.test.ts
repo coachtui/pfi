@@ -27,8 +27,8 @@ describe("buildTermSheetModel", () => {
   });
 
   it("omits the formula when the concept has none", () => {
-    // net-worth has a formula; pick a concept without one to assert undefined.
-    const withFormula = buildTermSheetModel(CONCEPT_REGISTRY, "free-cash-flow");
-    expect(withFormula!.formula).toBeTruthy();
+    const m = buildTermSheetModel(CONCEPT_REGISTRY, "financial-flexibility");
+    expect(m).not.toBeNull();
+    expect(m!.formula).toBeUndefined();
   });
 });
