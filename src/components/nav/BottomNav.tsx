@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileText, Home, Trophy } from "lucide-react";
+import { BarChart3, FileText, GraduationCap, Home, Trophy } from "lucide-react";
 
 const tabs = [
   { href: "/", label: "Home", icon: Home },
   { href: "/rankings", label: "Rankings", icon: Trophy },
   { href: "/data", label: "Data", icon: BarChart3 },
   { href: "/report", label: "Report", icon: FileText },
+  { href: "/academy", label: "Academy", icon: GraduationCap },
 ] as const;
 
 export function BottomNav() {
@@ -21,13 +22,13 @@ export function BottomNav() {
     >
       <ul className="mx-auto flex max-w-2xl items-stretch justify-around pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {tabs.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+          const active = href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
           return (
             <li key={href}>
               <Link
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center gap-1 rounded-lg px-4 py-1 text-xs transition-colors ${
+                className={`flex flex-col items-center gap-1 rounded-lg px-3 py-1 text-xs transition-colors ${
                   active ? "text-positive" : "text-secondary hover:text-primary"
                 }`}
               >
