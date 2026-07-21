@@ -1,8 +1,55 @@
 # Current Phase
 
-_Last updated: 2026-07-20 (per-driver AI explanations slice, Task 10 of 10 — live-provider QA against a real AI Gateway key complete on `worktree-driver-explanations`, no code changes required; a final whole-branch review is still pending before merge)._
+_Last updated: 2026-07-20 (Academy Slice 1 — terminology + concepts, Tasks 1–6 of 7 on `worktree-academy-concepts`; final verification (Task 7) still pending before merge)._
 
 **Phase:** 0 complete, 1.5 (infrastructure) complete, visual-parity slice (Home polish, Rankings, Data) complete, report screen complete, transactions/accounts CRUD slice complete, PFI score v1 (Phase 2) complete, Phase 3's CSV import (column mapping, preview, dedupe, transfer detection, import summary) **complete and merged to main** (Tasks 1–18 plus final whole-branch review; PR #2, merged 2026-07-17) → a post-merge **cleanup slice complete** (Tasks 1–4) → the **demo profiles + switcher slice complete** (Tasks 1–9, one bug found and fixed live) → three piecemeal pagination hotfixes (`rebuildSnapshots` #18, `getImportContext`/`importTransactions` #19, `getRecentImports` #20) → a **full pagination audit complete** (DECISIONS #21, four more silent-truncation bugs closed, including the PFI Score itself) → **PWA manifest + Playwright e2e slice complete** (DECISIONS #22, Phase 1 fully complete) → the **recurring-transaction detection slice complete and merged to main** (DECISIONS #23, Tasks 1–9 plus a final whole-branch review fix round; PR #10, merged 2026-07-18), closing out Phase 3's last remaining scope — **Phase 3 fully complete** → the **statement balance anchoring & staleness slice complete and merged to main** (DECISIONS #24 architecture, #25 final-review security fix; Tasks 1–10 plus a final whole-branch review fix round; PR #11, merged 2026-07-18): account balances are now anchor-derived from statement ending balances and manual entries rather than purely hand-typed, with reconciliation, roll-forward, and a 35-day staleness nudge → **Phase 4 kicked off**: the **AI interpreter core slice complete and merged to main** (DECISIONS #26; Tasks 1–10 plus a final whole-branch review fix round plus a live-provider QA fix round; PR #12, merged 2026-07-18): a provider-agnostic AI narration service now narrates the dashboard's Performance brief when a gateway key is configured, with a strict Zod data boundary, an `ai_narrations` cache/audit table, and full keyless-deterministic fallback so the app is identical with no key present → the **password auth slice complete** (DECISIONS #28; Tasks 1–14, three real bugs found and fixed via live testing against the actual Supabase project, one plan-document correction; PR #16, merged 2026-07-19, with same-day follow-up PR #17 and the Task 12 production auth hardening — see "Recently completed" below): magic-link-only sign-in is replaced with email-or-username + password, versioned Terms/Privacy consent recorded at sign-up and enforced post-login by a cookie-cached proxy gate, with `/login` rebuilt and `/signup`, `/auth/reset`, `/auth/reset/update`, `/consent`, `/terms`, `/privacy` all new → the **index-point-change display slice complete and merged to main** (DECISIONS #30; Tasks 1–4 plus a final whole-branch review, no fix rounds needed; PR #18, merged 2026-07-20): the dashboard's "Today" stat now shows the index-point delta primary with the percent in parens (`+1.3 (+1.2%) Today`), calculation moved out of the component into the engine (`indexDayChange`), resolving the KNOWN_LIMITATIONS `% Today` distortion item → **Phase 4 slice 2 in progress on `worktree-driver-explanations`**: per-driver AI explanations (DECISIONS #31; Tasks 1–10 of 10 done — migration, per-surface pipeline generalization, schemas/prompts/narrator/input assembly for the new `driver_explanations` surface, engine-level deterministic explanation text, an accordion UI wiring both, e2e/docs/live-keyless-verification, and a live-provider QA pass against a real AI Gateway key that found no blocking bugs), with only a final whole-branch review still to come before this branch merges.
+
+## Completed (this phase — Academy Slice 1: terminology + concepts)
+
+Phase 4.5 kickoff (DECISIONS #32): PFI adds financial fluency as a core product
+objective, inserted ahead of the remaining Phase 4 AI surfaces. Slice 1 of the
+Academy MVP ships the foundation — a framework-free typed concept registry, the
+terminology audit's approved renames, and the human governance layer. On
+`worktree-academy-concepts`, Tasks 1–6 of 7 (commits `26919d8`..`fe90a4a` plus this
+task's docs commit):
+
+- **Task 1 — concept types, registry, validators (`26919d8`).** New framework-free
+  `src/lib/concepts/` module (`types.ts`, `registry.ts`, `modules.ts`) — no
+  React/Next imports, same extraction discipline as `financial-engine` and
+  `demo-data`. `FinancialConcept`/`Lesson`/`Module` types per the design spec;
+  registry lookup/validation helpers (`byId`, `published`, `forModule`, …).
+- **Tasks 2–4 — the 15 concept records (`b786f6b`, `4307f14`, `288f065`, `cfce56d`,
+  `2043425`).** Module 1 (How Your Household Operates: revenue, operating
+  expenses, cash flow, free cash flow, savings rate), Module 2 (Reading Your
+  Household Balance Sheet: assets, liabilities, net worth, liquidity), Module 3
+  (Financial Pressure and Flexibility: debt pressure with a full lesson;
+  short-term obligations, financial flexibility, retained cash, capital
+  allocation as glossary-only records), plus `available-capital` as a fifth
+  glossary-only record outside any module. 10 lesson-bearing concepts, 5
+  glossary-only — full 15-concept MVP registry. Two fix commits caught and
+  corrected sample-data inconsistencies (liquidity's essential-vs-total expense
+  distinction, itemized liabilities example; debt-pressure's sample payment
+  aligned with liabilities' car-loan figure) before the set was considered
+  settled.
+- **Task 5 — canonical renames + drift guards (`fe90a4a`).** Applied the
+  terminology audit's approved renames across `ReportView.tsx`, `metrics.ts`,
+  `report.ts`, and `HomeDashboard.tsx` (metric ids unchanged — ids are stable);
+  swept `src/lib/ai/prompts.ts` for stale labels (already canonical). Added
+  `engine-binding.test.ts` (every `dataMetricKey`/`personalApplication.metricKey`
+  resolves to a real metric-registry id or report field) and
+  `label-consistency.test.ts` (every glossary title matches the label the product
+  actually renders for the same value, mechanically guarding against re-drift).
+  No metric formula changed — a naming audit only, every computed value stayed
+  bit-identical.
+- **Task 6 (this task) — governance docs.** `docs/TERMINOLOGY.md` created (the
+  human governance layer: the rule, what every term must have, the full audit
+  findings table, key canonical definitions, and the 15-row concept inventory).
+  `docs/ROADMAP.md` updated: Phase 4's remaining-surfaces line annotated as
+  deferred until after Phase 4.5; **Phase 4.5 — Financial Fluency: PFI Academy
+  (MVP)** inserted between Phase 4 and Phase 5, describing the four-slice Academy
+  MVP and its exit criteria. `docs/DECISIONS.md` #32 records the pivot. This file
+  updated accordingly. Slice 1's roadmap status marker stays ⏳ until Task 7's
+  final verification confirms `pnpm check` green.
 
 ## Completed (this phase — per-driver AI explanations, Tasks 1–10 of 10)
 
@@ -237,9 +284,14 @@ _Last updated: 2026-07-20 (per-driver AI explanations slice, Task 10 of 10 — l
 
 ## Next three priorities
 
-1. **Final whole-branch review for per-driver AI explanations, before merging `worktree-driver-explanations`.** All 10 tasks (including Task 10's live-provider QA) are done; the branch just needs the standard final review pass before it merges.
+1. **Academy Slice 2 — the `FinancialTerm` interaction system**, once Slice 1 merges: brainstorm → spec → plan (per this project's workflow) for the reusable tappable-term component and pre-completion definition sheets, wired into the report/dashboard surfaces Slice 1 just renamed to canonical terms.
 2. **Consider a transactional email provider** before real (non-demo) users onboard at any volume — Supabase's default SMTP has low rate limits and no deliverability guarantees, even though both the reset and sign-up-confirmation flows now work correctly on it. With "Confirm email" on, every new user is gated behind a delivered email, so deliverability is a sign-up blocker, not just a convenience concern.
 3. **Add regression coverage for the Vercel env gap Task 12 (password-auth slice) exposed.** `SUPABASE_SERVICE_ROLE_KEY` was missing in production for the entire life of that slice and no test, build step, or deploy check caught it. Worth a deploy-time assertion (or a smoke check against the deployed URL) that the server-only env vars an auth action needs are actually present in the target environment.
+
+Remaining Phase 4 AI surfaces (weekly brief, recommendation cards, quarterly
+shareholder report narration) are deferred to post-Academy — they'll be built on
+the Academy terminology architecture once the Academy MVP (Phase 4.5, Slices 1–4)
+ships.
 
 ## Known blockers
 
