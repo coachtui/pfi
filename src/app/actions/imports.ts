@@ -348,13 +348,33 @@ export async function uploadStatementPdf(formData: FormData): Promise<{ error: s
   const sha = fileSha256(bytes);
   const { data: duplicate, error: dupErr } = await supabase
     .from("import_batches")
-    .select("id")
+    .select("id, status, failure_reason, unsupported_reason")
+    .eq("user_id", user.id)
     .eq("source_type", "pdf")
     .eq("file_sha256", sha)
     .neq("status", "cancelled")
     .maybeSingle();
   if (dupErr) return { error: dupErr.message };
-  if (duplicate) return { error: "This statement PDF was already uploaded." };
+  if (duplicate) {
+    if (duplicate.status === "ready_for_review" || duplicate.status === "needs_review") {
+      const review = await readPdfReview(duplicate.id);
+      return review.data ? { error: "", review: review.data } : { error: review.error };
+    }
+    if (duplicate.status === "confirmed") {
+      return { error: "This statement PDF was already confirmed and added to your financial record." };
+    }
+    if (duplicate.status === "failed") {
+      return {
+        error: `This statement PDF was already uploaded, but extraction failed: ${duplicate.failure_reason ?? "No financial data was extracted."}`,
+      };
+    }
+    if (duplicate.status === "unsupported") {
+      return {
+        error: `This statement PDF was already uploaded, but it is not supported: ${duplicate.unsupported_reason ?? "Unsupported statement type."}`,
+      };
+    }
+    return { error: "This statement PDF was already uploaded and is still processing. Refresh the import screen in a moment." };
+  }
 
   const importId = randomUUID();
   const storagePath = `${user.id}/${importId}.pdf`;
