@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { BottomNav } from "@/components/nav/BottomNav";
+import { TermSheetProvider } from "@/components/concepts/TermSheetProvider";
 import { branding } from "@/lib/config/branding";
 import "./globals.css";
 
@@ -42,8 +43,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <main className="mx-auto w-full max-w-2xl flex-1 px-4 pt-3 pb-28">{children}</main>
-        <BottomNav />
+        <TermSheetProvider>
+          <main className="mx-auto w-full max-w-2xl flex-1 px-4 pt-3 pb-28">{children}</main>
+          <BottomNav />
+        </TermSheetProvider>
       </body>
     </html>
   );
