@@ -19,7 +19,12 @@ export function FinancialTerm({ conceptId, children }: { conceptId: ConceptId; c
   return (
     <button
       type="button"
-      onClick={() => openTerm(conceptId)}
+      onClick={(event) => {
+        // stopPropagation/preventDefault so activating the term never triggers an ambient ancestor click, e.g. when nested inside a Link-wrapped card
+        event.stopPropagation();
+        event.preventDefault();
+        openTerm(conceptId);
+      }}
       aria-label={`${concept.title} — show definition`}
       className="rounded-sm underline decoration-dotted decoration-tertiary underline-offset-2 hover:decoration-secondary focus:outline-none focus-visible:decoration-primary focus-visible:decoration-solid"
     >
