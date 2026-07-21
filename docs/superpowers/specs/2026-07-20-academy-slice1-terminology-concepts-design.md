@@ -24,7 +24,7 @@ The Academy MVP is four shippable slices, each with its own spec → plan → im
 
 | Slice | Scope | Depends on |
 |---|---|---|
-| **1 (this spec)** | Terminology audit + canonical glossary + concept schema + author 14 concept records (10 full lessons) + apply approved renames | — |
+| **1 (this spec)** | Terminology audit + canonical glossary + concept schema + author 15 concept records (10 full lessons, 5 glossary-only) + apply approved renames | — |
 | 2 | Reusable `FinancialTerm` interaction system + basic (pre-completion) term detail sheets, wired into report/dashboard | 1 |
 | 3 | Academy home + lesson experience + knowledge-check UI + DB-backed progress tracking (Supabase + RLS) + unlocked term sheets | 1, 2 |
 | 4 | Personalized calculation blocks bound to live household data + contextual reinforcement + analytics events → friends-and-family testing | 1–3 |
@@ -34,7 +34,7 @@ Mobile-first throughout (design and verify at ~390px before desktop), per projec
 ## Slice 1 goals
 
 1. Every user-visible financial label in the product resolves to exactly one canonical term with one canonical formula.
-2. A framework-free, typed, tested concept/content system exists (`src/lib/concepts/`) holding the glossary and the first ~14 concepts, built to expand to a much larger curriculum.
+2. A framework-free, typed, tested concept/content system exists (`src/lib/concepts/`) holding the glossary and the first 15 concepts, built to expand to a much larger curriculum.
 3. The live product is renamed to match the glossary — Slice 2 wires interactivity into an already-consistent surface.
 4. A governance standard (`docs/TERMINOLOGY.md`) prevents future drift.
 
@@ -55,7 +55,7 @@ Key finding: the report's "Monthly surplus" row and its prose "free cash flow" a
 | 3 | "Typical monthly surplus" (median income − spending) | `metrics.ts` (`recurring_surplus`) | Rename to **"Typical monthly free cash flow"** (id unchanged) |
 | 4 | Narration uses "surplus"/"shortfall" as the noun for FCF | `src/lib/financial-engine/report.ts` (`flowNoun`) | Rephrase so **"free cash flow"** is the noun; surplus/shortfall may survive only as a plain adjective, never as a metric name |
 | 5 | "Growth you created" row vs "owner-created equity" prose | `ReportView.tsx:128` vs `report.ts` narration | Standardize row label to **"Owner-created equity"** |
-| 6 | "Available Capital" dashboard card (value = liquid assets) | `src/components/dashboard/HomeDashboard.tsx:188` | Rename to **"Liquid assets"** — the exact balance-sheet term Module 2 teaches |
+| 6 | "Available Capital" dashboard card | `src/components/dashboard/HomeDashboard.tsx:188` | **Keep the label** (casing normalized to "Available capital"). Audit correction (2026-07-20): the card renders `availablePosition` = liquid assets − revolving balances − near-term obligations (`position.ts`), **not** liquid assets — renaming it "Liquid assets" would be mathematically wrong. Instead, "Available capital" becomes its own glossary-only concept record with that formula, related to liquidity and short-term obligations. It is PFI's signature derived quantity (the index is built from it) and deserves its own name. |
 | 7 | AI prompt/system text referencing any old label | `src/lib/ai/prompts.ts` (checked: currently only "owner-created equity", already canonical) | Sweep and align with glossary during implementation |
 
 ### Canonical definitions (approved)
@@ -150,7 +150,7 @@ src/lib/concepts/
   types.ts        — the types above
   registry.ts     — lookup + validation helpers (byId, published, forModule, …)
   modules.ts      — the 3 MVP modules
-  content/        — one file per concept (14 files)
+  content/        — one file per concept (15 files)
     revenue.ts
     operating-expenses.ts
     cash-flow.ts
@@ -165,6 +165,7 @@ src/lib/concepts/
     financial-flexibility.ts    (glossary-only)
     retained-cash.ts            (glossary-only)
     capital-allocation.ts       (glossary-only)
+    available-capital.ts        (glossary-only — PFI's derived available-position quantity; audit correction, see findings #6)
 ```
 
 Expansion path (the curriculum will grow well beyond the MVP): add a content file + one module-array entry. Nothing is hardcoded to "3 modules of 5"; modules are data.
@@ -211,7 +212,7 @@ Surfaces touched: `metrics.ts` (two `name` fields), `ReportView.tsx` (two row la
 - `pnpm check` green (lint + typecheck + test + build); all existing computed values bit-identical (only name assertions change).
 - Visual verification at ~390px then desktop of the three renamed surfaces: report, score screen, dashboard.
 - `docs/ROADMAP.md` updated: new phase **"Phase 4.5 — Financial Fluency: PFI Academy (MVP)"** inserted; remaining Phase 4 surfaces (weekly brief, recommendation cards, quarterly report narration) explicitly resume after the Academy MVP, built on the same terminology architecture. `docs/CURRENT_PHASE.md` updated. Pivot recorded in `docs/DECISIONS.md`.
-- All 14 concept records authored and `published`, passing the validation suite.
+- All 15 concept records authored and `published` (10 with lessons, 5 glossary-only), passing the validation suite.
 
 ## Out of scope for Slice 1 (deferred to Slices 2–4)
 
