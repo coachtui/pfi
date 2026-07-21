@@ -5,8 +5,6 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { createCanvas, DOMMatrix, ImageData, Path2D } from "@napi-rs/canvas";
-import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import { createWorker, PSM } from "tesseract.js";
 import {
   PDF_IMPORT_OCR_DPI,
@@ -19,13 +17,9 @@ import {
   type StatementOcrProvider,
 } from "./types";
 import { normalizeOcrDocument } from "./ocr-utils";
+import { renderPdfPagesWithPdfjs } from "./render-pdf";
 
 const execFileAsync = promisify(execFile);
-
-pdfjs.GlobalWorkerOptions.workerSrc = "";
-if (!globalThis.DOMMatrix) globalThis.DOMMatrix = DOMMatrix as typeof globalThis.DOMMatrix;
-if (!globalThis.ImageData) globalThis.ImageData = ImageData as typeof globalThis.ImageData;
-if (!globalThis.Path2D) globalThis.Path2D = Path2D as typeof globalThis.Path2D;
 
 export class OcrImportError extends Error {
   constructor(
@@ -57,34 +51,13 @@ async function assertCommand(command: string, label: string) {
 async function renderWithPdfjs(bytes: Uint8Array): Promise<Buffer[]> {
   const dpi = configuredNumber("PDF_IMPORT_OCR_DPI", PDF_IMPORT_OCR_DPI);
   const maxDimension = configuredNumber("PDF_IMPORT_OCR_MAX_DIMENSION", PDF_IMPORT_OCR_MAX_DIMENSION);
-  const loadingTask = pdfjs.getDocument({
-    data: new Uint8Array(bytes),
-    useSystemFonts: true,
-  });
-  let document: pdfjs.PDFDocumentProxy | null = null;
   try {
-    document = await loadingTask.promise;
-    const images: Buffer[] = [];
-    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-      const page = await document.getPage(pageNumber);
-      const base = page.getViewport({ scale: dpi / 72 });
-      const scale = Math.min(1, maxDimension / Math.max(base.width, base.height));
-      const viewport = page.getViewport({ scale: (dpi / 72) * scale });
-      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
-      const context = canvas.getContext("2d");
-      await page.render({
-        canvasContext: context as unknown as CanvasRenderingContext2D,
-        viewport,
-        canvas: canvas as unknown as HTMLCanvasElement,
-      }).promise;
-      images.push(canvas.toBuffer("image/png"));
-      page.cleanup();
-    }
-    return images;
-  } catch {
+    return await renderPdfPagesWithPdfjs(bytes, { dpi, maxDimension });
+  } catch (error) {
+    console.error("[pdf-import] PDF.js rendering failed", {
+      error: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 300) : "Unknown rendering error",
+    });
     throw new OcrImportError("pdf_render_failed", "The scanned PDF could not be rendered for OCR.");
-  } finally {
-    await document?.cleanup();
   }
 }
 
