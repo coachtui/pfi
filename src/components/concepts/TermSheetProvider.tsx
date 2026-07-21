@@ -21,7 +21,13 @@ export function useTermSheet(): TermSheetApi {
   return ctx;
 }
 
-export function TermSheetProvider({ children }: { children: ReactNode }) {
+export function TermSheetProvider({
+  children,
+  completedConceptIds = [],
+}: {
+  children: ReactNode;
+  completedConceptIds?: string[];
+}) {
   const [stack, setStack] = useState<ConceptId[]>([]);
 
   const openTerm = useCallback((id: ConceptId) => setStack([id]), []);
@@ -34,8 +40,12 @@ export function TermSheetProvider({ children }: { children: ReactNode }) {
     [openTerm, pushTerm, backTerm, closeTerm],
   );
 
+  const completedSet = useMemo(() => new Set(completedConceptIds), [completedConceptIds]);
+
   const currentId = stack.at(-1) ?? null;
-  const model = currentId ? buildTermSheetModel(CONCEPT_REGISTRY, currentId) : null;
+  const model = currentId
+    ? buildTermSheetModel(CONCEPT_REGISTRY, currentId, { completed: completedSet.has(currentId) })
+    : null;
 
   return (
     <TermSheetContext.Provider value={api}>
