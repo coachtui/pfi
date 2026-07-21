@@ -48,4 +48,29 @@ describe("authored content", () => {
       expect(ALL_CONCEPTS.find((c) => c.id === id)?.lesson, id).toBeDefined();
     }
   });
+
+  it("has Module 3 anchored by the debt-pressure lesson", () => {
+    const m3 = MODULES.find((m) => m.id === "financial-pressure-and-flexibility");
+    expect(m3?.conceptIds).toEqual([
+      "debt-pressure",
+      "short-term-obligations",
+      "financial-flexibility",
+      "retained-cash",
+      "capital-allocation",
+    ]);
+  });
+
+  it("has exactly 15 concepts, 10 with lessons", () => {
+    expect(ALL_CONCEPTS).toHaveLength(15);
+    expect(ALL_CONCEPTS.filter((c) => c.lesson)).toHaveLength(10);
+  });
+
+  it("keeps glossary-only records lesson-free but tappable", () => {
+    for (const id of ["short-term-obligations", "financial-flexibility", "retained-cash", "capital-allocation", "available-capital"]) {
+      const c = ALL_CONCEPTS.find((x) => x.id === id);
+      expect(c?.lesson, id).toBeUndefined();
+      expect(c?.shortDefinition, id).toBeTruthy();
+      expect(c?.fullDefinition, id).toBeTruthy();
+    }
+  });
 });

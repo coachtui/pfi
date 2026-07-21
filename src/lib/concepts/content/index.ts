@@ -9,6 +9,12 @@ import { assets } from "./assets";
 import { liabilities } from "./liabilities";
 import { netWorth } from "./net-worth";
 import { liquidity } from "./liquidity";
+import { debtPressure } from "./debt-pressure";
+import { shortTermObligations } from "./short-term-obligations";
+import { financialFlexibility } from "./financial-flexibility";
+import { retainedCash } from "./retained-cash";
+import { capitalAllocation } from "./capital-allocation";
+import { availableCapital } from "./available-capital";
 
 export const ALL_CONCEPTS: FinancialConcept[] = [
   revenue,
@@ -20,4 +26,10 @@ export const ALL_CONCEPTS: FinancialConcept[] = [
   liabilities,
   netWorth,
   liquidity,
+  debtPressure,
+  shortTermObligations,
+  financialFlexibility,
+  retainedCash,
+  capitalAllocation,
+  availableCapital,
 ];

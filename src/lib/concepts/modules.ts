@@ -14,4 +14,16 @@ export const MODULES: Module[] = [
     order: 2,
     conceptIds: ["assets", "liabilities", "net-worth", "liquidity"],
   },
+  {
+    id: "financial-pressure-and-flexibility",
+    title: "Financial Pressure and Flexibility",
+    order: 3,
+    conceptIds: [
+      "debt-pressure",
+      "short-term-obligations",
+      "financial-flexibility",
+      "retained-cash",
+      "capital-allocation",
+    ],
+  },
 ];

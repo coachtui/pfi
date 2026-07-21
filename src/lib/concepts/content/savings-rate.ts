@@ -16,7 +16,7 @@ export const savingsRate: FinancialConcept = {
     "Savings rate is analogous to a company's decision about how much of its free cash flow to hold as cash versus deploy elsewhere — toward buybacks, debt reduction, or reinvestment. A company retaining cash isn't automatically doing better than one deploying it; the same is true for a household.",
   commonMisunderstanding:
     "A low savings rate is not automatically a problem. A household can have a strong free cash flow margin — earning comfortably more than it spends — while deliberately directing most of that free cash flow into investments or extra debt payments instead of a cash account. That household would show a low savings rate despite being in a strong position.",
-  relatedConceptIds: ["free-cash-flow"],
+  relatedConceptIds: ["free-cash-flow", "retained-cash", "capital-allocation"],
   prerequisiteConceptIds: ["free-cash-flow"],
   dataMetricKey: "report:savingsRatePct",
   status: "published",

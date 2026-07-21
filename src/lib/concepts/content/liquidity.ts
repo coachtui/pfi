@@ -13,7 +13,7 @@ export const liquidity: FinancialConcept = {
     "Companies fail from running out of liquid cash far more often than from having too few assets on paper. Analysts specifically track a company's current ratio and quick ratio — measures of liquid assets against near-term obligations — separately from its total asset value, because the two tell very different stories.",
   commonMisunderstanding:
     "Wealthy is not the same as liquid. A household rich in home equity can still miss a rent payment if none of that value is available as cash. A household's total balance can even rise while its liquidity weakens, if more and more of that balance is committed to near-term obligations rather than sitting available.",
-  relatedConceptIds: ["assets"],
+  relatedConceptIds: ["assets", "short-term-obligations", "available-capital"],
   prerequisiteConceptIds: ["assets"],
   dataMetricKey: "metric:liquid_runway_months",
   status: "published",

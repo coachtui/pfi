@@ -13,7 +13,7 @@ export const liabilities: FinancialConcept = {
     "Liabilities are the right side of a company's balance sheet. Analysts compare a company's liabilities against its assets and against how much cash it generates, because a company (or household) can hold valuable assets and still be under financial strain if its liabilities are large relative to them.",
   commonMisunderstanding:
     "A monthly payment is not the liability — it's what services the liability. If a household makes a $280 monthly payment on a loan, the liability isn't $280; it's the full remaining balance owed, which might be $12,000 or more. The payment reduces the liability over time, but the liability is the whole balance, not the installment.",
-  relatedConceptIds: ["assets", "net-worth"],
+  relatedConceptIds: ["assets", "net-worth", "debt-pressure"],
   prerequisiteConceptIds: ["assets"],
   status: "published",
   lesson: {

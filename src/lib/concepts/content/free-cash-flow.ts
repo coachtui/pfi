@@ -16,7 +16,7 @@ export const freeCashFlow: FinancialConcept = {
     "Public companies report free cash flow to show how much cash the business generates beyond what it must spend to operate. It funds dividends, buybacks, debt paydown, and growth — a company's version of your allocation choices.",
   commonMisunderstanding:
     "Free cash flow is not the balance in your checking account. A balance is what you hold right now; free cash flow is what a period of operating produced. You can hold a large balance while your free cash flow is negative — spending down what you saved earlier.",
-  relatedConceptIds: ["cash-flow", "savings-rate"],
+  relatedConceptIds: ["cash-flow", "savings-rate", "retained-cash", "capital-allocation"],
   prerequisiteConceptIds: ["revenue", "operating-expenses"],
   dataMetricKey: "report:freeCashFlow",
   status: "published",
