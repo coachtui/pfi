@@ -40,12 +40,8 @@ export function MetricCard({
   href,
   conceptId,
 }: MetricCardProps) {
-  const card = (
-    <Card
-      className={`flex min-h-24 flex-col justify-between p-2.5 sm:min-h-28 sm:p-4 ${
-        href ? "transition-colors hover:border-border-strong" : ""
-      }`}
-    >
+  const inner = (
+    <>
       <p className="text-[11px] leading-tight font-medium text-secondary sm:text-xs">
         {conceptId ? <FinancialTerm conceptId={conceptId}>{label}</FinancialTerm> : label}
       </p>
@@ -57,6 +53,33 @@ export function MetricCard({
         </>
       )}
       {footer}
+    </>
+  );
+
+  const cardClass = "flex min-h-24 flex-col justify-between p-2.5 sm:min-h-28 sm:p-4";
+
+  // A card carrying a tappable term must not live inside a link (<a> may not
+  // contain interactive content): the drill-down becomes an explicit sibling
+  // link instead of a whole-card wrap. KNOWN_LIMITATIONS 2026-07-20, resolved
+  // by Academy Slice 3.
+  if (href && conceptId) {
+    return (
+      <Card className={cardClass}>
+        {inner}
+        <Link
+          href={href}
+          aria-label={`${label}: ${value}. View details`}
+          className="mt-1 self-start text-[11px] text-secondary underline-offset-2 hover:text-primary hover:underline sm:text-xs"
+        >
+          View details
+        </Link>
+      </Card>
+    );
+  }
+
+  const card = (
+    <Card className={`${cardClass} ${href ? "transition-colors hover:border-border-strong" : ""}`}>
+      {inner}
     </Card>
   );
   if (!href) return card;

@@ -32,3 +32,28 @@ describe("buildTermSheetModel", () => {
     expect(m!.formula).toBeUndefined();
   });
 });
+
+describe("completed variant (Slice 3)", () => {
+  it("defaults to pre-completion: no depth fields, completed false", () => {
+    const m = buildTermSheetModel(CONCEPT_REGISTRY, "revenue");
+    expect(m?.hasLesson).toBe(true);
+    expect(m?.completed).toBe(false);
+    expect(m?.whyItMatters).toBeUndefined();
+    expect(m?.businessContext).toBeUndefined();
+  });
+
+  it("completed unlocks whyItMatters and businessContext", () => {
+    const m = buildTermSheetModel(CONCEPT_REGISTRY, "revenue", { completed: true });
+    const c = CONCEPT_REGISTRY.byId("revenue")!;
+    expect(m?.completed).toBe(true);
+    expect(m?.whyItMatters).toBe(c.whyItMatters);
+    expect(m?.businessContext).toBe(c.businessContext);
+  });
+
+  it("glossary-only concepts never report a lesson or completion", () => {
+    const m = buildTermSheetModel(CONCEPT_REGISTRY, "short-term-obligations", { completed: true });
+    expect(m?.hasLesson).toBe(false);
+    expect(m?.completed).toBe(false);
+    expect(m?.whyItMatters).toBeUndefined();
+  });
+});

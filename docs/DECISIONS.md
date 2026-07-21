@@ -280,3 +280,11 @@ One finding worth recording, because it contradicts an assumption embedded in th
 **Reasoning:** keeping the two maps separate keeps each one honest about what it answers, and keeps `FinancialConcept` records free of UI-wiring concerns (a concept doesn't need to know which score metrics happen to display its name). `score-term-map.test.ts` validates every mapped id resolves to a real, published concept.
 
 **Consequences:** adding a new score metric that should be tappable requires a `SCORE_METRIC_CONCEPT_IDS` entry in addition to (not instead of) any `dataMetricKey` binding the underlying concept already has; the two maps can point at the same concept for different reasons and that's expected, not a duplication bug.
+
+## 34. 2026-07-21 — Academy Slice 3: derived progress, ungated completion, no streak/locks
+
+**Decision:** Academy progress lives in one `academy_progress` table (owner-only RLS); status is always derived (no row / `completed_at` null / set), never stored. Completion = reaching the end of a lesson having answered all its knowledge checks — correctness never gates (checks teach; explanations show either way). Answer correctness is never persisted — derivable from the compile-time registry. The mockups' streak counter is omitted entirely and "Locked" states are replaced by Not started / In progress / Completed with prerequisites as non-blocking "Builds on" hints. Academy is the 5th bottom-nav tab. The lesson page ships a Lesson · Related tab shell; Slice 4 adds "Your Data" (`personalApplication`).
+
+**Alternatives:** streak softened to "last activity" (still pressure-adjacent, omitted); correctness-gated completion (pass/fail feel violates the no-shame rule); stepper/pager lesson (section state the MVP doesn't need); sheet-based lessons (no deep links, poor long-form mobile UX); storing derived status (drift risk with the registry).
+
+**Consequences:** the term sheet's completed variant is driven by a layout-level completed-ids fetch (root layout is now async/dynamic — the app was already cookie-gated everywhere); `answerKnowledgeCheck` revalidates the layout on completion. `MetricCard` drill-down became an explicit sibling "View details" link when a term is present, closing the KNOWN_LIMITATIONS nested-interactive entry.

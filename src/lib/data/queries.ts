@@ -23,6 +23,7 @@ import {
 import type { TransactionFilters } from "@/lib/validation/transactions";
 import { percentToDecimal } from "./unit-conversions";
 import { paginateSelect } from "./paginate";
+import type { CheckResponse, ProgressRow } from "@/lib/concepts/progress";
 
 // PostgREST caps unbounded selects at 1000 rows (see DECISIONS #18–#21).
 // Every select in this file on a table that grows without bound per user
@@ -520,4 +521,41 @@ export async function getRecurringData(supabase: SupabaseClient): Promise<Recurr
     .sort((a, b) =>
       a.nextExpectedDate < b.nextExpectedDate ? -1 : a.nextExpectedDate > b.nextExpectedDate ? 1
         : a.seriesKey < b.seriesKey ? -1 : 1);
+}
+
+// ---------- Academy (Slice 3) ----------
+
+export interface AcademyProgressResult {
+  rows: ProgressRow[];
+  /** Non-null when the query failed: render Not-started + a notice, never fake completion. */
+  error: string | null;
+}
+
+/** All of the user's academy_progress rows. Row count is bounded by the
+ *  15-concept registry, so no pagination is needed (DECISIONS #21 audit). */
+export async function getAcademyProgress(supabase: SupabaseClient): Promise<AcademyProgressResult> {
+  const { data, error } = await supabase
+    .from("academy_progress")
+    .select("concept_id, started_at, completed_at, check_responses");
+  if (error) return { rows: [], error: error.message };
+  return {
+    rows: (data ?? []).map((r) => ({
+      conceptId: r.concept_id as string,
+      startedAt: r.started_at as string,
+      completedAt: (r.completed_at as string | null) ?? null,
+      checkResponses: (r.check_responses as CheckResponse[] | null) ?? [],
+    })),
+    error: null,
+  };
+}
+
+/** Completed concept ids for the term-sheet variant. [] when signed out or on error
+ *  (the sheet then shows the pre-completion variant — the safe degradation). */
+export async function getCompletedConceptIds(supabase: SupabaseClient): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("academy_progress")
+    .select("concept_id")
+    .not("completed_at", "is", null);
+  if (error) return [];
+  return (data ?? []).map((r) => r.concept_id as string);
 }

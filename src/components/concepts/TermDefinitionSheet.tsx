@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
 import { Sheet } from "@/components/ui/Sheet";
 import type { ConceptId } from "@/lib/concepts";
 import type { TermSheetModel } from "@/lib/concepts/term-sheet";
@@ -39,6 +40,12 @@ export function TermDefinitionSheet({
           )}
 
           <p className="text-base leading-relaxed text-primary">{model.shortDefinition}</p>
+          {model.completed && (
+            <p className="flex items-center gap-1.5 text-xs text-secondary">
+              <CheckCircle2 size={14} aria-hidden className="text-positive" />
+              Lesson completed
+            </p>
+          )}
           <p className="text-sm leading-relaxed text-secondary">{model.fullDefinition}</p>
 
           {(model.formula || model.householdAdaptation) && (
@@ -54,6 +61,19 @@ export function TermDefinitionSheet({
                   Household: {model.householdAdaptation}
                 </p>
               )}
+            </div>
+          )}
+
+          {model.whyItMatters && (
+            <div>
+              <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">Why it matters</p>
+              <p className="text-sm leading-relaxed text-secondary">{model.whyItMatters}</p>
+            </div>
+          )}
+          {model.businessContext && (
+            <div>
+              <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">In business terms</p>
+              <p className="text-sm leading-relaxed text-secondary">{model.businessContext}</p>
             </div>
           )}
 
@@ -73,6 +93,16 @@ export function TermDefinitionSheet({
                 ))}
               </div>
             </div>
+          )}
+
+          {model.hasLesson && (
+            <Link
+              href={`/academy/${model.id}`}
+              onClick={onClose}
+              className="mt-1 self-start rounded-lg border border-border-subtle px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:border-border-strong"
+            >
+              {model.completed ? "Review lesson" : "Take the lesson"}
+            </Link>
           )}
         </div>
       )}
