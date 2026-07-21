@@ -4,21 +4,29 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Check, CheckCircle2 } from "lucide-react";
 import { answerKnowledgeCheck } from "@/app/actions/academy";
+import { useTermSheet } from "@/components/concepts/TermSheetProvider";
 import type { KnowledgeCheck } from "@/lib/concepts";
 import type { CheckResponse } from "@/lib/concepts/progress";
 
+const ACTION_CLASS =
+  "rounded-lg border border-border-subtle px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:border-border-strong";
+
 export function KnowledgeChecks({
-  conceptId, checks, initialResponses, initialCompleted,
+  conceptId, conceptTitle, checks, initialResponses, initialCompleted, completionSummary, nextConcept,
 }: {
   conceptId: string;
+  conceptTitle: string;
   checks: KnowledgeCheck[];
   initialResponses: CheckResponse[];
   initialCompleted: boolean;
+  completionSummary?: string;
+  nextConcept: { id: string; title: string } | null;
 }) {
   const [responses, setResponses] = useState<CheckResponse[]>(initialResponses);
   const [completed, setCompleted] = useState(initialCompleted);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+  const { openTerm } = useTermSheet();
 
   const answerFor = (checkId: string) => responses.find((r) => r.checkId === checkId);
 
@@ -95,14 +103,22 @@ export function KnowledgeChecks({
             Lesson complete
           </p>
           <p className="text-xs text-secondary">
-            This term&apos;s definition sheet now includes its full analytical depth.
+            {completionSummary ??
+              `You can now recognize ${conceptTitle.toLowerCase()} throughout PFI and how it applies to your household.`}
           </p>
-          <Link
-            href="/academy"
-            className="self-start rounded-lg border border-border-subtle px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:border-border-strong"
-          >
-            Back to Academy
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => openTerm(conceptId)} className={ACTION_CLASS}>
+              Review concept
+            </button>
+            <Link href="/academy" className={ACTION_CLASS}>
+              Back to Academy
+            </Link>
+            {nextConcept && (
+              <Link href={`/academy/${nextConcept.id}`} className={ACTION_CLASS}>
+                Next: {nextConcept.title}
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </section>

@@ -7,6 +7,7 @@ import { startLesson } from "@/app/actions/academy";
 import { useTermSheet } from "@/components/concepts/TermSheetProvider";
 import { CONCEPT_REGISTRY } from "@/lib/concepts";
 import { adjacentLessons, lessonConcept, type CheckResponse } from "@/lib/concepts/progress";
+import type { ConceptLiveData } from "@/lib/data/concept-live";
 import { KnowledgeChecks } from "./KnowledgeChecks";
 import { LessonSections } from "./LessonSections";
 
@@ -17,11 +18,12 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export function LessonView({
-  conceptId, initialResponses, initialCompleted,
+  conceptId, initialResponses, initialCompleted, live,
 }: {
   conceptId: string;
   initialResponses: CheckResponse[];
   initialCompleted: boolean;
+  live: ConceptLiveData | null;
 }) {
   // The page validated the id; non-null here.
   const concept = lessonConcept(CONCEPT_REGISTRY, conceptId)!;
@@ -78,12 +80,15 @@ export function LessonView({
 
       <div id="panel-lesson" role="tabpanel" aria-labelledby="tab-lesson" hidden={tab !== "lesson"}
         className="flex flex-col gap-6">
-        <LessonSections concept={concept} />
+        <LessonSections concept={concept} live={live} />
         <KnowledgeChecks
           conceptId={conceptId}
+          conceptTitle={concept.title}
           checks={concept.lesson!.knowledgeChecks}
           initialResponses={initialResponses}
           initialCompleted={initialCompleted}
+          completionSummary={concept.lesson!.completionSummary}
+          nextConcept={nextConcept ? { id: nextConcept.id, title: nextConcept.title } : null}
         />
       </div>
 

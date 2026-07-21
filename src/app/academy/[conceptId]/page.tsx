@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CONCEPT_REGISTRY } from "@/lib/concepts";
 import { lessonConcept } from "@/lib/concepts/progress";
+import { getConceptLiveData } from "@/lib/data/concept-live";
 import { getAcademyProgress, getProfile } from "@/lib/data/queries";
 import { LessonView } from "@/components/academy/LessonView";
 
@@ -21,11 +22,16 @@ export default async function LessonPage({
   const { rows } = await getAcademyProgress(supabase);
   const row = rows.find((r) => r.conceptId === conceptId);
 
+  const concept = lessonConcept(CONCEPT_REGISTRY, conceptId)!;
+  const pa = concept.lesson!.personalApplication;
+  const live = pa ? await getConceptLiveData(supabase, pa.metricKey) : null;
+
   return (
     <LessonView
       conceptId={conceptId}
       initialResponses={row?.checkResponses ?? []}
       initialCompleted={!!row?.completedAt}
+      live={live}
     />
   );
 }
