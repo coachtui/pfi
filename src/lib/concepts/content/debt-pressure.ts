@@ -33,7 +33,7 @@ export const debtPressure: FinancialConcept = {
         "Add up the required monthly payments on loans and credit cards — minimums, not total balances, and not housing, which PFI measures separately so it's counted once. Divide that sum by monthly revenue. The result, as a percentage, is debt pressure.",
     },
     genericExample:
-      "Sample figures: the Rivera household's non-housing required debt payments — the car loan, student loan, and credit-card minimum — come to $310 a month, against $6,200 of revenue. Their debt pressure is $310 ÷ $6,200 ≈ 5% in this sample scenario.",
+      "Sample figures: the Rivera household's non-housing required debt payments — the car loan ($280), student loan ($45), and credit-card minimum ($35) — come to $360 a month, against $6,200 of revenue. Their debt pressure is $360 ÷ $6,200 ≈ 5.8% in this sample scenario.",
     personalApplication: {
       metricKey: "metric:debt_service_ratio",
       interpretationRules:
