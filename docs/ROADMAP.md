@@ -51,33 +51,59 @@ the Household Operating System (existing product — "where do I stand?"), PFI A
 ("what do these terms mean?"), and Contextual Reinforcement ("how does this apply
 to my household?"). Mobile-first throughout.
 
-Four slices, each its own spec → plan → implementation cycle:
+Four architecture slices (each its own spec → plan → implementation cycle), plus a
+follow-on content-refinement initiative once the architecture existed to refine:
 
 1. ✅ **Terminology governance + concept schema** — landed 2026-07-20: audit +
    canonical glossary (docs/TERMINOLOGY.md), framework-free `src/lib/concepts/`
    (15 typed concept records: 10 full lessons across 3 modules + 5 glossary-only),
    approved renames applied (spec: docs/superpowers/specs/2026-07-20-academy-slice1-terminology-concepts-design.md).
-2. ✅/⏳ **`FinancialTerm` interaction system** — a framework-free
-   term-sheet view-model builder (`src/lib/concepts/term-sheet.ts`) and score-metric
-   label→concept map (`src/lib/concepts/score-term-map.ts`), a React interaction
-   layer (`TermSheetProvider` stack API, `FinancialTerm` tappable dashed-underline
-   button, `TermDefinitionSheet` bottom-sheet/dialog with related-concept
-   navigation and back/close), wired into report statement rows, dashboard
-   metric-card labels, and score dimension-metric names (spec:
+2. ✅ **`FinancialTerm` interaction system** — landed 2026-07-20 (PR #21): a
+   framework-free term-sheet view-model builder (`src/lib/concepts/term-sheet.ts`)
+   and score-metric label→concept map (`src/lib/concepts/score-term-map.ts`), a
+   React interaction layer (`TermSheetProvider` stack API, `FinancialTerm`
+   tappable dashed-underline button, `TermDefinitionSheet` bottom-sheet/dialog
+   with related-concept navigation and back/close), wired into report statement
+   rows, dashboard metric-card labels, and score dimension-metric names (spec:
    docs/superpowers/specs/2026-07-20-academy-slice2-financial-term-design.md).
-3. **Academy home + lesson experience** — lesson template UI, knowledge checks,
-   DB-backed progress (Supabase + RLS), unlocked analytical term sheets.
-4. **Personalization + reinforcement + analytics** — lessons bound to live
-   household data, contextual reinforcement, analytics events → friends-and-family
-   testing gate.
+3. ✅ **Academy home + lesson experience** — landed 2026-07-21 (PR #22): `/academy`
+   home and `/academy/[conceptId]` lesson routes, `academy_progress` table with
+   owner-only RLS (status always derived, never stored), the Lesson/Related tab
+   shell, lightweight knowledge checks, and the completed/pre-completion term-sheet
+   CTA (spec: docs/superpowers/specs/2026-07-21-academy-slice3-home-lesson-progress-design.md).
+4. **Personalization + reinforcement + analytics** — contextual reinforcement and
+   analytics events, building on the content-refinement initiative below;
+   friends-and-family testing gate. Not yet started; live household-data
+   *rendering* for the Revenue reference concept landed early via
+   content-refinement Slice A (below), narrowing this slice's remaining scope to
+   the other 9 lessons' data wiring, reinforcement surfaces, and analytics.
+
+**Content-refinement initiative** (kicked off 2026-07-21, after Slice 3 shipped the
+architecture): lessons read like generic documentation and definition sheets risked
+density/internal-language leaks. Three sub-slices, each spec'd separately:
+
+- **Slice A** ✅ — landed 2026-07-21 (PR #23, stacked on PR #22): schema extension
+  (`classification`, `memorableDistinction`, structured `formulaRows`/
+  `comparisonRows`, `interpretation`, `whereUsed`), a pre-launch migration to
+  stable knowledge-check ids, **reversal of Slice 3's completion-gating** — the
+  definition sheet's `whyItMatters`/`businessContext` now show at every progress
+  state, never gated behind lesson completion (comprehension is never locked;
+  completion only adds a live personal-data block) — and two fully-authored
+  reference implementations, the Revenue lesson and the Available Capital
+  definition sheet (spec: docs/superpowers/specs/2026-07-21-academy-content-refinement-reference-design.md).
+- **Slice B** — not started: propagate the Slice A lesson pattern to the
+  remaining 9 lessons.
+- **Slice C** — not started: propagate the Slice A definition-sheet pattern to
+  the remaining 13 concepts (14 including Available Capital, already done).
 
 Out of MVP scope: video, leaderboards, certifications, complex gamification,
 daily-streak pressure, AI-generated lessons without review, investment/tax/
 personalized-advice content.
 
-Exit: a level-0 user can complete the three starter modules, every taught term is
-tappable where it appears, progress persists, lessons use real household data when
-available (clearly labeled otherwise), and the friends-and-family loop —
+Exit: a level-0 user can complete the three starter modules, every taught term's
+meaning is reachable at every progress state (never gated behind lesson
+completion), progress persists, lessons use real household data when available
+(clearly labeled otherwise), and the friends-and-family loop —
 learn → apply → encounter → retain — is testable end to end.
 
 ## Phase 5 — Scenario simulator & goals
