@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const operatingExpenses: FinancialConcept = {
   id: "operating-expenses",
   title: "Operating expenses",
+  classification: "standard_finance" as const,
   shortDefinition: "The recurring cost of running your household — housing, food, utilities, transport, and similar spending.",
   fullDefinition:
     "Operating expenses are what it costs to run your household day to day: housing, food, utilities, transport, and comparable recurring spending. They are measured against revenue to see how much of what came in was consumed by the cost of operating. Money moved into savings or investments is not an operating expense — it's a choice about what to do with what's left.",

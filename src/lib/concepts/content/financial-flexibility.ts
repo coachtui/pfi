@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const financialFlexibility: FinancialConcept = {
   id: "financial-flexibility",
   title: "Financial flexibility",
+  classification: "household_adaptation" as const,
   shortDefinition: "Your household's room to absorb surprises or seize opportunities without borrowing.",
   fullDefinition:
     "Financial flexibility is the room a household has to handle the unexpected — a repair, a medical bill, a slow month — or to act on an opportunity, without having to take on new debt. It draws on several things at once: how liquid a household's assets are, how much of its income is already committed to short-term obligations, and how much pressure existing debt already creates.",

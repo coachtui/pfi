@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const liquidity: FinancialConcept = {
   id: "liquidity",
   title: "Liquidity",
+  classification: "household_adaptation" as const,
   shortDefinition: "How quickly your household's money can be used — cash you can spend now versus value that takes time to unlock.",
   fullDefinition:
     "Liquidity describes how quickly an asset can be turned into spendable cash without a loss of value. Cash in a checking account is fully liquid — it can be used immediately. A home or a retirement account is far less liquid: turning either into spendable cash takes time, paperwork, or may come with a penalty or a sale price you don't control. A household's overall liquidity is about how much of its value sits in that readily usable form.",

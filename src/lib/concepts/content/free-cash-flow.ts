@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const freeCashFlow: FinancialConcept = {
   id: "free-cash-flow",
   title: "Free cash flow",
+  classification: "standard_finance" as const,
   shortDefinition: "The money remaining after the expenses required to operate your household have been paid.",
   fullDefinition:
     "Free cash flow is what's left of your household's revenue after operating expenses are paid. It is the cash your household is free to allocate — to savings, investments, or paying down debt. A household can own valuable things and still have weak free cash flow, or own little and generate strong free cash flow.",

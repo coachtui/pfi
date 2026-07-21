@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const liabilities: FinancialConcept = {
   id: "liabilities",
   title: "Liabilities",
+  classification: "standard_finance" as const,
   shortDefinition: "Everything your household owes to someone else.",
   fullDefinition:
     "A liability is anything your household owes to someone else — a mortgage balance, a car loan, a student loan, or a credit-card balance. Liabilities are the counterpart to assets: assets are what a household owns, liabilities are what it owes, and the difference between the two is net worth.",

@@ -3,7 +3,7 @@ import { ALL_CONCEPTS } from "./content";
 import { MODULES } from "./modules";
 import { buildRegistry } from "./registry";
 
-export type { ConceptId, DataRequirement, FinancialConcept, KnowledgeCheck, Lesson, Module, PersonalApplication } from "./types";
+export type { ComparisonRow, ConceptClassification, ConceptId, DataRequirement, FinancialConcept, FormulaRow, KnowledgeCheck, Lesson, Module, PersonalApplication } from "./types";
 export { buildRegistry, validateRegistry, type ConceptRegistry } from "./registry";
 export { ALL_CONCEPTS } from "./content";
 export { MODULES } from "./modules";

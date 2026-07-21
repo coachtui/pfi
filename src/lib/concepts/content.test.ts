@@ -73,4 +73,15 @@ describe("authored content", () => {
       expect(c?.fullDefinition, id).toBeTruthy();
     }
   });
+
+  it("classifies every concept, matching the spec's assignment table", () => {
+    const byId = (id: string) => ALL_CONCEPTS.find((c) => c.id === id);
+    expect(byId("available-capital")?.classification).toBe("pfi_metric");
+    for (const id of ["savings-rate", "net-worth", "debt-pressure", "financial-flexibility", "retained-cash", "liquidity"]) {
+      expect(byId(id)?.classification, id).toBe("household_adaptation");
+    }
+    for (const id of ["revenue", "operating-expenses", "cash-flow", "free-cash-flow", "assets", "liabilities", "short-term-obligations", "capital-allocation"]) {
+      expect(byId(id)?.classification, id).toBe("standard_finance");
+    }
+  });
 });

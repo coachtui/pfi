@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const cashFlow: FinancialConcept = {
   id: "cash-flow",
   title: "Cash flow",
+  classification: "standard_finance" as const,
   shortDefinition: "The movement of money into and out of your household over a period of time.",
   fullDefinition:
     "Cash flow describes how money moves through your household over time — what came in, what went out, and the net direction. Unlike a balance, which is a single number at a single moment, cash flow is measured over a period and shows the pattern of movement, not just where things stand right now.",

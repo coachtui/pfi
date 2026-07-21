@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const availableCapital: FinancialConcept = {
   id: "available-capital",
   title: "Available capital",
+  classification: "pfi_metric" as const,
   shortDefinition: "Cash you can actually deploy: liquid assets minus revolving balances and obligations due before your next income.",
   fullDefinition:
     "Available capital is the cash a household can actually deploy right now — liquid assets minus revolving balances and minus obligations due before the next expected income. It answers a more precise question than liquidity alone: not just how much cash exists, but how much of it is genuinely free to use after what's already committed against it.",

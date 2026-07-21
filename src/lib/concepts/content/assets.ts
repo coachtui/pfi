@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const assets: FinancialConcept = {
   id: "assets",
   title: "Assets",
+  classification: "standard_finance" as const,
   shortDefinition: "Everything your household owns that has monetary value.",
   fullDefinition:
     "An asset is anything your household owns that has monetary value — cash in an account, a home, a car, an investment balance, or any other thing of value you hold. Assets are what a household owns, as distinct from what it owes (liabilities) or how quickly a given asset can be turned into spendable cash (liquidity).",

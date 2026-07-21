@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const debtPressure: FinancialConcept = {
   id: "debt-pressure",
   title: "Debt pressure",
+  classification: "household_adaptation" as const,
   shortDefinition: "How much of your revenue is committed to required debt payments.",
   fullDefinition:
     "Debt pressure measures the share of your household's revenue that must go toward required debt payments — the minimums on loans and credit cards, with housing measured separately. It's a measure of strain, not size: it compares what you owe monthly against what you earn monthly, rather than the total balance owed.",

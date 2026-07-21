@@ -27,6 +27,26 @@ export type KnowledgeCheck =
   | { kind: "identify-figure"; prompt: string; choices: string[]; correctIndex: number; explanation: string }
   | { kind: "which-action"; prompt: string; choices: string[]; correctIndex: number; explanation: string };
 
+/** How the term relates to established finance vocabulary (spec §Definition-sheet header). */
+export type ConceptClassification = "standard_finance" | "household_adaptation" | "pfi_metric";
+
+/** One line of a statement-style visual calculation. */
+export interface FormulaRow {
+  label: string;
+  operator?: "+" | "-" | "=";
+  /** Binds to a live figure; same namespace as PersonalApplication.metricKey. */
+  valueKey?: string;
+  /** Sample display value (must be presented labeled as sample). */
+  staticValue?: string | number;
+}
+
+/** One included/excluded example supporting the memorable distinction. */
+export interface ComparisonRow {
+  label: string;
+  included: boolean;
+  explanation?: string;
+}
+
 export interface PersonalApplication {
   /**
    * Namespaced engine binding — never a literal figure:
@@ -58,17 +78,29 @@ export interface Lesson {
 export interface FinancialConcept {
   id: ConceptId;
   title: string;                      // canonical name, e.g. "Free cash flow"
+  classification: ConceptClassification;
   shortDefinition: string;            // one sentence; the pre-completion tap definition
   fullDefinition: string;
   whyItMatters: string;
+  /** One strong sentence for the definition sheet; sheet falls back to shortDefinition+fullDefinition when absent. */
+  plainEnglishSummary?: string;
+  /** The lesson's one retained takeaway, e.g. "Not every deposit is revenue." */
+  memorableDistinction?: string;
   formula?: string;                   // display string, e.g. "Revenue − operating expenses"
   /** Required when the household formula differs from the strict business definition. */
   householdAdaptation?: string;
   businessContext?: string;
   commonMisunderstanding?: string;
+  /** Structured calculation block; `formula` remains the accessible text fallback and is required alongside. */
+  formulaRows?: FormulaRow[];
+  comparisonRows?: ComparisonRow[];
+  /** What increases/decreases mean — and don't mean — in context. Never "higher is always good". */
+  interpretation?: string;
   relatedConceptIds: ConceptId[];
   prerequisiteConceptIds: ConceptId[];
   dataMetricKey?: string;             // same namespace as PersonalApplication.metricKey
+  /** Surfaces where the concept actually appears in PFI. Supersedes lesson.reinforcementPreview when present. */
+  whereUsed?: string[];
   status: "draft" | "published" | "archived";
   lesson?: Lesson;                    // absent = glossary-only record
 }

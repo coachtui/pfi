@@ -5,6 +5,7 @@ import type { FinancialConcept, Module } from "./types";
 const concept = (id: string, over: Partial<FinancialConcept> = {}): FinancialConcept => ({
   id,
   title: id,
+  classification: "standard_finance" as const,
   shortDefinition: "One sentence.",
   fullDefinition: "Full definition.",
   whyItMatters: "Why it matters.",
@@ -94,5 +95,15 @@ describe("validateRegistry", () => {
       }),
     });
     expect(validateRegistry([bad], [])).toContainEqual(expect.stringContaining("correctIndex"));
+  });
+
+  it("rejects formulaRows without an accessible formula fallback", () => {
+    const bad = concept("a", { formulaRows: [{ label: "X" }] });
+    expect(validateRegistry([bad], [])).toContainEqual(expect.stringContaining("formulaRows"));
+  });
+
+  it("rejects empty whereUsed entries", () => {
+    const bad = concept("a", { whereUsed: ["Report", " "] });
+    expect(validateRegistry([bad], [])).toContainEqual(expect.stringContaining("whereUsed"));
   });
 });

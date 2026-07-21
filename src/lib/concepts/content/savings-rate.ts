@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const savingsRate: FinancialConcept = {
   id: "savings-rate",
   title: "Savings rate",
+  classification: "household_adaptation" as const,
   shortDefinition: "The share of your revenue you kept as cash this period.",
   fullDefinition:
     "Savings rate is the portion of your household's revenue that stayed as cash during the period, rather than being spent on operating expenses or directed elsewhere. It measures cash retention specifically — it does not include money sent to investments or used to pay down debt, even though those are also productive uses of free cash flow.",

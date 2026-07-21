@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const revenue: FinancialConcept = {
   id: "revenue",
   title: "Revenue",
+  classification: "standard_finance" as const,
   shortDefinition: "All the money your household brings in — pay, side income, benefits, and other earnings.",
   fullDefinition:
     "Revenue is the total of every dollar your household received in a period, from every source. It includes wages, side income, and benefits. It does not include money that simply moved between your own accounts — a transfer from savings to checking is not new money, so it is not revenue.",

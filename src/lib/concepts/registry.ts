@@ -43,6 +43,12 @@ export function validateRegistry(concepts: FinancialConcept[], modules: Module[]
     for (const pre of c.prerequisiteConceptIds) {
       if (!ids.has(pre)) errors.push(`${c.id}: unknown prerequisiteConceptId ${pre}`);
     }
+    if (c.formulaRows && c.formulaRows.length > 0 && !c.formula) {
+      errors.push(`${c.id}: formulaRows requires formula as its accessible text fallback`);
+    }
+    for (const w of c.whereUsed ?? []) {
+      if (!w.trim()) errors.push(`${c.id}: whereUsed contains an empty entry`);
+    }
     const checks = c.lesson?.knowledgeCheck;
     if (checks && (checks.length < 1 || checks.length > 2)) {
       errors.push(`${c.id}: lessons need 1–2 knowledge checks, found ${checks.length}`);

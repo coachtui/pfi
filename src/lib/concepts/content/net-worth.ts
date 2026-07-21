@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const netWorth: FinancialConcept = {
   id: "net-worth",
   title: "Net worth",
+  classification: "household_adaptation" as const,
   shortDefinition: "What your household owns minus what it owes — also called household equity.",
   fullDefinition:
     "Net worth is what your household owns (assets) minus what it owes (liabilities). It is also called household equity — the same concept as shareholder equity in a business, just applied to a household instead of a company. Net worth is a snapshot at a point in time, not a flow: it captures where things stand today, the way assets and liabilities do, rather than what moved during a period.",
