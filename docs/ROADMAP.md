@@ -53,10 +53,10 @@ to my household?"). Mobile-first throughout.
 
 Four slices, each its own spec → plan → implementation cycle:
 
-1. ✅/⏳ **Terminology governance + concept schema** — audit + canonical glossary
-   (docs/TERMINOLOGY.md), framework-free `src/lib/concepts/` (15 typed concept
-   records: 10 full lessons across 3 modules + 5 glossary-only), approved renames
-   applied (spec: docs/superpowers/specs/2026-07-20-academy-slice1-terminology-concepts-design.md).
+1. ✅ **Terminology governance + concept schema** — landed 2026-07-20: audit +
+   canonical glossary (docs/TERMINOLOGY.md), framework-free `src/lib/concepts/`
+   (15 typed concept records: 10 full lessons across 3 modules + 5 glossary-only),
+   approved renames applied (spec: docs/superpowers/specs/2026-07-20-academy-slice1-terminology-concepts-design.md).
 2. **`FinancialTerm` interaction system** — reusable tappable-term component +
    pre-completion definition sheets, wired into report/dashboard.
 3. **Academy home + lesson experience** — lesson template UI, knowledge checks,
