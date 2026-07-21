@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Database, Upload } from "lucide-react";
+import { Database, FileText, Upload } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { loadDemoDataForForm } from "@/app/actions/demo";
 import { LoadDemoButton } from "@/components/dashboard/LoadDemoButton";
@@ -16,23 +16,30 @@ export function EmptyDashboard({ companyName }: { companyName: string }) {
         <div>
           <p className="text-sm font-medium text-primary">No financial data yet</p>
           <p className="mt-1 max-w-sm text-sm text-secondary">
-            Load the sample dataset to explore, or import your real transactions from a bank CSV.
+            Start with your own household accounts. Import transactions from a bank CSV or use a statement PDF when CSV export is unavailable.
           </p>
-        </div>
-        <div className="flex w-full max-w-sm flex-col gap-2">
-          {DEMO_PROFILE_METAS.map((m) => (
-            <form key={m.id} action={loadDemoDataForForm.bind(null, m.id)} className="flex flex-col items-center gap-1">
-              <LoadDemoButton label={`Load ${m.companyName}`} pendingLabel="Loading demo data…" />
-              <p className="text-xs text-secondary">{m.description}</p>
-            </form>
-          ))}
         </div>
         <Link
           href="/import"
-          className="flex items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-1.5 text-xs font-medium text-secondary transition-colors hover:text-primary"
+          className="inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base transition-opacity hover:opacity-90"
         >
-          <Upload size={14} aria-hidden /> Import a CSV from your bank
+          <Upload size={18} aria-hidden /> Import financial data
         </Link>
+        <p className="flex max-w-sm items-center justify-center gap-1.5 text-xs text-tertiary">
+          <FileText size={13} aria-hidden /> CSV is best for accuracy. PDF imports are reviewed before anything is added.
+        </p>
+
+        <div className="mt-2 w-full max-w-lg border-t border-border-subtle pt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-tertiary">Explore with sample data</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {DEMO_PROFILE_METAS.map((m) => (
+              <form key={m.id} action={loadDemoDataForForm.bind(null, m.id)} className="flex flex-col gap-1.5">
+                <LoadDemoButton label={m.companyName} pendingLabel="Loading…" variant="secondary" />
+                <p className="text-left text-[11px] leading-snug text-tertiary">{m.description}</p>
+              </form>
+            ))}
+          </div>
+        </div>
       </Card>
     </div>
   );
