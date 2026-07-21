@@ -172,7 +172,10 @@ export async function extractPdfText(bytes: Uint8Array): Promise<ExtractedText> 
         nativeTextPageCount: extracted.nativeTextPageCount,
       };
     }
-  } catch {
+  } catch (error) {
+    console.error("[pdf-import] PDF.js native text extraction failed", {
+      error: error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 300) : "Unknown extraction error",
+    });
     // Preserve support for unusual PDFs that the legacy operator scanner can read.
   }
   return extractTextOperatorsFallback(bytes);

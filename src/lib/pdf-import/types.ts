@@ -4,7 +4,7 @@ import type { NormalizedRow } from "@/lib/csv-import/types";
 export const PDF_IMPORT_BUCKET = "statement-pdfs";
 export const PDF_IMPORT_MAX_BYTES = 10 * 1024 * 1024;
 export const PDF_IMPORT_MAX_PAGES = 24;
-export const PDF_IMPORT_PARSER_VERSION = "pdf-generic-v2";
+export const PDF_IMPORT_PARSER_VERSION = "pdf-generic-v3";
 export const PDF_IMPORT_OCR_DPI = 250;
 export const PDF_IMPORT_OCR_MAX_DIMENSION = 3200;
 export const PDF_IMPORT_OCR_TIMEOUT_MS = 90_000;
