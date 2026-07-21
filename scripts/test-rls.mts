@@ -277,6 +277,29 @@ try {
     input_hash: "w".repeat(64),
   });
   check("unknown surface value rejected by check constraint", !!nBadSurface);
+
+  // academy_progress: owner-only Academy lesson progress (Slice 3).
+  const progressRow = { user_id: a.id, concept_id: "revenue", check_responses: [] };
+  const { error: apIns } = await a.client.from("academy_progress").insert(progressRow);
+  check("A can insert own academy progress", !apIns, apIns?.message);
+
+  const { data: apOwn } = await a.client.from("academy_progress").select("concept_id").eq("user_id", a.id);
+  check("A can read own academy progress", (apOwn?.length ?? 0) === 1);
+
+  const { data: apCross } = await b.client.from("academy_progress").select("concept_id");
+  check("B cannot read A's academy progress", (apCross?.length ?? 0) === 0);
+
+  const { error: apForge } = await b.client.from("academy_progress")
+    .insert({ ...progressRow, concept_id: "assets" });
+  check("B cannot insert academy progress for A", !!apForge);
+
+  const { data: apUpd } = await b.client.from("academy_progress")
+    .update({ completed_at: new Date().toISOString() }).eq("user_id", a.id).select("concept_id");
+  check("B cannot update A's academy progress", (apUpd?.length ?? 0) === 0);
+
+  const { data: apDel } = await b.client.from("academy_progress")
+    .delete().eq("user_id", a.id).select("concept_id");
+  check("B cannot delete A's academy progress", (apDel?.length ?? 0) === 0);
 } finally {
   if (a) {
     try {
