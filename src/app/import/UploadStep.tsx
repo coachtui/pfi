@@ -61,7 +61,7 @@ export function UploadStep({
           Import into which account?
         </label>
         <p className="mb-2 text-xs text-secondary">
-          One CSV holds one account&apos;s transactions — pick where these belong.
+          Best for accurate transaction history. One CSV holds one account&apos;s transactions — pick where these belong.
         </p>
         <select
           id="import-account"

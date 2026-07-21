@@ -12,8 +12,24 @@ import {
   computeDiscrepancy, effectiveAnchor,
   type AccountInput, type AccountType, type BalanceAnchor, type TransactionInput,
 } from "@/lib/financial-engine";
-import { importTransactionsSchema, type ImportResult, type ImportTransactionsInput } from "@/lib/validation/imports";
+import {
+  confirmPdfImportSchema,
+  importTransactionsSchema,
+  type ConfirmPdfImportInput,
+  type ImportResult,
+  type ImportTransactionsInput,
+} from "@/lib/validation/imports";
 import type { MutationResult } from "@/lib/validation/transactions";
+import { extractPdfText } from "@/lib/pdf-import/extract";
+import { fileSha256, likelyDuplicateTransaction } from "@/lib/pdf-import/dedupe";
+import { parseStatementWithRegistry } from "@/lib/pdf-import/registry";
+import {
+  PDF_IMPORT_BUCKET,
+  PDF_IMPORT_PARSER_VERSION,
+  type PdfReviewData,
+  type StatementMetadata,
+} from "@/lib/pdf-import/types";
+import { validatePdfUpload } from "@/lib/pdf-import/validate";
 
 // PostgREST caps unbounded selects at 1000 rows (see DECISIONS #18); the
 // dedupe/transfer re-check below needs every existing transaction, not just
@@ -30,7 +46,28 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
 
   const parsed = importTransactionsSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  const v = parsed.data;
+  const batchId = randomUUID();
+  const { error: batchErr } = await supabase.from("import_batches").insert({
+    id: batchId,
+    user_id: user.id,
+    source_type: "csv",
+    status: "confirmed",
+    confirmed_at: new Date().toISOString(),
+  });
+  if (batchErr) return { error: batchErr.message };
+
+  const result = await commitImportedTransactions(parsed.data, { batchId, userId: user.id });
+  if (result.error) {
+    await supabase.from("import_batches").update({ status: "failed", failure_reason: result.error }).eq("id", batchId);
+  }
+  return result;
+}
+
+async function commitImportedTransactions(
+  v: ImportTransactionsInput,
+  opts: { batchId: string; userId: string; allowDuplicateLines?: ReadonlySet<number> },
+): Promise<ImportResult> {
+  const supabase = await createClient();
 
   const { data: account, error: acctErr } = await supabase
     .from("financial_accounts")
@@ -74,7 +111,7 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
   let skippedDuplicates = 0;
   for (const r of v.rows) {
     const key = dedupeKey(v.accountId, r);
-    if (seen.has(key)) { skippedDuplicates++; continue; }
+    if (seen.has(key) && !opts.allowDuplicateLines?.has(r.line)) { skippedDuplicates++; continue; }
     seen.add(key);
     fresh.push(r);
   }
@@ -97,12 +134,12 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
     pairByLine.set(p.line, other.id);
   }
 
-  const batchId = randomUUID();
+  const batchId = opts.batchId;
   const inserts = fresh.map((r) => {
     const pairedWith = pairByLine.get(r.line) ?? null;
     return {
       account_id: v.accountId,
-      user_id: user.id,
+      user_id: opts.userId,
       posted_date: r.postedDate,
       amount: r.amount,
       direction: r.direction,
@@ -177,7 +214,7 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
     const discrepancy = computeDiscrepancy(acctForMath, eff, v.endingBalance, v.anchorDate, mathTxns);
 
     const { error: anchorInsErr } = await supabase.from("balance_anchors").insert({
-      user_id: user.id, account_id: v.accountId, anchor_date: v.anchorDate,
+      user_id: opts.userId, account_id: v.accountId, anchor_date: v.anchorDate,
       balance: v.endingBalance, source: "import", import_batch_id: batchId, discrepancy,
     });
     if (anchorInsErr) {
@@ -193,6 +230,376 @@ export async function importTransactions(input: ImportTransactionsInput): Promis
 
   const finish = await finishWithRebuild(supabase);
   return { ...finish, ...anchorFacts, batchId, imported: inserts.length, skippedDuplicates };
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+}
+
+function asReconciliation(value: unknown): PdfReviewData["reconciliation"] {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  return {
+    status: String(v.status) as NonNullable<PdfReviewData["reconciliation"]>["status"],
+    difference: typeof v.difference === "number" ? v.difference : v.difference === null ? null : Number(v.difference),
+    tolerance: typeof v.tolerance === "number" ? v.tolerance : 0.01,
+    equation: typeof v.equation === "string" ? v.equation : null,
+  };
+}
+
+async function readPdfReview(importId: string): Promise<{ data: PdfReviewData | null; error: string }> {
+  const supabase = await createClient();
+  const { data: batch, error: batchErr } = await supabase
+    .from("import_batches")
+    .select("*")
+    .eq("id", importId)
+    .eq("source_type", "pdf")
+    .maybeSingle();
+  if (batchErr) return { data: null, error: batchErr.message };
+  if (!batch) return { data: null, error: "Import not found" };
+
+  const [{ data: meta, error: metaErr }, { data: staged, error: stagedErr }, { data: accounts, error: acctErr }] = await Promise.all([
+    supabase.from("staged_statement_metadata").select("*").eq("import_batch_id", importId).maybeSingle(),
+    supabase.from("staged_transactions").select("*").eq("import_batch_id", importId).order("posted_date", { ascending: true }),
+    supabase.from("financial_accounts").select("id, institution, type, mask, archived_at"),
+  ]);
+  if (metaErr) return { data: null, error: metaErr.message };
+  if (stagedErr) return { data: null, error: stagedErr.message };
+  if (acctErr) return { data: null, error: acctErr.message };
+
+  const metadata: StatementMetadata = {
+    institution: meta?.institution ?? null,
+    accountName: meta?.account_name ?? null,
+    accountType: meta?.account_type ?? null,
+    maskedAccountNumber: meta?.masked_account_number ?? null,
+    statementStartDate: meta?.statement_start_date ?? null,
+    statementEndDate: meta?.statement_end_date ?? null,
+    beginningBalance: meta?.beginning_balance === null || meta?.beginning_balance === undefined ? null : Number(meta.beginning_balance),
+    endingBalance: meta?.ending_balance === null || meta?.ending_balance === undefined ? null : Number(meta.ending_balance),
+    availableBalance: meta?.available_balance === null || meta?.available_balance === undefined ? null : Number(meta.available_balance),
+    creditLimit: meta?.credit_limit === null || meta?.credit_limit === undefined ? null : Number(meta.credit_limit),
+    minimumPayment: meta?.minimum_payment === null || meta?.minimum_payment === undefined ? null : Number(meta.minimum_payment),
+    paymentDueDate: meta?.payment_due_date ?? null,
+  };
+  const suggested = (accounts ?? []).find((a) =>
+    !a.archived_at
+    && (!metadata.accountType || a.type === metadata.accountType)
+    && (!metadata.institution || !a.institution || a.institution.toLowerCase() === metadata.institution.toLowerCase())
+    && (!metadata.maskedAccountNumber || !a.mask || metadata.maskedAccountNumber.endsWith(a.mask)),
+  )?.id ?? null;
+
+  return {
+    error: "",
+    data: {
+      importId,
+      status: batch.status,
+      originalFilename: batch.original_filename ?? "",
+      storagePath: batch.storage_path ?? "",
+      detectedInstitution: batch.detected_institution ?? null,
+      detectedAccountType: batch.detected_account_type ?? null,
+      statementStartDate: batch.statement_start_date ?? null,
+      statementEndDate: batch.statement_end_date ?? null,
+      extractionMethod: batch.extraction_method ?? null,
+      confidence: batch.confidence ?? null,
+      failureReason: batch.failure_reason ?? null,
+      unsupportedReason: batch.unsupported_reason ?? null,
+      validationResults: asStringArray(batch.validation_results),
+      reconciliation: asReconciliation(batch.reconciliation_results),
+      metadata,
+      fieldConfidence: meta?.field_confidence ?? {},
+      transactions: (staged ?? []).map((r) => ({
+        stagedId: r.id,
+        line: 2,
+        postedDate: r.posted_date,
+        transactionDate: r.transaction_date,
+        amount: Number(r.amount),
+        direction: r.direction,
+        description: r.description,
+        category: r.category ?? (r.direction === "inflow" ? "income" : "other"),
+        referenceNumber: r.reference_number,
+        sourcePage: r.source_page,
+        confidence: r.confidence,
+        fieldConfidence: r.field_confidence ?? {},
+        issues: asStringArray(r.issues),
+        excluded: r.excluded,
+        duplicateOfTransactionId: r.duplicate_of_transaction_id,
+      })),
+      suggestedAccountId: suggested,
+    },
+  };
+}
+
+export async function uploadStatementPdf(formData: FormData): Promise<{ error: string; review?: PdfReviewData }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+  const file = formData.get("file");
+  if (!(file instanceof File)) return { error: "Choose a PDF statement first." };
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const validation = validatePdfUpload({
+    filename: file.name,
+    mimeType: file.type,
+    size: file.size,
+    bytes,
+  });
+  if (!validation.ok) return { error: validation.reason ?? "The PDF could not be validated." };
+
+  const sha = fileSha256(bytes);
+  const { data: duplicate, error: dupErr } = await supabase
+    .from("import_batches")
+    .select("id")
+    .eq("source_type", "pdf")
+    .eq("file_sha256", sha)
+    .neq("status", "cancelled")
+    .maybeSingle();
+  if (dupErr) return { error: dupErr.message };
+  if (duplicate) return { error: "This statement PDF was already uploaded." };
+
+  const importId = randomUUID();
+  const storagePath = `${user.id}/${importId}.pdf`;
+  const { error: batchErr } = await supabase.from("import_batches").insert({
+    id: importId,
+    user_id: user.id,
+    source_type: "pdf",
+    status: "uploaded",
+    original_filename: file.name,
+    storage_path: storagePath,
+    file_sha256: sha,
+    parser_version: PDF_IMPORT_PARSER_VERSION,
+    validation_results: [],
+  });
+  if (batchErr) return { error: batchErr.message };
+
+  const { error: uploadErr } = await supabase.storage.from(PDF_IMPORT_BUCKET).upload(storagePath, bytes, {
+    contentType: "application/pdf",
+    upsert: false,
+  });
+  if (uploadErr) {
+    await supabase.from("import_batches").update({ status: "failed", failure_reason: uploadErr.message }).eq("id", importId);
+    return { error: uploadErr.message };
+  }
+  await supabase.from("import_files").insert({
+    user_id: user.id,
+    import_batch_id: importId,
+    bucket_id: PDF_IMPORT_BUCKET,
+    storage_path: storagePath,
+    original_filename: file.name,
+    mime_type: file.type,
+    size_bytes: file.size,
+    page_count: validation.pageCount ?? null,
+    file_sha256: sha,
+  });
+
+  await supabase.from("import_batches").update({ status: "extracting" }).eq("id", importId);
+  const extracted = extractPdfText(bytes);
+  if (extracted.scanned) {
+    await supabase.from("import_batches").update({
+      status: "failed",
+      extraction_method: "ocr",
+      confidence: "low",
+      failure_reason: "Scanned document could not be read. OCR is detected but not enabled for this importer yet.",
+      validation_results: ["No usable embedded text was found."],
+    }).eq("id", importId);
+    const review = await readPdfReview(importId);
+    return review.data ? { error: "", review: review.data } : { error: review.error };
+  }
+
+  const parsed = parseStatementWithRegistry(extracted.text);
+  const status = parsed.unsupportedReason
+    ? "unsupported"
+    : parsed.transactions.length === 0
+      ? "failed"
+      : parsed.reconciliation.status === "does_not_reconcile" || parsed.confidence === "low"
+        ? "needs_review"
+        : "ready_for_review";
+  const failureReason = parsed.transactions.length === 0 && !parsed.unsupportedReason ? "No financial transaction data was detected." : null;
+
+  await supabase.from("import_batches").update({
+    status,
+    detected_institution: parsed.metadata.institution,
+    detected_account_type: parsed.metadata.accountType,
+    statement_start_date: parsed.metadata.statementStartDate,
+    statement_end_date: parsed.metadata.statementEndDate,
+    extraction_method: parsed.extractionMethod,
+    confidence: parsed.confidence,
+    validation_results: parsed.issues,
+    reconciliation_results: parsed.reconciliation,
+    failure_reason: failureReason,
+    unsupported_reason: parsed.unsupportedReason,
+  }).eq("id", importId);
+  await supabase.from("staged_statement_metadata").insert({
+    import_batch_id: importId,
+    user_id: user.id,
+    institution: parsed.metadata.institution,
+    account_name: parsed.metadata.accountName,
+    account_type: parsed.metadata.accountType,
+    masked_account_number: parsed.metadata.maskedAccountNumber,
+    statement_start_date: parsed.metadata.statementStartDate,
+    statement_end_date: parsed.metadata.statementEndDate,
+    beginning_balance: parsed.metadata.beginningBalance,
+    ending_balance: parsed.metadata.endingBalance,
+    available_balance: parsed.metadata.availableBalance,
+    credit_limit: parsed.metadata.creditLimit,
+    minimum_payment: parsed.metadata.minimumPayment,
+    payment_due_date: parsed.metadata.paymentDueDate,
+    raw_text_excerpt: parsed.rawTextExcerpt,
+    parser_metadata: { adapterId: parsed.adapterId, parserVersion: PDF_IMPORT_PARSER_VERSION },
+    field_confidence: parsed.fieldConfidence,
+  });
+  if (parsed.transactions.length > 0) {
+    await insertChunked(supabase, "staged_transactions", parsed.transactions.map((t) => ({
+      import_batch_id: importId,
+      user_id: user.id,
+      posted_date: t.postedDate,
+      transaction_date: t.transactionDate,
+      description: t.description,
+      amount: t.amount,
+      direction: t.direction,
+      category: t.category,
+      reference_number: t.referenceNumber,
+      source_page: t.sourcePage,
+      confidence: t.confidence,
+      field_confidence: t.fieldConfidence,
+      issues: t.issues,
+      original_values: t,
+    })));
+  }
+  const review = await readPdfReview(importId);
+  return review.data ? { error: "", review: review.data } : { error: review.error };
+}
+
+export async function getPdfImportReview(importId: string): Promise<{ error: string; review?: PdfReviewData }> {
+  if (!z.uuid().safeParse(importId).success) return { error: "Invalid import" };
+  const review = await readPdfReview(importId);
+  return review.data ? { error: "", review: review.data } : { error: review.error };
+}
+
+export async function cancelPdfImport(importId: string): Promise<MutationResult> {
+  if (!z.uuid().safeParse(importId).success) return { error: "Invalid import" };
+  const supabase = await createClient();
+  const { data: batch, error: fetchErr } = await supabase
+    .from("import_batches")
+    .select("id, storage_path, status")
+    .eq("id", importId)
+    .eq("source_type", "pdf")
+    .maybeSingle();
+  if (fetchErr) return { error: fetchErr.message };
+  if (!batch) return { error: "Import not found" };
+  if (batch.status === "confirmed") return { error: "Confirmed imports cannot be cancelled." };
+  if (batch.storage_path) await supabase.storage.from(PDF_IMPORT_BUCKET).remove([batch.storage_path]);
+  const { error } = await supabase.from("import_batches").update({ status: "cancelled" }).eq("id", importId);
+  return { error: error?.message ?? "" };
+}
+
+export async function confirmPdfImport(input: ConfirmPdfImportInput): Promise<ImportResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+  const parsed = confirmPdfImportSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  const v = parsed.data;
+
+  const { data: batch, error: batchErr } = await supabase
+    .from("import_batches")
+    .select("id, status, source_type")
+    .eq("id", v.importId)
+    .eq("source_type", "pdf")
+    .maybeSingle();
+  if (batchErr) return { error: batchErr.message };
+  if (!batch) return { error: "Import not found" };
+  if (!["ready_for_review", "needs_review"].includes(batch.status)) {
+    return { error: "This PDF import is not ready to confirm." };
+  }
+
+  const existingRows = await paginateSelect<{
+    id: string; account_id: string; posted_date: string; amount: number;
+    direction: string; description: string; is_transfer: boolean; transfer_pair_id: string | null;
+  }>(EXISTING_TXN_PAGE_SIZE, (from, to) =>
+    supabase.from("transactions")
+      .select("id, account_id, posted_date, amount, direction, description, is_transfer, transfer_pair_id")
+      .order("id", { ascending: true })
+      .range(from, to));
+  const existing = existingRows.map((t) => ({
+    id: t.id,
+    accountId: t.account_id,
+    postedDate: t.posted_date,
+    amount: Number(t.amount),
+    direction: t.direction as "inflow" | "outflow",
+    description: t.description,
+    isTransfer: t.is_transfer,
+    transferPairId: t.transfer_pair_id,
+  }));
+  for (const row of v.rows) {
+    const duplicate = likelyDuplicateTransaction(v.accountId, row, existing);
+    const excluded = row.excluded || (duplicate !== null && row.duplicateDecision !== "import");
+    await supabase.from("staged_transactions").update({
+      excluded,
+      duplicate_of_transaction_id: duplicate?.id ?? null,
+      corrected_values: row,
+    }).eq("id", row.stagedId).eq("import_batch_id", v.importId);
+    if (excluded || duplicate || row.duplicateDecision === "import") {
+      await supabase.from("import_corrections").insert({
+        import_batch_id: v.importId,
+        staged_transaction_id: row.stagedId,
+        user_id: user.id,
+        correction_type: excluded ? "excluded_or_duplicate" : "duplicate_accepted",
+        original_value: { duplicateOfTransactionId: duplicate?.id ?? null },
+        corrected_value: row,
+      });
+    }
+  }
+
+  const kept = v.rows.filter((r) => !r.excluded && !(likelyDuplicateTransaction(v.accountId, r, existing) && r.duplicateDecision !== "import"));
+  if (kept.length === 0) return { error: "No reviewed transactions remain to import." };
+  const commit = await commitImportedTransactions({
+    accountId: v.accountId,
+    rows: kept.map((r) => ({
+      line: r.line,
+      postedDate: r.postedDate,
+      amount: r.amount,
+      direction: r.direction,
+      description: r.description,
+      category: r.category,
+    })),
+    transferPairs: [],
+    ...(v.metadata.endingBalance !== null && v.metadata.statementEndDate
+      ? { endingBalance: v.metadata.endingBalance, anchorDate: v.metadata.statementEndDate }
+      : {}),
+  }, {
+    batchId: v.importId,
+    userId: user.id,
+    allowDuplicateLines: new Set(v.rows.filter((r) => r.duplicateDecision === "import").map((r) => r.line)),
+  });
+  if (commit.error) {
+    await supabase.from("import_batches").update({ status: "failed", failure_reason: commit.error }).eq("id", v.importId);
+    return commit;
+  }
+
+  await supabase.from("staged_statement_metadata").update({
+    institution: v.metadata.institution,
+    account_name: v.metadata.accountName,
+    account_type: v.metadata.accountType,
+    masked_account_number: v.metadata.maskedAccountNumber,
+    statement_start_date: v.metadata.statementStartDate,
+    statement_end_date: v.metadata.statementEndDate,
+    beginning_balance: v.metadata.beginningBalance,
+    ending_balance: v.metadata.endingBalance,
+    available_balance: v.metadata.availableBalance,
+    credit_limit: v.metadata.creditLimit,
+    minimum_payment: v.metadata.minimumPayment,
+    payment_due_date: v.metadata.paymentDueDate,
+  }).eq("import_batch_id", v.importId);
+  await supabase.from("import_batches").update({
+    status: "confirmed",
+    confirmed_at: new Date().toISOString(),
+    detected_institution: v.metadata.institution,
+    detected_account_type: v.metadata.accountType,
+    statement_start_date: v.metadata.statementStartDate,
+    statement_end_date: v.metadata.statementEndDate,
+  }).eq("id", v.importId);
+
+  return commit;
 }
 
 /** Remove exactly one import batch's rows, then rebuild. */

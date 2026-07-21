@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, FileText } from "lucide-react";
 import type { AccountSummary } from "@/lib/data/mappers";
-import type { ColumnMapping, ExistingTxn, ParsedCsv } from "@/lib/csv-import/types";
+import type { ColumnMapping, ExistingTxn, NormalizedRow, ParsedCsv } from "@/lib/csv-import/types";
 import { normalizeRows } from "@/lib/csv-import/normalize";
 import { markDuplicates } from "@/lib/csv-import/dedupe";
 import { detectTransfers } from "@/lib/csv-import/transfers";
@@ -12,17 +12,22 @@ import { UploadStep } from "./UploadStep";
 import { MapStep } from "./MapStep";
 import { PreviewStep } from "./PreviewStep";
 import { SummaryStep } from "./SummaryStep";
+import { PdfUploadStep } from "./PdfUploadStep";
+import { PdfReviewStep } from "./PdfReviewStep";
 import { importTransactions } from "@/app/actions/imports";
 import type { ImportResult } from "@/lib/validation/imports";
+import type { PdfReviewData } from "@/lib/pdf-import/types";
 
-type Step = "upload" | "map" | "preview" | "summary";
+type ImportMode = "csv" | "pdf";
+type Step = "choose" | "upload" | "map" | "preview" | "pdfReview" | "summary";
 const STEP_LABELS: Record<Step, string> = {
+  choose: "Choose source",
   upload: "Choose file",
   map: "Map columns",
   preview: "Preview",
+  pdfReview: "Review PDF",
   summary: "Done",
 };
-const STEPS: Step[] = ["upload", "map", "preview", "summary"];
 
 export function ImportWizard(props: {
   accounts: AccountSummary[];
@@ -31,11 +36,15 @@ export function ImportWizard(props: {
   anchors: Record<string, { anchorDate: string; balance: number }>;
 }) {
   const { accounts } = props;
-  const [step, setStep] = useState<Step>("upload");
+  const [mode, setMode] = useState<ImportMode | null>(null);
+  const [step, setStep] = useState<Step>("choose");
   const [accountId, setAccountId] = useState("");
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const [fileName, setFileName] = useState("");
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
+  const [pdfReview, setPdfReview] = useState<PdfReviewData | null>(null);
+  const [summaryRows, setSummaryRows] = useState<NormalizedRow[] | null>(null);
+  const [summaryAccountId, setSummaryAccountId] = useState("");
   const [removedPairs, setRemovedPairs] = useState<Set<number>>(new Set());
   const [endingBalance, setEndingBalance] = useState("");
   const [anchorDate, setAnchorDate] = useState("");
@@ -94,8 +103,16 @@ export function ImportWizard(props: {
       return;
     }
     setResult(res);
+    setSummaryRows(preview.fresh);
+    setSummaryAccountId(accountId);
     setStep("summary");
   };
+
+  const steps = mode === "pdf"
+    ? (["choose", "upload", "pdfReview", "summary"] as Step[])
+    : mode === "csv"
+      ? (["choose", "upload", "map", "preview", "summary"] as Step[])
+      : (["choose"] as Step[]);
 
   return (
     <div>
@@ -103,11 +120,11 @@ export function ImportWizard(props: {
         <Link href="/accounts" aria-label="Back to accounts" className="rounded-lg p-1 text-secondary hover:text-primary">
           <ArrowLeft size={20} aria-hidden />
         </Link>
-        <h1 className="text-lg font-semibold text-primary">Import CSV</h1>
+        <h1 className="text-lg font-semibold text-primary">Import financial data</h1>
       </div>
 
       <ol className="mb-6 flex gap-3 text-xs text-secondary" aria-label="Import steps">
-        {STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <li
             key={s}
             aria-current={s === step ? "step" : undefined}
@@ -118,7 +135,33 @@ export function ImportWizard(props: {
         ))}
       </ol>
 
-      {step === "upload" && (
+      {step === "choose" && (
+        <section className="grid gap-3 md:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => { setMode("csv"); setStep("upload"); }}
+            className="rounded-card border border-border-subtle bg-elevated p-4 text-left transition-colors hover:border-border-strong"
+          >
+            <FileSpreadsheet size={22} className="mb-3 text-secondary" aria-hidden />
+            <span className="block text-sm font-semibold text-primary">Upload CSV</span>
+            <span className="mt-1 block text-sm text-secondary">Best for accurate transaction history.</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode("pdf"); setStep("upload"); }}
+            className="rounded-card border border-border-subtle bg-elevated p-4 text-left transition-colors hover:border-border-strong"
+          >
+            <FileText size={22} className="mb-3 text-secondary" aria-hidden />
+            <span className="block text-sm font-semibold text-primary">Upload statement PDF</span>
+            <span className="mt-1 block text-sm text-secondary">Use a bank or credit-card statement when CSV export is unavailable.</span>
+          </button>
+          <p className="md:col-span-2 text-xs text-tertiary">
+            PDF extraction is a fallback review workflow. Nothing from a PDF affects your financial record until you confirm it.
+          </p>
+        </section>
+      )}
+
+      {step === "upload" && mode === "csv" && (
         <UploadStep
           accounts={accounts}
           accountId={accountId}
@@ -127,6 +170,15 @@ export function ImportWizard(props: {
             setParsed(p);
             setFileName(name);
             setStep("map");
+          }}
+        />
+      )}
+
+      {step === "upload" && mode === "pdf" && (
+        <PdfUploadStep
+          onReady={(review) => {
+            setPdfReview(review);
+            setStep("pdfReview");
           }}
         />
       )}
@@ -168,8 +220,27 @@ export function ImportWizard(props: {
         />
       )}
 
-      {step === "summary" && result && preview && (
-        <SummaryStep result={result} accountId={accountId} fresh={preview.fresh} />
+      {step === "pdfReview" && pdfReview && (
+        <PdfReviewStep
+          review={pdfReview}
+          accounts={accounts}
+          existing={props.existing}
+          onCancelled={() => {
+            setPdfReview(null);
+            setMode(null);
+            setStep("choose");
+          }}
+          onConfirmed={(nextResult, rows, nextAccountId) => {
+            setResult(nextResult);
+            setSummaryRows(rows);
+            setSummaryAccountId(nextAccountId);
+            setStep("summary");
+          }}
+        />
+      )}
+
+      {step === "summary" && result && summaryRows && (
+        <SummaryStep result={result} accountId={summaryAccountId} fresh={summaryRows} />
       )}
     </div>
   );
