@@ -232,6 +232,7 @@ export function ImportWizard(props: {
 
       {step === "upload" && mode === "pdf" && (
         <PdfUploadStep
+          accountId={accountId}
           accountName={selectedAccount?.displayName ?? ""}
           onReady={(review) => {
             setPdfReview(review);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyStatement, parseGenericStatement, reconcileStatement } from "./parse";
+import { classifyStatement, parseGenericStatement, reconcileStatement, scopeStatementToAccount } from "./parse";
 import type { ExtractedTransaction, StatementMetadata } from "./types";
 
 const checking = `
@@ -25,6 +25,32 @@ Payment Due Date: 08/20/2026
 07/04 Coffee Shop 10.00 purchase
 07/10 Online Payment 50.00 payment
 07/11 Hotel 100.00 purchase
+`;
+
+const combinedCreditUnion = `
+Fictional Community Credit Union
+Member No. Statement Period Page
+000001 06/01/26 Thru 06/30/26 1
+Regular Share Account Number: 11111111
+Beginning Balance Deposits Withdrawals Ending Balance YTD Dividends
+100.00 5.00 0.00 105.00 5.00
+TRANSACTION ACTIVITY
+Date Date Transaction Description Deposit Withdrawal Balance
+06/01 06/01 Beginning Balance 100.00
+06/15 06/15 Monthly Dividend 5.00 105.00
+Checking Account Number: 22222222
+Beginning Balance Deposits Withdrawals Checks Cleared Ending Balance YTD Dividends
+1,000.00 500.00 100.00 1,400.00 0.00
+TRANSACTION ACTIVITY
+Date Date Transaction Description Deposit Withdrawal Balance
+06/01 06/01 Beginning Balance 1,000.00
+06/02 06/02 Fictional Payroll Deposit 500.00 1,500.00
+06/03 06/03 Fictional Grocery Store 25.00 1,475.00
+--- Page 2 ---
+Checking Account Number: 22222222 Continued
+TRANSACTION ACTIVITY
+Date Date Transaction Description Deposit Withdrawal Balance
+06/04 06/04 Check 1001 75.00 1,400.00
 `;
 
 describe("classifyStatement", () => {
@@ -63,6 +89,31 @@ describe("parseGenericStatement", () => {
     const parsed = parseGenericStatement(checking.replace("Ending Balance: $140.00", "Ending Balance: $141.00"));
     expect(parsed.reconciliation.status).toBe("does_not_reconcile");
     expect(parsed.confidence).toBe("medium");
+  });
+
+  it("scopes a combined statement to the selected checking account and parses running-balance rows", () => {
+    const scoped = scopeStatementToAccount(combinedCreditUnion, { accountType: "checking", mask: "2222" });
+    const parsed = parseGenericStatement(scoped.text);
+
+    expect(scoped.unsupportedReason).toBeNull();
+    expect(scoped.issues).toHaveLength(1);
+    expect(scoped.text).not.toContain("Regular Share Account Number");
+    expect(parsed.metadata.accountType).toBe("checking");
+    expect(parsed.metadata.statementStartDate).toBe("2026-06-01");
+    expect(parsed.metadata.statementEndDate).toBe("2026-06-30");
+    expect(parsed.metadata.beginningBalance).toBe(1000);
+    expect(parsed.metadata.endingBalance).toBe(1400);
+    expect(parsed.transactions.map((transaction) => [transaction.amount, transaction.direction])).toEqual([
+      [500, "inflow"],
+      [25, "outflow"],
+      [75, "outflow"],
+    ]);
+    expect(parsed.reconciliation.status).toBe("reconciled");
+    expect(parsed.confidence).toBe("high");
+  });
+
+  it("keeps an unscoped combined statement out of the single-account pipeline", () => {
+    expect(parseGenericStatement(combinedCreditUnion).unsupportedReason).toMatch(/multiple accounts/i);
   });
 });
 

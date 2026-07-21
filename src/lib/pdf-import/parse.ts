@@ -29,9 +29,55 @@ const blankMetadata = (): StatementMetadata => ({
 
 const lower = (s: string) => s.toLowerCase();
 
+const MONTHS: Record<string, number> = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3,
+  apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7,
+  aug: 8, august: 8, sep: 9, sept: 9, september: 9, oct: 10,
+  october: 10, nov: 11, november: 11, dec: 12, december: 12,
+};
+
+const numericDatePattern = String.raw`\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2}`;
+const monthDatePattern = String.raw`(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4}`;
+const statementDatePattern = `(?:${numericDatePattern}|${monthDatePattern})`;
+const decimalMoneyRe = /(\(?[-+$€£]?\s*\d[\d,]*\.\d{2}\)?)/g;
+
 function parseLooseDate(raw: string): string | null {
   const cleaned = raw.trim().replace(/,/g, "");
+  const named = /^([a-z]+)\s+(\d{1,2})\s+(\d{4})$/i.exec(cleaned);
+  if (named) {
+    const month = MONTHS[named[1].toLowerCase()];
+    const day = Number(named[2]);
+    const year = Number(named[3]);
+    if (month && day >= 1 && day <= 31) {
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (date.getUTCMonth() === month - 1 && date.getUTCDate() === day) {
+        return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      }
+    }
+  }
   return parseDateToken(cleaned, "mdy") ?? parseDateToken(cleaned, "ymd") ?? parseDateToken(cleaned, "dmy");
+}
+
+function statementPeriod(text: string): [string | null, string | null] {
+  const match = new RegExp(`(${statementDatePattern})\\s*(?:-|–|to|thru|through)\\s*(${statementDatePattern})`, "i").exec(text);
+  return match ? [parseLooseDate(match[1]), parseLooseDate(match[2])] : [null, null];
+}
+
+function columnarSummaryBalances(text: string): { beginningBalance: number | null; endingBalance: number | null } {
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const header = lines[index];
+    if (!/beginning balance/i.test(header) || !/ending balance/i.test(header)) continue;
+    const values = [...lines[index + 1].matchAll(decimalMoneyRe)]
+      .map((match) => parseAmountToken(match[1]))
+      .filter((value): value is number => value !== null);
+    if (values.length < 2) continue;
+    return {
+      beginningBalance: Math.abs(values[0]),
+      endingBalance: Math.abs(values[/ytd dividends?/i.test(header) && values.length >= 3 ? values.length - 2 : values.length - 1]),
+    };
+  }
+  return { beginningBalance: null, endingBalance: null };
 }
 
 function moneyAfter(text: string, labels: string[]): number | null {
@@ -77,8 +123,8 @@ export function classifyStatement(text: string): { accountType: PdfAccountType |
 
 function parseMetadata(text: string, accountType: PdfAccountType | null): StatementMetadata {
   const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
-  const period =
-    /statement\s+period\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})\s*(?:-|to|through|–)\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})/i.exec(text);
+  const period = statementPeriod(text);
+  const summary = columnarSummaryBalances(text);
   const accountNumber =
     /(?:account|card)\s*(?:number|no\.?)?\s*[:#\-]?\s*(?:x{2,}|\*{2,}|ending\s+in)?\s*([*\dxX-]{2,20})/i.exec(text);
 
@@ -88,10 +134,10 @@ function parseMetadata(text: string, accountType: PdfAccountType | null): Statem
     accountName: lines.find((l) => /\b(checking|savings|credit card)\b/i.test(l))?.slice(0, 80) ?? null,
     accountType,
     maskedAccountNumber: accountNumber?.[1]?.replace(/[^\d*xX-]/g, "").slice(-12) ?? null,
-    statementStartDate: period ? parseLooseDate(period[1]) : dateAfter(text, ["statement start date", "opening date"]),
-    statementEndDate: period ? parseLooseDate(period[2]) : dateAfter(text, ["statement end date", "closing date", "statement date"]),
-    beginningBalance: moneyAfter(text, ["beginning balance", "previous balance", "opening balance"]),
-    endingBalance: moneyAfter(text, ["ending balance", "new balance", "closing balance"]),
+    statementStartDate: period[0] ?? dateAfter(text, ["statement start date", "opening date"]),
+    statementEndDate: period[1] ?? dateAfter(text, ["statement end date", "closing date", "statement date"]),
+    beginningBalance: moneyAfter(text, ["beginning balance", "previous balance", "opening balance"]) ?? summary.beginningBalance,
+    endingBalance: moneyAfter(text, ["ending balance", "new balance", "closing balance"]) ?? summary.endingBalance,
     availableBalance: moneyAfter(text, ["available balance"]),
     creditLimit: moneyAfter(text, ["credit limit"]),
     minimumPayment: moneyAfter(text, ["minimum payment", "minimum amount due"]),
@@ -104,6 +150,83 @@ function directionFromLine(line: string, amount: number, accountType: PdfAccount
   if (/\b(payment|credit|refund|deposit|interest paid|transfer from)\b/.test(l)) return "inflow";
   if (/\b(debit|withdrawal|purchase|fee|interest charged|check|card purchase|transfer to)\b/.test(l)) return "outflow";
   return amount < 0 ? "outflow" : accountType === "credit_card" ? "outflow" : "inflow";
+}
+
+function parseColumnarTransactions(
+  text: string,
+  accountType: PdfAccountType,
+  metadata: StatementMetadata,
+): ExtractedTransaction[] | null {
+  if (!/transaction description\s+deposit\s+withdrawal\s+balance/i.test(text.replace(/\n+/g, " "))) return null;
+
+  const rows: ExtractedTransaction[] = [];
+  const dateStartRe = /^\s*(\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|\d{4}-\d{2}-\d{2})\s+/;
+  const year = metadata.statementEndDate?.slice(0, 4) ?? new Date().getFullYear().toString();
+  let priorBalance = metadata.beginningBalance === null ? null : toCents(metadata.beginningBalance);
+  let pageNumber: number | null = null;
+  let lineNo = 2;
+
+  for (const raw of text.split(/\n+/)) {
+    const line = raw.trim();
+    const page = /^--- Page (\d+) ---$/.exec(line);
+    if (page) {
+      pageNumber = Number(page[1]);
+      continue;
+    }
+    const firstDate = dateStartRe.exec(line);
+    if (!firstDate) continue;
+    const moneyMatches = [...line.matchAll(decimalMoneyRe)];
+    if (/beginning balance/i.test(line) && moneyMatches.length === 1) {
+      const opening = parseAmountToken(moneyMatches[0][1]);
+      if (opening !== null) priorBalance = toCents(Math.abs(opening));
+      continue;
+    }
+    if (moneyMatches.length < 2) continue;
+
+    const afterFirstDate = line.slice(firstDate[0].length);
+    const secondDate = dateStartRe.exec(afterFirstDate);
+    const dateText = firstDate[1].includes("/") && firstDate[1].split("/").length === 2 ? `${firstDate[1]}/${year}` : firstDate[1];
+    const postedDate = parseLooseDate(dateText);
+    const transactionDate = secondDate
+      ? parseLooseDate(secondDate[1].includes("/") && secondDate[1].split("/").length === 2 ? `${secondDate[1]}/${year}` : secondDate[1])
+      : null;
+    const amountMatch = moneyMatches.at(-2)!;
+    const balanceMatch = moneyMatches.at(-1)!;
+    const parsedAmount = parseAmountToken(amountMatch[1]);
+    const parsedBalance = parseAmountToken(balanceMatch[1]);
+    if (!postedDate || parsedAmount === null || parsedBalance === null || parsedAmount === 0) continue;
+
+    const amount = Math.abs(parsedAmount);
+    const amountCents = toCents(amount)!;
+    const balanceCents = toCents(Math.abs(parsedBalance))!;
+    const delta = priorBalance === null ? null : balanceCents - priorBalance;
+    const balanceMatched = delta !== null && Math.abs(delta) === amountCents;
+    const direction = balanceMatched
+      ? delta! > 0 ? "inflow" : "outflow"
+      : parsedAmount < 0 ? "outflow" : directionFromLine(line, parsedAmount, accountType);
+    const descriptionStart = firstDate[0].length + (secondDate?.[0].length ?? 0);
+    const description = line
+      .slice(descriptionStart, amountMatch.index)
+      .trim()
+      .replace(/\s+/g, " ")
+      .slice(0, 200);
+    priorBalance = balanceCents;
+    rows.push({
+      line: lineNo++,
+      postedDate,
+      transactionDate,
+      amount,
+      direction,
+      description,
+      category: categoryForDirection(direction),
+      referenceNumber: /\b(?:ref|reference|check)\s*#?\s*([a-z0-9-]+)/i.exec(line)?.[1] ?? null,
+      sourcePage: pageNumber,
+      confidence: balanceMatched ? "high" : "medium",
+      fieldConfidence: { dates: "medium", amounts: "high", direction: balanceMatched ? "high" : "medium" },
+      issues: balanceMatched ? [] : ["Debit or credit direction could not be verified from the running balance."],
+    });
+  }
+  return rows.length > 0 ? rows : null;
 }
 
 function parseTransactions(text: string, accountType: PdfAccountType): ExtractedTransaction[] {
@@ -164,6 +287,67 @@ function detectMultipleAccounts(text: string): boolean {
     .map((m) => m[1].replace(/\D/g, "").slice(-4))
     .filter((v) => v.length >= 2);
   return new Set(matches).size > 1;
+}
+
+type AccountSectionHeading = { lineIndex: number; accountType: PdfAccountType; identifier: string | null };
+
+function accountSectionHeading(line: string, lineIndex: number): AccountSectionHeading | null {
+  if (!/(?:account|card)\s*(?:number|no\.?)/i.test(line)) return null;
+  const accountType: PdfAccountType | null = /\bcredit card\b/i.test(line)
+    ? "credit_card"
+    : /\bchecking\b/i.test(line)
+      ? "checking"
+      : /\b(savings|regular share|share savings)\b/i.test(line)
+        ? "savings"
+        : null;
+  if (!accountType) return null;
+  const match = /(?:account|card)\s*(?:number|no\.?)?\s*[:#\-]?\s*(?:x{2,}|\*{2,}|ending\s+in)?\s*([*\dxX-]{2,20})/i.exec(line);
+  const digits = match?.[1]?.replace(/\D/g, "") ?? "";
+  return { lineIndex, accountType, identifier: digits.length >= 2 ? digits : null };
+}
+
+export function scopeStatementToAccount(
+  text: string,
+  target: { accountType: PdfAccountType; mask?: string | null },
+): { text: string; issues: string[]; unsupportedReason: string | null } {
+  const lines = text.split(/\n/);
+  const headings = lines.map(accountSectionHeading).filter((heading): heading is AccountSectionHeading => heading !== null);
+  const identities = new Set(headings.map((heading) => `${heading.accountType}:${heading.identifier ?? heading.lineIndex}`));
+  if (identities.size <= 1) return { text, issues: [], unsupportedReason: null };
+
+  const candidates = headings.filter((heading) => heading.accountType === target.accountType);
+  const candidateIds = new Map<string, AccountSectionHeading>();
+  for (const candidate of candidates) candidateIds.set(candidate.identifier ?? `line-${candidate.lineIndex}`, candidate);
+  const mask = target.mask?.replace(/\D/g, "") ?? "";
+  const selected = mask
+    ? [...candidateIds.values()].find((candidate) => candidate.identifier?.endsWith(mask)) ?? null
+    : candidateIds.size === 1 ? [...candidateIds.values()][0] : null;
+  if (!selected) {
+    return {
+      text,
+      issues: [],
+      unsupportedReason: candidates.length === 0
+        ? "This statement does not contain a section matching the selected account type."
+        : "This statement contains multiple matching accounts. Add the account's masked digits or use a single-account statement.",
+    };
+  }
+
+  const firstHeading = Math.min(...headings.map((heading) => heading.lineIndex));
+  const selectedLines = lines.slice(0, firstHeading);
+  let include = false;
+  for (let index = firstHeading; index < lines.length; index += 1) {
+    const heading = accountSectionHeading(lines[index], index);
+    if (heading) {
+      include = heading.accountType === selected.accountType
+        && (selected.identifier === null || heading.identifier === selected.identifier);
+    }
+    if (include) selectedLines.push(lines[index]);
+  }
+  return {
+    text: selectedLines.join("\n"),
+    issues: [`This PDF contains multiple accounts. Only the selected ${target.accountType.replace("_", " ")} section was staged; other account sections were skipped.`],
+    unsupportedReason: null,
+  };
 }
 
 export function reconcileStatement(metadata: StatementMetadata, transactions: ExtractedTransaction[]): ReconciliationResult {
@@ -246,7 +430,7 @@ export function parseGenericStatement(text: string, extractionMethod: "native_te
     };
   }
   const metadata = parseMetadata(text, cls.accountType);
-  const transactions = parseTransactions(text, cls.accountType);
+  const transactions = parseColumnarTransactions(text, cls.accountType, metadata) ?? parseTransactions(text, cls.accountType);
   const reconciliation = reconcileStatement(metadata, transactions);
   const fieldConfidence: FieldConfidence = {
     dates: metadata.statementStartDate && metadata.statementEndDate ? "high" : "low",

@@ -24,12 +24,14 @@ import type { MutationResult } from "@/lib/validation/transactions";
 import { extractPdfText } from "@/lib/pdf-import/extract";
 import { fileSha256, likelyDuplicateTransaction } from "@/lib/pdf-import/dedupe";
 import { parseStatementWithRegistry } from "@/lib/pdf-import/registry";
+import { scopeStatementToAccount } from "@/lib/pdf-import/parse";
 import {
   PDF_IMPORT_BUCKET,
   PDF_IMPORT_PARSER_VERSION,
   type OcrDocument,
   type OcrFailureCode,
   type ParsedStatement,
+  type PdfAccountType,
   type PdfReviewData,
   type StatementMetadata,
 } from "@/lib/pdf-import/types";
@@ -474,7 +476,12 @@ async function failPdfOcrImport(
 
 async function processPdfImport(
   supabase: SupabaseClient,
-  input: { importId: string; userId: string; bytes: Uint8Array },
+  input: {
+    importId: string;
+    userId: string;
+    bytes: Uint8Array;
+    targetAccount: { id: string; accountType: PdfAccountType; mask: string | null };
+  },
 ): Promise<{ error: string; review?: PdfReviewData }> {
   await supabase.from("import_batches").update({
     status: "extracting",
@@ -501,7 +508,13 @@ async function processPdfImport(
         const review = await readPdfReview(input.importId);
         return review.data ? { error: "", review: review.data } : { error: review.error };
       }
-      const parsed = parseStatementWithRegistry(ocr.fullText, "ocr");
+      const scoped = scopeStatementToAccount(ocr.fullText, input.targetAccount);
+      const parsed = parseStatementWithRegistry(scoped.text, "ocr");
+      parsed.issues = [...scoped.issues, ...parsed.issues];
+      if (scoped.unsupportedReason) {
+        parsed.transactions = [];
+        parsed.unsupportedReason = scoped.unsupportedReason;
+      }
       await stageParsedPdfImport(supabase, {
         importId: input.importId,
         userId: input.userId,
@@ -513,7 +526,13 @@ async function processPdfImport(
       return review.data ? { error: "", review: review.data } : { error: review.error };
     }
 
-    const parsed = parseStatementWithRegistry(extracted.text, extracted.method);
+    const scoped = scopeStatementToAccount(extracted.text, input.targetAccount);
+    const parsed = parseStatementWithRegistry(scoped.text, extracted.method);
+    parsed.issues = [...scoped.issues, ...parsed.issues];
+    if (scoped.unsupportedReason) {
+      parsed.transactions = [];
+      parsed.unsupportedReason = scoped.unsupportedReason;
+    }
     await stageParsedPdfImport(supabase, {
       importId: input.importId,
       userId: input.userId,
@@ -547,6 +566,27 @@ export async function uploadStatementPdf(formData: FormData): Promise<{ error: s
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
+  const accountId = formData.get("accountId");
+  if (typeof accountId !== "string" || !z.uuid().safeParse(accountId).success) {
+    return { error: "Choose the account this statement belongs to first." };
+  }
+  const { data: account, error: accountErr } = await supabase
+    .from("financial_accounts")
+    .select("id, type, mask, provider, archived_at")
+    .eq("id", accountId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (accountErr) return { error: accountErr.message };
+  if (!account || account.archived_at) return { error: "The selected account is unavailable." };
+  if (account.provider === "demo") return { error: "Import into one of your own accounts, not demo data." };
+  if (!["checking", "savings", "credit_card"].includes(account.type)) {
+    return { error: "PDF imports currently support checking, savings, and credit-card accounts." };
+  }
+  const targetAccount = {
+    id: account.id,
+    accountType: account.type as PdfAccountType,
+    mask: account.mask as string | null,
+  };
   const file = formData.get("file");
   if (!(file instanceof File)) return { error: "Choose a PDF statement first." };
 
@@ -578,11 +618,11 @@ export async function uploadStatementPdf(formData: FormData): Promise<{ error: s
       return { error: "This statement PDF was already confirmed and added to your financial record." };
     }
     if (duplicate.status === "failed") {
-      return processPdfImport(supabase, { importId: duplicate.id, userId: user.id, bytes });
+      return processPdfImport(supabase, { importId: duplicate.id, userId: user.id, bytes, targetAccount });
     }
     if (duplicate.status === "unsupported") {
       if (duplicate.parser_version !== PDF_IMPORT_PARSER_VERSION) {
-        return processPdfImport(supabase, { importId: duplicate.id, userId: user.id, bytes });
+        return processPdfImport(supabase, { importId: duplicate.id, userId: user.id, bytes, targetAccount });
       }
       return {
         error: `This statement PDF was already uploaded, but it is not supported: ${duplicate.unsupported_reason ?? "Unsupported statement type."}`,
@@ -626,7 +666,7 @@ export async function uploadStatementPdf(formData: FormData): Promise<{ error: s
     file_sha256: sha,
   });
 
-  return processPdfImport(supabase, { importId, userId: user.id, bytes });
+  return processPdfImport(supabase, { importId, userId: user.id, bytes, targetAccount });
 }
 
 export async function getPdfImportReview(importId: string): Promise<{ error: string; review?: PdfReviewData }> {

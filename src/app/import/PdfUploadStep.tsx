@@ -6,9 +6,11 @@ import { uploadStatementPdf } from "@/app/actions/imports";
 import type { PdfReviewData } from "@/lib/pdf-import/types";
 
 export function PdfUploadStep({
+  accountId,
   accountName,
   onReady,
 }: {
+  accountId: string;
   accountName: string;
   onReady: (review: PdfReviewData) => void;
 }) {
@@ -20,6 +22,7 @@ export function PdfUploadStep({
     setError("");
     const form = new FormData();
     form.set("file", file);
+    form.set("accountId", accountId);
     startTransition(async () => {
       const result = await uploadStatementPdf(form);
       if (result.error) {
