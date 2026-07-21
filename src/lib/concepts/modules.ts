@@ -8,4 +8,10 @@ export const MODULES: Module[] = [
     order: 1,
     conceptIds: ["revenue", "operating-expenses", "cash-flow", "free-cash-flow", "savings-rate"],
   },
+  {
+    id: "reading-your-household-balance-sheet",
+    title: "Reading Your Household Balance Sheet",
+    order: 2,
+    conceptIds: ["assets", "liabilities", "net-worth", "liquidity"],
+  },
 ];

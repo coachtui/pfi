@@ -37,4 +37,15 @@ describe("authored content", () => {
       if (c.lesson) expect(c.lesson.genericExample.toLowerCase(), c.id).toContain("sample");
     }
   });
+
+  it("has Module 2 with its four concepts in teaching order", () => {
+    const m2 = MODULES.find((m) => m.id === "reading-your-household-balance-sheet");
+    expect(m2?.conceptIds).toEqual(["assets", "liabilities", "net-worth", "liquidity"]);
+  });
+
+  it("gives every Module 2 concept a full lesson", () => {
+    for (const id of ["assets", "liabilities", "net-worth", "liquidity"]) {
+      expect(ALL_CONCEPTS.find((c) => c.id === id)?.lesson, id).toBeDefined();
+    }
+  });
 });
