@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { ConceptId } from "@/lib/concepts";
+import type { ConceptId, ConceptProgressStatus } from "@/lib/concepts";
 import { CONCEPT_REGISTRY } from "@/lib/concepts";
 import { buildTermSheetModel } from "@/lib/concepts/term-sheet";
 import { TermDefinitionSheet } from "./TermDefinitionSheet";
@@ -23,10 +23,10 @@ export function useTermSheet(): TermSheetApi {
 
 export function TermSheetProvider({
   children,
-  completedConceptIds = [],
+  academyStatus,
 }: {
   children: ReactNode;
-  completedConceptIds?: string[];
+  academyStatus?: { inProgress: string[]; completed: string[] };
 }) {
   const [stack, setStack] = useState<ConceptId[]>([]);
 
@@ -40,11 +40,16 @@ export function TermSheetProvider({
     [openTerm, pushTerm, backTerm, closeTerm],
   );
 
-  const completedSet = useMemo(() => new Set(completedConceptIds), [completedConceptIds]);
+  const statusFor = useMemo(() => {
+    const started = new Set(academyStatus?.inProgress ?? []);
+    const completed = new Set(academyStatus?.completed ?? []);
+    return (id: ConceptId): ConceptProgressStatus =>
+      completed.has(id) ? "completed" : started.has(id) ? "in-progress" : "not-started";
+  }, [academyStatus]);
 
   const currentId = stack.at(-1) ?? null;
   const model = currentId
-    ? buildTermSheetModel(CONCEPT_REGISTRY, currentId, { completed: completedSet.has(currentId) })
+    ? buildTermSheetModel(CONCEPT_REGISTRY, currentId, { progress: statusFor(currentId) })
     : null;
 
   return (

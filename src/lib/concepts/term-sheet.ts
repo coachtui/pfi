@@ -1,8 +1,11 @@
 // src/lib/concepts/term-sheet.ts
-// Framework-free (no React/Next). Builds the pre-completion definition-sheet
-// view-model from the concept registry. Slice 2 (docs/superpowers/plans/2026-07-20-academy-slice2-financial-term.md).
+// Framework-free (no React/Next). Builds the definition-sheet view-model.
+// Depth content (whyItMatters, businessContext, classification) is un-gated —
+// shown at every progress state; completion only adds the live-data block
+// (spec 2026-07-21-academy-content-refinement, decision #4).
+import type { ConceptProgressStatus } from "./progress";
 import type { ConceptRegistry } from "./registry";
-import type { ConceptId, FinancialConcept } from "./types";
+import type { ConceptClassification, ConceptId, FinancialConcept, FormulaRow } from "./types";
 
 export interface TermSheetRelated {
   id: ConceptId;
@@ -12,30 +15,29 @@ export interface TermSheetRelated {
 export interface TermSheetModel {
   id: ConceptId;
   title: string;
-  shortDefinition: string;
-  fullDefinition: string;
+  classification: ConceptClassification;
+  /** plainEnglishSummary when authored; shortDefinition otherwise. */
+  summary: string;
+  /** fullDefinition, only for concepts not yet migrated to plainEnglishSummary. */
+  detail?: string;
+  whyItMatters: string;
+  businessContext?: string;
   formula?: string;
+  formulaRows?: FormulaRow[];
   householdAdaptation?: string;
+  whereUsed: string[];
   related: TermSheetRelated[];
-  /** Slice 3: lesson CTA + completed ("analytical depth") variant. */
   hasLesson: boolean;
-  completed: boolean;
-  whyItMatters?: string;   // present only when completed
-  businessContext?: string; // present only when completed
+  /** Always "not-started" for glossary-only concepts. */
+  progress: ConceptProgressStatus;
+  /** Present ⇒ the completed live block may fetch (via getConceptLive). */
+  dataMetricKey?: string;
 }
 
-/**
- * Build the definition-sheet view-model for a concept. Returns null when the
- * concept is missing or not published, so callers render nothing (FinancialTerm
- * degrades to plain text). Related concepts are filtered to published records.
- *
- * When completed is true and the concept has a lesson, unlocks whyItMatters
- * and businessContext for deeper analytical engagement.
- */
 export function buildTermSheetModel(
   registry: ConceptRegistry,
   conceptId: ConceptId,
-  opts?: { completed?: boolean },
+  opts?: { progress?: ConceptProgressStatus },
 ): TermSheetModel | null {
   const c = registry.byId(conceptId);
   if (!c || c.status !== "published") return null;
@@ -46,19 +48,23 @@ export function buildTermSheetModel(
     .map((r) => ({ id: r.id, title: r.title }));
 
   const hasLesson = !!c.lesson;
-  const completed = hasLesson && !!opts?.completed; // glossary-only records can never complete
+  const progress: ConceptProgressStatus = hasLesson ? (opts?.progress ?? "not-started") : "not-started";
 
   return {
     id: c.id,
     title: c.title,
-    shortDefinition: c.shortDefinition,
-    fullDefinition: c.fullDefinition,
+    classification: c.classification,
+    summary: c.plainEnglishSummary ?? c.shortDefinition,
+    detail: c.plainEnglishSummary ? undefined : c.fullDefinition,
+    whyItMatters: c.whyItMatters,
+    businessContext: c.businessContext,
     formula: c.formula,
+    formulaRows: c.formulaRows,
     householdAdaptation: c.householdAdaptation,
+    whereUsed: c.whereUsed ?? [],
     related,
     hasLesson,
-    completed,
-    whyItMatters: completed ? c.whyItMatters : undefined,
-    businessContext: completed ? c.businessContext : undefined,
+    progress,
+    dataMetricKey: c.dataMetricKey,
   };
 }

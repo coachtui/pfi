@@ -4,7 +4,7 @@ import { BottomNav } from "@/components/nav/BottomNav";
 import { TermSheetProvider } from "@/components/concepts/TermSheetProvider";
 import { branding } from "@/lib/config/branding";
 import { createClient } from "@/lib/supabase/server";
-import { getCompletedConceptIds } from "@/lib/data/queries";
+import { getAcademyStatusIds } from "@/lib/data/queries";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,7 +40,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const supabase = await createClient();
-  const completedConceptIds = await getCompletedConceptIds(supabase);
+  const academyStatus = await getAcademyStatusIds(supabase);
 
   return (
     <html
@@ -48,7 +48,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <TermSheetProvider completedConceptIds={completedConceptIds}>
+        <TermSheetProvider academyStatus={academyStatus}>
           <main className="mx-auto w-full max-w-2xl flex-1 px-4 pt-3 pb-28">{children}</main>
           <BottomNav />
         </TermSheetProvider>
