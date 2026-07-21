@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const assets: FinancialConcept = {
   id: "assets",
   title: "Assets",
+  classification: "standard_finance" as const,
   shortDefinition: "Everything your household owns that has monetary value.",
   fullDefinition:
     "An asset is anything your household owns that has monetary value — cash in an account, a home, a car, an investment balance, or any other thing of value you hold. Assets are what a household owns, as distinct from what it owes (liabilities) or how quickly a given asset can be turned into spendable cash (liquidity).",
@@ -17,7 +18,7 @@ export const assets: FinancialConcept = {
   prerequisiteConceptIds: [],
   status: "published",
   lesson: {
-    intro:
+    opening:
       "If someone asked you to list everything your household owns that's worth money — your checking account, your car, your home, your retirement account — you'd be listing its assets. That's the whole idea: an asset is anything of monetary value your household owns.",
     standardTerm:
       "“Assets” is the standard business and accounting term for everything an entity owns that has monetary value. It appears on every balance sheet, whether for a household, a small business, or a public company, and it's always paired with the question of what's owed against it.",
@@ -30,8 +31,9 @@ export const assets: FinancialConcept = {
       "Sample figures: the Rivera household owns a home worth $225,000, has $9,300 in liquid cash across checking and savings, holds $18,000 in a retirement account, and owns a car and other smaller items worth $7,700. Added together, their total assets come to $225,000 + $9,300 + $18,000 + $7,700 = $260,000 in this sample scenario — the starting figure this module's net worth lesson builds on.",
     commonMisunderstanding:
       "Owning valuable assets does not mean you have cash available. A household can be asset-rich — a paid-off home, a strong retirement balance — and still struggle to cover an unexpected bill next week, because most of that value isn't sitting in cash. Assets measure what's owned, not what's immediately spendable.",
-    knowledgeCheck: [
+    knowledgeChecks: [
       {
+        id: "assets-check-1",
         kind: "identify-figure",
         prompt: "Sample figures: which of the following is an asset for a household?",
         choices: ["A $9,300 savings account balance", "A $1,800 credit-card balance", "A $1,400 monthly rent payment", "A $6,200 monthly salary"],

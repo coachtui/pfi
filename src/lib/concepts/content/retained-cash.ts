@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const retainedCash: FinancialConcept = {
   id: "retained-cash",
   title: "Retained cash",
+  classification: "household_adaptation" as const,
   shortDefinition: "The portion of free cash flow your household kept as cash rather than allocating elsewhere.",
   fullDefinition:
     "Retained cash is the slice of a household's free cash flow that stayed as cash — not sent to an investment account and not used to pay down debt beyond the required minimum. It's the numerator in the savings rate: retained cash divided by revenue produces the savings-rate percentage.",

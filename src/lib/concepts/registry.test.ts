@@ -5,6 +5,7 @@ import type { FinancialConcept, Module } from "./types";
 const concept = (id: string, over: Partial<FinancialConcept> = {}): FinancialConcept => ({
   id,
   title: id,
+  classification: "standard_finance" as const,
   shortDefinition: "One sentence.",
   fullDefinition: "Full definition.",
   whyItMatters: "Why it matters.",
@@ -15,12 +16,12 @@ const concept = (id: string, over: Partial<FinancialConcept> = {}): FinancialCon
 });
 
 const lesson = (over: Partial<NonNullable<FinancialConcept["lesson"]>> = {}) => ({
-  intro: "Intro.",
+  opening: "Opening.",
   standardTerm: "Term.",
-  genericExample: "Example.",
+  genericExample: "Sample example.",
   commonMisunderstanding: "Misunderstanding.",
-  knowledgeCheck: [
-    { kind: "interpretation" as const, prompt: "?", choices: ["a", "b"], correctIndex: 0, explanation: "Because." },
+  knowledgeChecks: [
+    { id: "c-1", kind: "interpretation" as const, prompt: "?", choices: ["a", "b"], correctIndex: 0, explanation: "Because." },
   ],
   reinforcementPreview: "Preview.",
   ...over,
@@ -73,13 +74,13 @@ describe("validateRegistry", () => {
   });
 
   it("rejects lessons with zero or more than two knowledge checks", () => {
-    const zero = concept("a", { lesson: lesson({ knowledgeCheck: [] }) });
+    const zero = concept("a", { lesson: lesson({ knowledgeChecks: [] }) });
     const three = concept("b", {
       lesson: lesson({
-        knowledgeCheck: [
-          { kind: "interpretation", prompt: "?", choices: ["a", "b"], correctIndex: 0, explanation: "x" },
-          { kind: "interpretation", prompt: "?", choices: ["a", "b"], correctIndex: 0, explanation: "x" },
-          { kind: "interpretation", prompt: "?", choices: ["a", "b"], correctIndex: 0, explanation: "x" },
+        knowledgeChecks: [
+          { id: "k1", kind: "interpretation", prompt: "?", choices: ["a", "b"], correctIndex: 0, explanation: "x" },
+          { id: "k2", kind: "interpretation", prompt: "?", choices: ["a", "b"], correctIndex: 0, explanation: "x" },
+          { id: "k3", kind: "interpretation", prompt: "?", choices: ["a", "b"], correctIndex: 0, explanation: "x" },
         ],
       }),
     });
@@ -90,9 +91,31 @@ describe("validateRegistry", () => {
   it("rejects out-of-bounds correctIndex", () => {
     const bad = concept("a", {
       lesson: lesson({
-        knowledgeCheck: [{ kind: "interpretation", prompt: "?", choices: ["a", "b"], correctIndex: 2, explanation: "x" }],
+        knowledgeChecks: [{ id: "k1", kind: "interpretation", prompt: "?", choices: ["a", "b"], correctIndex: 2, explanation: "x" }],
       }),
     });
     expect(validateRegistry([bad], [])).toContainEqual(expect.stringContaining("correctIndex"));
+  });
+
+  it("rejects duplicate knowledge-check ids within a lesson", () => {
+    const bad = concept("a", {
+      lesson: lesson({
+        knowledgeChecks: [
+          { id: "dup", kind: "interpretation", prompt: "?", choices: ["a", "b"], correctIndex: 0, explanation: "x" },
+          { id: "dup", kind: "interpretation", prompt: "?", choices: ["a", "b"], correctIndex: 0, explanation: "x" },
+        ],
+      }),
+    });
+    expect(validateRegistry([bad], [])).toContainEqual(expect.stringContaining("duplicate knowledge check id"));
+  });
+
+  it("rejects formulaRows without an accessible formula fallback", () => {
+    const bad = concept("a", { formulaRows: [{ label: "X" }] });
+    expect(validateRegistry([bad], [])).toContainEqual(expect.stringContaining("formulaRows"));
+  });
+
+  it("rejects empty whereUsed entries", () => {
+    const bad = concept("a", { whereUsed: ["Report", " "] });
+    expect(validateRegistry([bad], [])).toContainEqual(expect.stringContaining("whereUsed"));
   });
 });

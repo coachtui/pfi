@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const debtPressure: FinancialConcept = {
   id: "debt-pressure",
   title: "Debt pressure",
+  classification: "household_adaptation" as const,
   shortDefinition: "How much of your revenue is committed to required debt payments.",
   fullDefinition:
     "Debt pressure measures the share of your household's revenue that must go toward required debt payments — the minimums on loans and credit cards, with housing measured separately. It's a measure of strain, not size: it compares what you owe monthly against what you earn monthly, rather than the total balance owed.",
@@ -21,7 +22,7 @@ export const debtPressure: FinancialConcept = {
   dataMetricKey: "metric:debt_service_ratio",
   status: "published",
   lesson: {
-    intro:
+    opening:
       "You've seen what your household owes in total (liabilities) and what it generates after operating costs (free cash flow). Debt pressure asks a narrower, more urgent question: of the money coming in each month, how much is already spoken for by required debt payments?",
     standardTerm:
       "Analysts and lenders call this family of measures “debt service” ratios — required debt payments compared against income. It's one of the first things a lender checks before extending new credit, because it shows how much strain existing obligations already create.",
@@ -42,8 +43,9 @@ export const debtPressure: FinancialConcept = {
     },
     commonMisunderstanding:
       "Debt pressure is not the same as total debt. The Rivera household's $12,000 car loan is a small piece of their $212,000 total liabilities, but if its required payment were high relative to income, it could create more monthly pressure than the much larger mortgage balance, which carries a manageable payment. Pressure is about the required payment against income, not the size of what's owed.",
-    knowledgeCheck: [
+    knowledgeChecks: [
       {
+        id: "debt-pressure-check-1",
         kind: "interpretation",
         prompt:
           "Household A owes a $250,000 mortgage with payments equal to 12% of revenue. Household B owes $8,000 in credit-card balances with payments equal to 22% of revenue. Which household has more debt pressure?",
@@ -58,6 +60,7 @@ export const debtPressure: FinancialConcept = {
           "Debt pressure compares required payments against revenue, not the size of the balance owed. Household B's smaller balance carries a much heavier required payment relative to its income, so it faces more pressure despite owing far less in total.",
       },
       {
+        id: "debt-pressure-check-2",
         kind: "which-action",
         prompt: "Which action would reduce a household's debt pressure next month?",
         choices: [

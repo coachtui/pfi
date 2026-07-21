@@ -41,6 +41,7 @@ test("glossary-only row opens the definition sheet, not a lesson", async () => {
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("link", { name: /lesson/i })).toHaveCount(0); // no CTA on glossary terms
+  await expect(dialog.getByText("Why it matters")).toBeVisible(); // un-gated for glossary concepts too
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 });
@@ -55,11 +56,37 @@ test("the report's Revenue term offers Take the lesson and deep-links into it", 
   await page.goto("/report");
   await page.getByRole("button", { name: "Revenue — show definition" }).click();
   const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Standard finance term")).toBeVisible();
+  await expect(dialog.getByText("Why it matters")).toBeVisible(); // un-gated pre-completion
   await expect(dialog.getByRole("link", { name: "Take the lesson" })).toBeVisible();
+  // Registered before the click so the listener is armed before LessonView
+  // mounts and fires its startLesson server action (a POST to the current
+  // URL) — waiting for the response only after navigating risks missing it
+  // if the action already fired and resolved by then.
+  const startLessonResponse = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.status() === 200,
+  );
   await dialog.getByRole("link", { name: "Take the lesson" }).click();
   await page.waitForURL("**/academy/revenue");
   await expect(page.getByRole("heading", { name: "1. What is revenue?" })).toBeVisible();
-  await expect(page.getByText("Sample data")).toBeVisible(); // generic example is labeled
+  await expect(page.getByText("Not every deposit is revenue.")).toBeVisible(); // memorable distinction
+  await expect(page.getByText("Calculated from your data")).toBeVisible();     // live household application
+  // LessonView's startLesson call on mount is deliberately fire-and-forget (a
+  // failure only delays "In progress" showing up, never blocks reading the
+  // lesson) — wait for it to settle so the next test's status read is stable.
+  await startLessonResponse;
+});
+
+test("an in-progress lesson's term sheet offers Continue lesson", async () => {
+  await page.goto("/report");
+  await page.getByRole("button", { name: "Revenue — show definition" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("link", { name: "Continue lesson" })).toBeVisible();
+  await dialog.getByRole("link", { name: "Continue lesson" }).click();
+  await page.waitForURL("**/academy/revenue");
+  // Wait for the lesson content (not just the URL) to render before the next
+  // test reads knowledge-check groups off this same page.
+  await expect(page.getByRole("heading", { name: "1. What is revenue?" })).toBeVisible();
 });
 
 test("answering all checks completes the lesson — right or wrong", async () => {
@@ -89,6 +116,7 @@ test("answering all checks completes the lesson — right or wrong", async () =>
 
   const complete = page.getByRole("status").filter({ hasText: "Lesson complete" });
   await expect(complete).toBeVisible(); // lesson completes despite the wrong answer above
+  await expect(complete.getByRole("button", { name: "Review concept" })).toBeVisible();
 });
 
 test("home reflects the completion", async () => {
@@ -99,14 +127,26 @@ test("home reflects the completion", async () => {
   await expect(page.getByText("Completed").first()).toBeVisible();
 });
 
-test("the term sheet unlocks the completed variant", async () => {
+test("the completed term sheet deepens with the user's data", async () => {
   await page.goto("/report");
   await page.getByRole("button", { name: "Revenue — show definition" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("Lesson completed")).toBeVisible();
+  await expect(dialog.getByText("Academy concept completed")).toBeVisible();
   await expect(dialog.getByText("Why it matters")).toBeVisible();
+  await expect(dialog.getByText("Your data")).toBeVisible(); // completed live block (demo data present)
   await expect(dialog.getByRole("link", { name: "Review lesson" })).toBeVisible();
   await page.keyboard.press("Escape");
+});
+
+test("Available capital's sheet is a labeled PFI metric with no internal language", async () => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Available capital — show definition" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("PFI metric")).toBeVisible();
+  await expect(dialog.getByText("Where it appears")).toBeVisible();
+  await expect(dialog.getByText(/audit ruling|spec finding/i)).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
 });
 
 test("no nested interactive content on the dashboard", async () => {

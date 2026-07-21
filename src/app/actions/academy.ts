@@ -6,6 +6,7 @@ import { CONCEPT_REGISTRY } from "@/lib/concepts";
 import {
   appendCheckResponse, lessonConcept, validateCheckAnswer, type CheckResponse,
 } from "@/lib/concepts/progress";
+import { getConceptLiveData, type ConceptLiveData } from "@/lib/data/concept-live";
 
 /** Upsert the in-progress row. Idempotent — re-opening a lesson is a no-op. */
 export async function startLesson(conceptId: string): Promise<{ error: string }> {
@@ -36,14 +37,14 @@ export interface AnswerResult {
  */
 export async function answerKnowledgeCheck(
   conceptId: string,
-  checkIndex: number,
+  checkId: string,
   choiceIndex: number,
 ): Promise<AnswerResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
-  const invalid = validateCheckAnswer(CONCEPT_REGISTRY, conceptId, checkIndex, choiceIndex);
+  const invalid = validateCheckAnswer(CONCEPT_REGISTRY, conceptId, checkId, choiceIndex);
   if (invalid) return { error: invalid };
   const concept = lessonConcept(CONCEPT_REGISTRY, conceptId)!;
 
@@ -57,9 +58,9 @@ export async function answerKnowledgeCheck(
 
   const prior = (row?.check_responses as CheckResponse[] | null) ?? [];
   const { responses, allAnswered, duplicate } = appendCheckResponse(
-    concept.lesson!.knowledgeCheck.length,
+    concept.lesson!.knowledgeChecks.length,
     prior,
-    { checkIndex, choiceIndex },
+    { checkId, choiceIndex },
   );
   if (duplicate) return { error: "", responses: prior, completed: !!row?.completed_at };
 
@@ -77,4 +78,17 @@ export async function answerKnowledgeCheck(
     revalidatePath("/academy");
   }
   return { error: "", responses, completed: !!completedAt };
+}
+
+/** Lazy completed-state fetch for the definition sheet (spec decision #10). */
+export async function getConceptLive(
+  conceptId: string,
+): Promise<{ error: string; data?: ConceptLiveData | null }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+  const c = CONCEPT_REGISTRY.byId(conceptId);
+  if (!c || c.status !== "published" || !c.dataMetricKey) return { error: "", data: null };
+  const data = await getConceptLiveData(supabase, c.dataMetricKey);
+  return { error: "", data };
 }

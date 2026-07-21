@@ -549,13 +549,20 @@ export async function getAcademyProgress(supabase: SupabaseClient): Promise<Acad
   };
 }
 
-/** Completed concept ids for the term-sheet variant. [] when signed out or on error
- *  (the sheet then shows the pre-completion variant — the safe degradation). */
-export async function getCompletedConceptIds(supabase: SupabaseClient): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("academy_progress")
-    .select("concept_id")
-    .not("completed_at", "is", null);
-  if (error) return [];
-  return (data ?? []).map((r) => r.concept_id as string);
+export interface AcademyStatusIds {
+  inProgress: string[];
+  completed: string[];
+}
+
+/** Started/completed concept ids for the term-sheet CTA states. Empty when
+ *  signed out or on error — the sheet then shows not-started, the safe
+ *  degradation (never fake completion). */
+export async function getAcademyStatusIds(supabase: SupabaseClient): Promise<AcademyStatusIds> {
+  const { data, error } = await supabase.from("academy_progress").select("concept_id, completed_at");
+  if (error) return { inProgress: [], completed: [] };
+  const out: AcademyStatusIds = { inProgress: [], completed: [] };
+  for (const r of data ?? []) {
+    (r.completed_at ? out.completed : out.inProgress).push(r.concept_id as string);
+  }
+  return out;
 }

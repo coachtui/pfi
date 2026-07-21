@@ -5,6 +5,16 @@ import Link from "next/link";
 import { Sheet } from "@/components/ui/Sheet";
 import type { ConceptId } from "@/lib/concepts";
 import type { TermSheetModel } from "@/lib/concepts/term-sheet";
+import { ClassificationLabel } from "./ClassificationLabel";
+import { ConceptLiveBlock } from "./ConceptLiveBlock";
+import { FormulaBlock } from "./FormulaBlock";
+import { WhereUsedList } from "./WhereUsedList";
+
+const CTA_LABEL = {
+  "not-started": "Take the lesson",
+  "in-progress": "Continue lesson",
+  completed: "Review lesson",
+} as const;
 
 export function TermDefinitionSheet({
   model,
@@ -20,12 +30,7 @@ export function TermDefinitionSheet({
   onRelated: (id: ConceptId) => void;
 }) {
   return (
-    <Sheet
-      open={model !== null}
-      onClose={onClose}
-      title={model?.title ?? ""}
-      contentKey={model?.id}
-    >
+    <Sheet open={model !== null} onClose={onClose} title={model?.title ?? ""} contentKey={model?.id}>
       {model && (
         <div className="flex flex-col gap-4">
           {canGoBack && (
@@ -39,43 +44,62 @@ export function TermDefinitionSheet({
             </button>
           )}
 
-          <p className="text-base leading-relaxed text-primary">{model.shortDefinition}</p>
-          {model.completed && (
+          <div className="flex flex-col gap-1">
+            <ClassificationLabel classification={model.classification} />
+            {model.businessContext && (
+              <p className="text-xs leading-relaxed text-tertiary">{model.businessContext}</p>
+            )}
+          </div>
+
+          <p className="text-base leading-relaxed text-primary">{model.summary}</p>
+          {model.detail && <p className="text-sm leading-relaxed text-secondary">{model.detail}</p>}
+
+          {model.progress === "completed" && (
             <p className="flex items-center gap-1.5 text-xs text-secondary">
               <CheckCircle2 size={14} aria-hidden className="text-positive" />
-              Lesson completed
+              Academy concept completed
             </p>
           )}
-          <p className="text-sm leading-relaxed text-secondary">{model.fullDefinition}</p>
 
-          {(model.formula || model.householdAdaptation) && (
-            <div className="rounded-xl border border-border-subtle bg-inset p-3">
-              {model.formula && (
-                <>
-                  <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">Formula</p>
-                  <p className="font-mono text-sm text-primary">{model.formula}</p>
-                </>
-              )}
+          <div>
+            <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">Why it matters</p>
+            <p className="text-sm leading-relaxed text-secondary">{model.whyItMatters}</p>
+          </div>
+
+          {model.formulaRows && model.formula ? (
+            <div>
+              <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">Formula</p>
+              <FormulaBlock rows={model.formulaRows} fallbackText={model.formula} showValues={false} />
               {model.householdAdaptation && (
-                <p className={model.formula ? "mt-2 text-xs text-tertiary" : "text-xs text-tertiary"}>
-                  Household: {model.householdAdaptation}
-                </p>
+                <p className="mt-2 text-xs text-tertiary">Household: {model.householdAdaptation}</p>
               )}
+            </div>
+          ) : (
+            (model.formula || model.householdAdaptation) && (
+              <div className="rounded-xl border border-border-subtle bg-inset p-3">
+                {model.formula && (
+                  <>
+                    <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">Formula</p>
+                    <p className="font-mono text-sm text-primary">{model.formula}</p>
+                  </>
+                )}
+                {model.householdAdaptation && (
+                  <p className={model.formula ? "mt-2 text-xs text-tertiary" : "text-xs text-tertiary"}>
+                    Household: {model.householdAdaptation}
+                  </p>
+                )}
+              </div>
+            )
+          )}
+
+          {model.whereUsed.length > 0 && (
+            <div>
+              <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">Where it appears</p>
+              <WhereUsedList items={model.whereUsed} />
             </div>
           )}
 
-          {model.whyItMatters && (
-            <div>
-              <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">Why it matters</p>
-              <p className="text-sm leading-relaxed text-secondary">{model.whyItMatters}</p>
-            </div>
-          )}
-          {model.businessContext && (
-            <div>
-              <p className="mb-1 text-xs font-medium tracking-wide text-tertiary uppercase">In business terms</p>
-              <p className="text-sm leading-relaxed text-secondary">{model.businessContext}</p>
-            </div>
-          )}
+          {model.progress === "completed" && model.dataMetricKey && <ConceptLiveBlock conceptId={model.id} />}
 
           {model.related.length > 0 && (
             <div>
@@ -101,7 +125,7 @@ export function TermDefinitionSheet({
               onClick={onClose}
               className="mt-1 self-start rounded-lg border border-border-subtle px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:border-border-strong"
             >
-              {model.completed ? "Review lesson" : "Take the lesson"}
+              {CTA_LABEL[model.progress]}
             </Link>
           )}
         </div>

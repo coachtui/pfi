@@ -22,10 +22,35 @@ export type DataRequirement =
   | "debt-accounts"
   | "recurring-obligations";
 
-export type KnowledgeCheck =
-  | { kind: "interpretation"; prompt: string; choices: string[]; correctIndex: number; explanation: string }
-  | { kind: "identify-figure"; prompt: string; choices: string[]; correctIndex: number; explanation: string }
-  | { kind: "which-action"; prompt: string; choices: string[]; correctIndex: number; explanation: string };
+export interface KnowledgeCheck {
+  /** Stable persistence key, e.g. "revenue-check-1" — never re-derived from position. */
+  id: string;
+  kind: "interpretation" | "identify-figure" | "which-action";
+  prompt: string;
+  choices: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+/** How the term relates to established finance vocabulary (spec §Definition-sheet header). */
+export type ConceptClassification = "standard_finance" | "household_adaptation" | "pfi_metric";
+
+/** One line of a statement-style visual calculation. */
+export interface FormulaRow {
+  label: string;
+  operator?: "+" | "-" | "=";
+  /** Binds to a live figure; same namespace as PersonalApplication.metricKey. */
+  valueKey?: string;
+  /** Sample display value (must be presented labeled as sample). */
+  staticValue?: string | number;
+}
+
+/** One included/excluded example supporting the memorable distinction. */
+export interface ComparisonRow {
+  label: string;
+  included: boolean;
+  explanation?: string;
+}
 
 export interface PersonalApplication {
   /**
@@ -42,33 +67,46 @@ export interface PersonalApplication {
   requiresData: DataRequirement[];
 }
 
-/** The 10-part lesson template (spec §Lesson template). */
+/** The lesson template (spec §Lesson framework; named fields per decision #7). */
 export interface Lesson {
-  intro: string;                      // 1. plain language, assumes zero prior knowledge
-  standardTerm: string;               // 2. the real terminology and how business/investing uses it
-  whyItMattersExtended?: string;      // 3. optional extension of concept.whyItMatters
-  calculation?: { formula: string; walkthrough: string }; // 4.
-  genericExample: string;             // 5. Rivera-household sample, labeled as sample
-  personalApplication?: PersonalApplication; // 6–7. binding, not prose
-  commonMisunderstanding: string;     // 8.
-  knowledgeCheck: KnowledgeCheck[];   // 9. one or two items (validated)
-  reinforcementPreview: string;       // 10. where this appears throughout PFI
+  opening: string;                    // 1. household scenario, then names the standard term
+  standardTerm: string;               // 2.
+  whyItMattersExtended?: string;      // extends concept.whyItMatters
+  calculation?: { formula?: string; walkthrough: string }; // formula legacy — concept.formulaRows preferred
+  genericExample: string;             // Rivera-household sample, labeled as sample
+  personalApplication?: PersonalApplication;
+  commonMisunderstanding: string;
+  knowledgeChecks: KnowledgeCheck[];  // 1–2 items, stable ids
+  completionSummary?: string;         // completion-card copy; generic fluency fallback when absent
+  reinforcementPreview?: string;      // legacy; superseded by concept.whereUsed on migrated concepts
 }
 
 export interface FinancialConcept {
   id: ConceptId;
   title: string;                      // canonical name, e.g. "Free cash flow"
+  classification: ConceptClassification;
   shortDefinition: string;            // one sentence; the pre-completion tap definition
   fullDefinition: string;
   whyItMatters: string;
+  /** One strong sentence for the definition sheet; sheet falls back to shortDefinition+fullDefinition when absent. */
+  plainEnglishSummary?: string;
+  /** The lesson's one retained takeaway, e.g. "Not every deposit is revenue." */
+  memorableDistinction?: string;
   formula?: string;                   // display string, e.g. "Revenue − operating expenses"
   /** Required when the household formula differs from the strict business definition. */
   householdAdaptation?: string;
   businessContext?: string;
   commonMisunderstanding?: string;
+  /** Structured calculation block; `formula` remains the accessible text fallback and is required alongside. */
+  formulaRows?: FormulaRow[];
+  comparisonRows?: ComparisonRow[];
+  /** What increases/decreases mean — and don't mean — in context. Never "higher is always good". */
+  interpretation?: string;
   relatedConceptIds: ConceptId[];
   prerequisiteConceptIds: ConceptId[];
   dataMetricKey?: string;             // same namespace as PersonalApplication.metricKey
+  /** Surfaces where the concept actually appears in PFI. Supersedes lesson.reinforcementPreview when present. */
+  whereUsed?: string[];
   status: "draft" | "published" | "archived";
   lesson?: Lesson;                    // absent = glossary-only record
 }

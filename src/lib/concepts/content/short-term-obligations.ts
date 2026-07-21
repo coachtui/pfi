@@ -4,6 +4,7 @@ import type { FinancialConcept } from "../types";
 export const shortTermObligations: FinancialConcept = {
   id: "short-term-obligations",
   title: "Short-term obligations",
+  classification: "standard_finance" as const,
   shortDefinition: "Payments your household is committed to before your next expected income.",
   fullDefinition:
     "Short-term obligations are the payments a household is already committed to make before its next expected income arrives — rent or a mortgage installment, a loan payment, a credit-card minimum, or any other bill already due. They are distinct from total liabilities: a liability is the full balance owed, while a short-term obligation is only the slice of it that's due right now.",
