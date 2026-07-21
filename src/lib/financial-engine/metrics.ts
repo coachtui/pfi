@@ -47,7 +47,7 @@ const fullHistory = (i: MetricInputs) => i.historyDays >= WINDOW_DAYS;
 export const METRICS: MetricDef[] = [
   // ── Cash Flow Health ──────────────────────────────────────────────
   {
-    id: "net_cash_flow_margin", name: "Monthly surplus margin", dimension: "cash_flow", scored: true,
+    id: "net_cash_flow_margin", name: "Free cash flow margin", dimension: "cash_flow", scored: true,
     definition: "(income − spending) / income over the last 90 days. Spending excludes transfers and money you saved or invested.",
     assumptions: ["Refunds reduce spending", "Savings and investment contributions are not spending"],
     limitations: ["Business and shared-household expenses are treated as ordinary household spending"],
@@ -79,7 +79,7 @@ export const METRICS: MetricDef[] = [
     },
   },
   {
-    id: "recurring_surplus", name: "Typical monthly surplus", dimension: "cash_flow", scored: false,
+    id: "recurring_surplus", name: "Typical monthly free cash flow", dimension: "cash_flow", scored: false,
     definition: "Median of (income − spending) across the three 30-day periods.",
     assumptions: [], limitations: ["Context only — never affects the score"],
     format: (v) => `$${Math.round(v).toLocaleString("en-US")}`,

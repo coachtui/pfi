@@ -34,9 +34,45 @@ Auth, schema, RLS, tenant isolation, and the snapshot builder landed in Phase 1.
 
 - ✅ **Service core + performance-brief narration** — landed 2026-07-18 (DECISIONS #26): provider-agnostic narration service (Vercel AI SDK `generateObject` over AI Gateway model strings, default `anthropic/claude-haiku-4-5`), a strict Zod input/output boundary (`src/lib/ai/schemas.ts`) carrying only derived metrics and type-enum driver references (never raw transactions, labels, or ids), the `ai_narrations` cache/audit table (migration `0009`, owner-only RLS), and the dashboard's existing "Performance brief" card now AI-narrated when a key is configured, falling back to the deterministic brief otherwise (progressive enhancement — the app works identically with no key). Live QA with a real provider key completed post-slice (two bugs found and fixed, see DECISIONS #26/#27).
 - ✅ **"What moved my line?" per-driver AI explanations** — landed 2026-07-20 (DECISIONS #31): each driver card in "What moved your line" expands in place (accordion, one panel open at a time) to a short per-event explanation, AI-narrated when a key is configured and the card's event matches the AI input's fixed 30-day window, deterministic "Calculated" text otherwise. The narration pipeline generalized to a discriminated union of per-surface inputs/outputs (`BRIEF_SURFACE` / `DRIVER_EXPLANATIONS_SURFACE`) rather than forking a parallel module, so a third surface (report commentary, weekly brief) is now a schema+prompt+input-builder addition, not a new pipeline. Migration `0011` only widened the `ai_narrations.surface` check constraint. e2e coverage and mobile-first (390×844) then desktop (1280×900) live visual verification completed keyless (Task 9); a real-provider QA pass is a separate pre-merge gate (Task 10).
-- ⏳ Weekly brief, recommendation cards (green/yellow/red policy enforced), quarterly shareholder report narration — remaining Phase 4 surfaces, not yet built.
+- ⏳ Weekly brief, recommendation cards (green/yellow/red policy enforced), quarterly shareholder report narration — remaining Phase 4 surfaces, not yet built, **deferred until after Phase 4.5** and to be built on the Academy terminology architecture.
 
 Exit: AI only explains verified metrics; unsafe categories blocked; every recommendation shows evidence and assumptions.
+
+## Phase 4.5 — Financial Fluency: PFI Academy (MVP)
+
+**The product-priority pivot (2026-07-20, DECISIONS #32):** PFI's core objective now
+includes making users financially fluent — teaching the standard language of business
+and finance (revenue, operating expenses, free cash flow, liquidity, assets,
+liabilities, equity, capital allocation) and reinforcing it through the household's
+own data. Model: **Academy teaches the concept → the application applies it →
+repetition creates fluency.** Users learn to think like the CFO of their household.
+Three connected layers sharing one terminology, calculation, and visual language:
+the Household Operating System (existing product — "where do I stand?"), PFI Academy
+("what do these terms mean?"), and Contextual Reinforcement ("how does this apply
+to my household?"). Mobile-first throughout.
+
+Four slices, each its own spec → plan → implementation cycle:
+
+1. ✅ **Terminology governance + concept schema** — landed 2026-07-20: audit +
+   canonical glossary (docs/TERMINOLOGY.md), framework-free `src/lib/concepts/`
+   (15 typed concept records: 10 full lessons across 3 modules + 5 glossary-only),
+   approved renames applied (spec: docs/superpowers/specs/2026-07-20-academy-slice1-terminology-concepts-design.md).
+2. **`FinancialTerm` interaction system** — reusable tappable-term component +
+   pre-completion definition sheets, wired into report/dashboard.
+3. **Academy home + lesson experience** — lesson template UI, knowledge checks,
+   DB-backed progress (Supabase + RLS), unlocked analytical term sheets.
+4. **Personalization + reinforcement + analytics** — lessons bound to live
+   household data, contextual reinforcement, analytics events → friends-and-family
+   testing gate.
+
+Out of MVP scope: video, leaderboards, certifications, complex gamification,
+daily-streak pressure, AI-generated lessons without review, investment/tax/
+personalized-advice content.
+
+Exit: a level-0 user can complete the three starter modules, every taught term is
+tappable where it appears, progress persists, lessons use real household data when
+available (clearly labeled otherwise), and the friends-and-family loop —
+learn → apply → encounter → retain — is testable end to end.
 
 ## Phase 5 — Scenario simulator & goals
 

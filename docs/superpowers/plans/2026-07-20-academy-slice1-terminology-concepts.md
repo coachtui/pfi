@@ -846,7 +846,8 @@ describe("canonical labels", () => {
     const src = read("src/lib/financial-engine/metrics.ts");
     expect(src).toContain('name: "Free cash flow margin"');
     expect(src).toContain('name: "Typical monthly free cash flow"');
-    expect(src).not.toContain("surplus");
+    // Display names must not use "surplus"; stable metric IDS (recurring_surplus) are exempt.
+    expect(src).not.toMatch(/name: "[^"]*surplus[^"]*"/i);
   });
 
   it("report narration never uses 'surplus' as the noun for free cash flow", () => {

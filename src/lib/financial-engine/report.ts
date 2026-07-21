@@ -201,7 +201,7 @@ export function computePeriodStatement(
 export function buildManagementCommentary(statement: PeriodStatement, companyName: string): string[] {
   const s = statement;
   const fcfVerb = s.freeCashFlow >= 0 ? "produced" : "posted";
-  const flowNoun = s.freeCashFlow >= 0 ? "surplus" : "shortfall";
+  // (flowNoun removed — audit ruling: surplus/shortfall wording never stands in for free cash flow)
   const equityVerb = s.ownerCreatedEquity >= 0
     ? `building ${formatDollars(s.ownerCreatedEquity)} of owner-created equity`
     : `reducing owner-created equity by ${formatDollars(Math.abs(s.ownerCreatedEquity))}`;
@@ -212,7 +212,7 @@ export function buildManagementCommentary(statement: PeriodStatement, companyNam
 
   return [
     `During ${s.period.label}, ${companyName} recorded ${formatDollars(s.revenue)} of revenue against ${formatDollars(s.operatingExpenses)} of operating expenses, and ${fcfVerb} ${formatSignedDollars(s.freeCashFlow)} of free cash flow.`,
-    `That ${flowNoun} was allocated across ${formatDollars(s.savings)} of retained cash, ${formatDollars(s.investments)} of investment contributions, and ${formatSignedDollars(s.debtReduction)} of debt reduction — ${equityVerb}, with no market appreciation recorded this period.`,
+    `That free cash flow was allocated across ${formatDollars(s.savings)} of retained cash, ${formatDollars(s.investments)} of investment contributions, and ${formatSignedDollars(s.debtReduction)} of debt reduction — ${equityVerb}, with no market appreciation recorded this period.`,
     `The personal index ${indexPhrase} over the period, ending at ${s.indexEnd.toFixed(1)}.`,
     `The household retained ${s.savingsRatePct.toFixed(1)}% of revenue as cash this period.`,
   ];

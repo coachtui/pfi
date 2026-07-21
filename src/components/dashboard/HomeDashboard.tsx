@@ -185,7 +185,7 @@ export function HomeDashboard({
       {/* Key metrics */}
       <section aria-label="Key metrics" className="grid grid-cols-4 gap-2 md:gap-3">
         <MetricCard
-          label="Available Capital"
+          label="Available capital"
           value={formatDollars(availableNow)}
           tone="neutral"
           trend={trendOf(availablePosition)}

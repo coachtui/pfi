@@ -112,3 +112,5 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **`transactions.transfer_pair_id` has no FK/same-owner constraint.** RLS prevents any leak; this is an integrity-only gap for a future migration (2026-07-15).
 - **Trigger functions lack pinned `search_path=''`** (Supabase linter warning class); add via `alter function` in a future migration (2026-07-15).
 - **No `engines` field in package.json** while Supabase packages declare `node>=22` (local Node 24 fine) (2026-07-15).
+- **Academy concept `relatedConceptIds` links are partly one-directional** (e.g. net-worth→free-cash-flow, financial-flexibility→liquidity have no reverse link). Deliberately deferred from Slice 1's final review: decide curated directionality when Slice 2 renders related-concept lists (2026-07-20).
+- **`validateRegistry` doesn't reject duplicate module ids, a concept in two modules, or self-referencing related/prerequisite ids.** Cheap additions when the Academy curriculum grows beyond the 15-concept MVP (2026-07-20).
