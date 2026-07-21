@@ -18,15 +18,18 @@ export function UploadStep({
   accountId,
   onAccountChange,
   onReady,
+  showAccountPicker = true,
 }: {
   accounts: AccountSummary[];
   accountId: string;
   onAccountChange: (id: string) => void;
   onReady: (parsed: ParsedCsv, fileName: string) => void;
+  showAccountPicker?: boolean;
 }) {
   const [error, setError] = useState("");
   const [addingAccount, setAddingAccount] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const accountName = accounts.find((a) => a.id === accountId)?.displayName ?? "";
 
   async function handleFile(file: File) {
     setError("");
@@ -56,32 +59,39 @@ export function UploadStep({
 
   return (
     <section className="flex flex-col gap-4">
-      <div>
-        <label htmlFor="import-account" className="mb-1 block text-sm font-medium text-primary">
-          Import into which account?
-        </label>
-        <p className="mb-2 text-xs text-secondary">
-          Best for accurate transaction history. One CSV holds one account&apos;s transactions — pick where these belong.
-        </p>
-        <select
-          id="import-account"
-          value={accountId}
-          onChange={(e) => onAccountChange(e.target.value)}
-          className={selectCls}
-        >
-          <option value="">Choose an account…</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>{a.displayName}</option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => setAddingAccount(true)}
-          className="mt-2 inline-flex items-center gap-1 text-sm text-secondary hover:text-primary"
-        >
-          <Plus size={16} aria-hidden /> New account
-        </button>
-      </div>
+      {showAccountPicker ? (
+        <div>
+          <label htmlFor="import-account" className="mb-1 block text-sm font-medium text-primary">
+            Import into which account?
+          </label>
+          <p className="mb-2 text-xs text-secondary">
+            Best for accurate transaction history. One CSV holds one account&apos;s transactions — pick where these belong.
+          </p>
+          <select
+            id="import-account"
+            value={accountId}
+            onChange={(e) => onAccountChange(e.target.value)}
+            className={selectCls}
+          >
+            <option value="">Choose an account...</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>{a.displayName}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setAddingAccount(true)}
+            className="mt-2 inline-flex items-center gap-1 text-sm text-secondary hover:text-primary"
+          >
+            <Plus size={16} aria-hidden /> New account
+          </button>
+        </div>
+      ) : (
+        <div className="rounded-card border border-border-subtle bg-elevated p-3">
+          <p className="text-xs text-secondary">Importing into</p>
+          <p className="text-sm font-semibold text-primary">{accountName}</p>
+        </div>
+      )}
 
       <div>
         <input

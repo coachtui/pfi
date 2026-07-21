@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowLeft, FileSpreadsheet, FileText } from "lucide-react";
+import { ArrowLeft, FileSpreadsheet, FileText, Plus } from "lucide-react";
+import { AccountSheet } from "@/app/accounts/AccountSheet";
 import type { AccountSummary } from "@/lib/data/mappers";
 import type { ColumnMapping, ExistingTxn, NormalizedRow, ParsedCsv } from "@/lib/csv-import/types";
 import { normalizeRows } from "@/lib/csv-import/normalize";
@@ -19,9 +20,10 @@ import type { ImportResult } from "@/lib/validation/imports";
 import type { PdfReviewData } from "@/lib/pdf-import/types";
 
 type ImportMode = "csv" | "pdf";
-type Step = "choose" | "upload" | "map" | "preview" | "pdfReview" | "summary";
+type Step = "account" | "choose" | "upload" | "map" | "preview" | "pdfReview" | "summary";
 const STEP_LABELS: Record<Step, string> = {
-  choose: "Choose source",
+  account: "Choose account",
+  choose: "Choose format",
   upload: "Choose file",
   map: "Map columns",
   preview: "Preview",
@@ -37,8 +39,9 @@ export function ImportWizard(props: {
 }) {
   const { accounts } = props;
   const [mode, setMode] = useState<ImportMode | null>(null);
-  const [step, setStep] = useState<Step>("choose");
+  const [step, setStep] = useState<Step>("account");
   const [accountId, setAccountId] = useState("");
+  const [addingAccount, setAddingAccount] = useState(false);
   const [parsed, setParsed] = useState<ParsedCsv | null>(null);
   const [fileName, setFileName] = useState("");
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
@@ -108,11 +111,13 @@ export function ImportWizard(props: {
     setStep("summary");
   };
 
+  const selectedAccount = accounts.find((a) => a.id === accountId) ?? null;
+
   const steps = mode === "pdf"
-    ? (["choose", "upload", "pdfReview", "summary"] as Step[])
+    ? (["account", "choose", "upload", "pdfReview", "summary"] as Step[])
     : mode === "csv"
-      ? (["choose", "upload", "map", "preview", "summary"] as Step[])
-      : (["choose"] as Step[]);
+      ? (["account", "choose", "upload", "map", "preview", "summary"] as Step[])
+      : (["account", "choose"] as Step[]);
 
   return (
     <div>
@@ -135,8 +140,57 @@ export function ImportWizard(props: {
         ))}
       </ol>
 
+      {step === "account" && (
+        <section className="flex flex-col gap-4">
+          <div>
+            <label htmlFor="import-account" className="mb-1 block text-sm font-medium text-primary">
+              Import into which account?
+            </label>
+            <p className="mb-2 text-xs text-secondary">
+              Choose the household bank or card account these transactions belong to.
+            </p>
+            <select
+              id="import-account"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              className="w-full rounded-xl border border-border-subtle bg-inset px-4 py-3 text-sm text-primary focus:border-border-strong focus:outline-none"
+            >
+              <option value="">Choose an account...</option>
+              {accounts.filter((a) => a.provider !== "demo").map((a) => (
+                <option key={a.id} value={a.id}>{a.displayName}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setAddingAccount(true)}
+              className="mt-2 inline-flex items-center gap-1 text-sm text-secondary hover:text-primary"
+            >
+              <Plus size={16} aria-hidden /> New account
+            </button>
+          </div>
+          <button
+            type="button"
+            disabled={!accountId}
+            onClick={() => setStep("choose")}
+            className="rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base disabled:opacity-60"
+          >
+            Continue
+          </button>
+          {!accountId && <p className="text-xs text-secondary">Pick or create an account first.</p>}
+          <AccountSheet account={null} open={addingAccount} onClose={() => setAddingAccount(false)} />
+        </section>
+      )}
+
       {step === "choose" && (
-        <section className="grid gap-3 md:grid-cols-2">
+        <section className="space-y-4">
+          <div className="rounded-card border border-border-subtle bg-elevated p-3">
+            <p className="text-xs text-secondary">Selected account</p>
+            <p className="text-sm font-semibold text-primary">{selectedAccount?.displayName ?? "No account selected"}</p>
+            <button type="button" onClick={() => setStep("account")} className="mt-1 text-sm text-secondary hover:text-primary">
+              Change account
+            </button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
           <button
             type="button"
             onClick={() => { setMode("csv"); setStep("upload"); }}
@@ -158,6 +212,7 @@ export function ImportWizard(props: {
           <p className="md:col-span-2 text-xs text-tertiary">
             PDF extraction is a fallback review workflow. Nothing from a PDF affects your financial record until you confirm it.
           </p>
+          </div>
         </section>
       )}
 
@@ -166,6 +221,7 @@ export function ImportWizard(props: {
           accounts={accounts}
           accountId={accountId}
           onAccountChange={setAccountId}
+          showAccountPicker={false}
           onReady={(p, name) => {
             setParsed(p);
             setFileName(name);
@@ -176,6 +232,7 @@ export function ImportWizard(props: {
 
       {step === "upload" && mode === "pdf" && (
         <PdfUploadStep
+          accountName={selectedAccount?.displayName ?? ""}
           onReady={(review) => {
             setPdfReview(review);
             setStep("pdfReview");
@@ -225,10 +282,11 @@ export function ImportWizard(props: {
           review={pdfReview}
           accounts={accounts}
           existing={props.existing}
+          initialAccountId={accountId}
           onCancelled={() => {
             setPdfReview(null);
             setMode(null);
-            setStep("choose");
+            setStep("account");
           }}
           onConfirmed={(nextResult, rows, nextAccountId) => {
             setResult(nextResult);

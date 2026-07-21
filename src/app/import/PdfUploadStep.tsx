@@ -6,8 +6,10 @@ import { uploadStatementPdf } from "@/app/actions/imports";
 import type { PdfReviewData } from "@/lib/pdf-import/types";
 
 export function PdfUploadStep({
+  accountName,
   onReady,
 }: {
+  accountName: string;
   onReady: (review: PdfReviewData) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,6 +42,11 @@ export function PdfUploadStep({
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="rounded-card border border-border-subtle bg-elevated p-3">
+        <p className="text-xs text-secondary">Importing into</p>
+        <p className="text-sm font-semibold text-primary">{accountName}</p>
       </div>
 
       <input

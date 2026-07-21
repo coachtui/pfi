@@ -33,16 +33,18 @@ export function PdfReviewStep({
   review,
   accounts,
   existing,
+  initialAccountId,
   onConfirmed,
   onCancelled,
 }: {
   review: PdfReviewData;
   accounts: AccountSummary[];
   existing: ExistingTxn[];
+  initialAccountId: string;
   onConfirmed: (result: ImportResult, rows: NormalizedRow[], accountId: string) => void;
   onCancelled: () => void;
 }) {
-  const [accountId, setAccountId] = useState(review.suggestedAccountId ?? "");
+  const [accountId, setAccountId] = useState(initialAccountId || review.suggestedAccountId || "");
   const [addingAccount, setAddingAccount] = useState(false);
   const [metadata, setMetadata] = useState<StatementMetadata>(review.metadata);
   const [rows, setRows] = useState<ReviewTransaction[]>(review.transactions);
