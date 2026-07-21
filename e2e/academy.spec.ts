@@ -59,6 +59,13 @@ test("the report's Revenue term offers Take the lesson and deep-links into it", 
   await expect(dialog.getByText("Standard finance term")).toBeVisible();
   await expect(dialog.getByText("Why it matters")).toBeVisible(); // un-gated pre-completion
   await expect(dialog.getByRole("link", { name: "Take the lesson" })).toBeVisible();
+  // Registered before the click so the listener is armed before LessonView
+  // mounts and fires its startLesson server action (a POST to the current
+  // URL) — waiting for the response only after navigating risks missing it
+  // if the action already fired and resolved by then.
+  const startLessonResponse = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.status() === 200,
+  );
   await dialog.getByRole("link", { name: "Take the lesson" }).click();
   await page.waitForURL("**/academy/revenue");
   await expect(page.getByRole("heading", { name: "1. What is revenue?" })).toBeVisible();
@@ -67,7 +74,7 @@ test("the report's Revenue term offers Take the lesson and deep-links into it", 
   // LessonView's startLesson call on mount is deliberately fire-and-forget (a
   // failure only delays "In progress" showing up, never blocks reading the
   // lesson) — wait for it to settle so the next test's status read is stable.
-  await page.waitForLoadState("networkidle");
+  await startLessonResponse;
 });
 
 test("an in-progress lesson's term sheet offers Continue lesson", async () => {
