@@ -476,7 +476,10 @@ async function processPdfImport(
   supabase: SupabaseClient,
   input: { importId: string; userId: string; bytes: Uint8Array },
 ): Promise<{ error: string; review?: PdfReviewData }> {
-  await supabase.from("import_batches").update({ status: "extracting" }).eq("id", input.importId);
+  await supabase.from("import_batches").update({
+    status: "extracting",
+    parser_version: PDF_IMPORT_PARSER_VERSION,
+  }).eq("id", input.importId);
   try {
     const extracted = await extractPdfText(input.bytes);
     if (extracted.scanned) {
@@ -559,7 +562,7 @@ export async function uploadStatementPdf(formData: FormData): Promise<{ error: s
   const sha = fileSha256(bytes);
   const { data: duplicate, error: dupErr } = await supabase
     .from("import_batches")
-    .select("id, status, failure_reason, unsupported_reason")
+    .select("id, status, failure_reason, unsupported_reason, parser_version")
     .eq("user_id", user.id)
     .eq("source_type", "pdf")
     .eq("file_sha256", sha)
@@ -578,6 +581,9 @@ export async function uploadStatementPdf(formData: FormData): Promise<{ error: s
       return processPdfImport(supabase, { importId: duplicate.id, userId: user.id, bytes });
     }
     if (duplicate.status === "unsupported") {
+      if (duplicate.parser_version !== PDF_IMPORT_PARSER_VERSION) {
+        return processPdfImport(supabase, { importId: duplicate.id, userId: user.id, bytes });
+      }
       return {
         error: `This statement PDF was already uploaded, but it is not supported: ${duplicate.unsupported_reason ?? "Unsupported statement type."}`,
       };
