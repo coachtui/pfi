@@ -20,7 +20,7 @@ export const cashFlow: FinancialConcept = {
   dataMetricKey: "metric:recurring_surplus",
   status: "published",
   lesson: {
-    intro:
+    opening:
       "Your account balance tells you what you have right now. It doesn't tell you whether you're generally taking in more than you spend, or the reverse. That pattern over time has a name: cash flow.",
     standardTerm:
       "“Cash flow” is the standard term for the movement of money into and out of an operation over a period, as distinct from a balance at a single point in time. It's central enough to business and investing that companies publish a dedicated cash-flow statement.",
@@ -39,8 +39,9 @@ export const cashFlow: FinancialConcept = {
     },
     commonMisunderstanding:
       "A healthy-looking account balance does not guarantee positive cash flow. A household can hold a large balance built up in the past while its current cash flow is negative — spending down that balance a little more each month.",
-    knowledgeCheck: [
+    knowledgeChecks: [
       {
+        id: "cash-flow-check-1",
         kind: "interpretation",
         prompt: "A household's account balance is high, but its cash flow this month is negative. What does this most likely mean?",
         choices: [

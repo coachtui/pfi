@@ -22,10 +22,15 @@ export type DataRequirement =
   | "debt-accounts"
   | "recurring-obligations";
 
-export type KnowledgeCheck =
-  | { kind: "interpretation"; prompt: string; choices: string[]; correctIndex: number; explanation: string }
-  | { kind: "identify-figure"; prompt: string; choices: string[]; correctIndex: number; explanation: string }
-  | { kind: "which-action"; prompt: string; choices: string[]; correctIndex: number; explanation: string };
+export interface KnowledgeCheck {
+  /** Stable persistence key, e.g. "revenue-check-1" — never re-derived from position. */
+  id: string;
+  kind: "interpretation" | "identify-figure" | "which-action";
+  prompt: string;
+  choices: string[];
+  correctIndex: number;
+  explanation: string;
+}
 
 /** How the term relates to established finance vocabulary (spec §Definition-sheet header). */
 export type ConceptClassification = "standard_finance" | "household_adaptation" | "pfi_metric";
@@ -62,17 +67,18 @@ export interface PersonalApplication {
   requiresData: DataRequirement[];
 }
 
-/** The 10-part lesson template (spec §Lesson template). */
+/** The lesson template (spec §Lesson framework; named fields per decision #7). */
 export interface Lesson {
-  intro: string;                      // 1. plain language, assumes zero prior knowledge
-  standardTerm: string;               // 2. the real terminology and how business/investing uses it
-  whyItMattersExtended?: string;      // 3. optional extension of concept.whyItMatters
-  calculation?: { formula: string; walkthrough: string }; // 4.
-  genericExample: string;             // 5. Rivera-household sample, labeled as sample
-  personalApplication?: PersonalApplication; // 6–7. binding, not prose
-  commonMisunderstanding: string;     // 8.
-  knowledgeCheck: KnowledgeCheck[];   // 9. one or two items (validated)
-  reinforcementPreview: string;       // 10. where this appears throughout PFI
+  opening: string;                    // 1. household scenario, then names the standard term
+  standardTerm: string;               // 2.
+  whyItMattersExtended?: string;      // extends concept.whyItMatters
+  calculation?: { formula?: string; walkthrough: string }; // formula legacy — concept.formulaRows preferred
+  genericExample: string;             // Rivera-household sample, labeled as sample
+  personalApplication?: PersonalApplication;
+  commonMisunderstanding: string;
+  knowledgeChecks: KnowledgeCheck[];  // 1–2 items, stable ids
+  completionSummary?: string;         // completion-card copy; generic fluency fallback when absent
+  reinforcementPreview?: string;      // legacy; superseded by concept.whereUsed on migrated concepts
 }
 
 export interface FinancialConcept {

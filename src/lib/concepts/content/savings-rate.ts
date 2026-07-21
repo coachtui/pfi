@@ -22,7 +22,7 @@ export const savingsRate: FinancialConcept = {
   dataMetricKey: "report:savingsRatePct",
   status: "published",
   lesson: {
-    intro:
+    opening:
       "Once a household knows what it earned and what's left after operating costs, a natural next question is: how much of that stayed as cash? The answer to that specific question is called the savings rate.",
     standardTerm:
       "“Savings rate” is a widely used term, but it's used loosely in everyday conversation. PFI uses a precise, standard definition: the share of revenue retained as cash. It's related to, but distinct from, the broader idea of how much a household kept overall after spending.",
@@ -41,8 +41,9 @@ export const savingsRate: FinancialConcept = {
     },
     commonMisunderstanding:
       "Savings rate is not the same as Free cash flow margin. Free cash flow margin measures how much of revenue was left after operating expenses, full stop. Savings rate measures only the slice of that leftover amount that stayed as cash — money sent to investments or debt paydown counts toward free cash flow margin but not toward savings rate.",
-    knowledgeCheck: [
+    knowledgeChecks: [
       {
+        id: "savings-rate-check-1",
         kind: "interpretation",
         prompt: "A household has a savings rate of 5% but makes large monthly contributions to an investment account. Is this household a weak saver?",
         choices: [
@@ -56,6 +57,7 @@ export const savingsRate: FinancialConcept = {
           "Savings rate only counts cash that was retained. A household can have strong free cash flow and choose to direct most of it to investments or debt paydown, which lowers the savings rate without indicating weakness.",
       },
       {
+        id: "savings-rate-check-2",
         kind: "identify-figure",
         prompt: "Sample figures: a household has $4,000 of revenue and keeps $400 of it as cash this month. What is its savings rate?",
         choices: ["10%", "40%", "4%", "$400"],

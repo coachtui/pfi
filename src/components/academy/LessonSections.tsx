@@ -5,7 +5,7 @@ import type { FinancialConcept } from "@/lib/concepts";
 export function LessonSections({ concept }: { concept: FinancialConcept }) {
   const lesson = concept.lesson!;
   const sections: { title: string; body: ReactNode }[] = [
-    { title: `What is ${concept.title.toLowerCase()}?`, body: <p>{lesson.intro}</p> },
+    { title: `What is ${concept.title.toLowerCase()}?`, body: <p>{lesson.opening}</p> },
     { title: "The standard term", body: <p>{lesson.standardTerm}</p> },
     {
       title: "Why it matters",
@@ -16,9 +16,11 @@ export function LessonSections({ concept }: { concept: FinancialConcept }) {
           title: "How it's calculated",
           body: (
             <>
-              <p className="rounded-lg bg-inset p-2 font-mono text-sm text-primary">
-                {lesson.calculation.formula}
-              </p>
+              {(lesson.calculation.formula ?? concept.formula) && (
+                <p className="rounded-lg bg-inset p-2 font-mono text-sm text-primary">
+                  {lesson.calculation.formula ?? concept.formula}
+                </p>
+              )}
               <p className="mt-2">{lesson.calculation.walkthrough}</p>
             </>
           ),
@@ -36,7 +38,9 @@ export function LessonSections({ concept }: { concept: FinancialConcept }) {
       ),
     },
     { title: "Common misunderstanding", body: <p>{lesson.commonMisunderstanding}</p> },
-    { title: "Where you'll see this in PFI", body: <p>{lesson.reinforcementPreview}</p> },
+    ...(lesson.reinforcementPreview
+      ? [{ title: "Where you'll see this in PFI", body: <p>{lesson.reinforcementPreview}</p> }]
+      : []),
   ];
 
   return (

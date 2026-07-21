@@ -22,7 +22,7 @@ export const revenue: FinancialConcept = {
   dataMetricKey: "report:revenue",
   status: "published",
   lesson: {
-    intro:
+    opening:
       "Every household has money coming in from somewhere — a paycheck, side work, benefits. Before anything else can be measured, that incoming money needs a name. In business and investing, it's called revenue.",
     standardTerm:
       "“Revenue” is the standard term for money a business (or, here, a household) brings in during a period. It's also called “the top line” because of where it appears on a company's income statement.",
@@ -41,8 +41,9 @@ export const revenue: FinancialConcept = {
     },
     commonMisunderstanding:
       "Revenue is not the same as free cash flow. Revenue is everything that came in; free cash flow is what's left after operating expenses are paid. A household's revenue can rise while its free cash flow shrinks, if expenses grew even faster.",
-    knowledgeCheck: [
+    knowledgeChecks: [
       {
+        id: "revenue-check-1",
         kind: "identify-figure",
         prompt: "Which of these is revenue?",
         choices: [
@@ -56,6 +57,7 @@ export const revenue: FinancialConcept = {
           "A paycheck is new money from an outside source, so it's revenue. Transfers move money the household already had; refunds reverse a purchase; a loan disbursement is borrowed money, not earned income.",
       },
       {
+        id: "revenue-check-2",
         kind: "interpretation",
         prompt: "A household's revenue rose this month, but its free cash flow fell. What's the most likely explanation?",
         choices: [

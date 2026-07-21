@@ -22,7 +22,7 @@ export const operatingExpenses: FinancialConcept = {
   dataMetricKey: "report:operatingExpenses",
   status: "published",
   lesson: {
-    intro:
+    opening:
       "Running a household costs money — rent or a mortgage, groceries, utilities, getting to work. Businesses have a name for this kind of recurring cost, and it applies just as directly to a household: operating expenses.",
     standardTerm:
       "“Operating expenses” (often shortened to OpEx) is the standard term for the recurring costs of running an operation, as opposed to one-time or capital costs. Analysts watch this line closely because it shows how much revenue gets consumed just keeping things running.",
@@ -41,8 +41,9 @@ export const operatingExpenses: FinancialConcept = {
     },
     commonMisunderstanding:
       "A 401(k) contribution or a transfer to a savings account is not an operating expense, even though it leaves the checking account. Operating expenses are the cost of running the household; savings and investment contributions are what the household chooses to do with money it already kept.",
-    knowledgeCheck: [
+    knowledgeChecks: [
       {
+        id: "operating-expenses-check-1",
         kind: "identify-figure",
         prompt: "Which of these counts as an operating expense?",
         choices: [
@@ -56,6 +57,7 @@ export const operatingExpenses: FinancialConcept = {
           "Rent is the cost of operating the household. The other three move money the household already earned into savings, retirement, or debt paydown — allocations, not operating costs.",
       },
       {
+        id: "operating-expenses-check-2",
         kind: "interpretation",
         prompt: "A household's operating expenses rose two months in a row while revenue stayed flat. What does this mean for free cash flow?",
         choices: [

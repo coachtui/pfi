@@ -36,14 +36,14 @@ export interface AnswerResult {
  */
 export async function answerKnowledgeCheck(
   conceptId: string,
-  checkIndex: number,
+  checkId: string,
   choiceIndex: number,
 ): Promise<AnswerResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated" };
 
-  const invalid = validateCheckAnswer(CONCEPT_REGISTRY, conceptId, checkIndex, choiceIndex);
+  const invalid = validateCheckAnswer(CONCEPT_REGISTRY, conceptId, checkId, choiceIndex);
   if (invalid) return { error: invalid };
   const concept = lessonConcept(CONCEPT_REGISTRY, conceptId)!;
 
@@ -57,9 +57,9 @@ export async function answerKnowledgeCheck(
 
   const prior = (row?.check_responses as CheckResponse[] | null) ?? [];
   const { responses, allAnswered, duplicate } = appendCheckResponse(
-    concept.lesson!.knowledgeCheck.length,
+    concept.lesson!.knowledgeChecks.length,
     prior,
-    { checkIndex, choiceIndex },
+    { checkId, choiceIndex },
   );
   if (duplicate) return { error: "", responses: prior, completed: !!row?.completed_at };
 

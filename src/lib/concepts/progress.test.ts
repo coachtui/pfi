@@ -99,28 +99,27 @@ describe("lessonConcept", () => {
 
 describe("validateCheckAnswer", () => {
   it("accepts a valid answer", () => {
-    expect(validateCheckAnswer(CONCEPT_REGISTRY, "revenue", 0, 0)).toBeNull();
+    expect(validateCheckAnswer(CONCEPT_REGISTRY, "revenue", "revenue-check-1", 0)).toBeNull();
   });
-  it("rejects unknown/glossary-only lessons and out-of-bounds indices", () => {
-    expect(validateCheckAnswer(CONCEPT_REGISTRY, "no-such-concept", 0, 0)).toBe("Unknown lesson");
-    expect(validateCheckAnswer(CONCEPT_REGISTRY, "short-term-obligations", 0, 0)).toBe("Unknown lesson");
-    expect(validateCheckAnswer(CONCEPT_REGISTRY, "revenue", 99, 0)).toBe("Unknown knowledge check");
-    expect(validateCheckAnswer(CONCEPT_REGISTRY, "revenue", -1, 0)).toBe("Unknown knowledge check");
-    expect(validateCheckAnswer(CONCEPT_REGISTRY, "revenue", 0, 99)).toBe("Unknown choice");
-    expect(validateCheckAnswer(CONCEPT_REGISTRY, "revenue", 0.5, 0)).toBe("Unknown knowledge check");
+  it("rejects unknown lessons, unknown check ids, and out-of-bounds choices", () => {
+    expect(validateCheckAnswer(CONCEPT_REGISTRY, "no-such-concept", "x", 0)).toBe("Unknown lesson");
+    expect(validateCheckAnswer(CONCEPT_REGISTRY, "short-term-obligations", "x", 0)).toBe("Unknown lesson");
+    expect(validateCheckAnswer(CONCEPT_REGISTRY, "revenue", "nope", 0)).toBe("Unknown knowledge check");
+    expect(validateCheckAnswer(CONCEPT_REGISTRY, "revenue", "revenue-check-1", 99)).toBe("Unknown choice");
+    expect(validateCheckAnswer(CONCEPT_REGISTRY, "revenue", "revenue-check-1", 0.5)).toBe("Unknown choice");
   });
 });
 
 describe("appendCheckResponse", () => {
   it("appends and reports allAnswered when every check has a response", () => {
-    const first = appendCheckResponse(2, [], { checkIndex: 0, choiceIndex: 1 });
-    expect(first).toEqual({ responses: [{ checkIndex: 0, choiceIndex: 1 }], allAnswered: false, duplicate: false });
-    const second = appendCheckResponse(2, first.responses, { checkIndex: 1, choiceIndex: 0 });
+    const first = appendCheckResponse(2, [], { checkId: "c-1", choiceIndex: 1 });
+    expect(first).toEqual({ responses: [{ checkId: "c-1", choiceIndex: 1 }], allAnswered: false, duplicate: false });
+    const second = appendCheckResponse(2, first.responses, { checkId: "c-2", choiceIndex: 0 });
     expect(second.allAnswered).toBe(true);
   });
   it("first answer wins; duplicates are ignored", () => {
-    const prior = [{ checkIndex: 0, choiceIndex: 1 }];
-    const dup = appendCheckResponse(2, prior, { checkIndex: 0, choiceIndex: 2 });
+    const prior = [{ checkId: "c-1", choiceIndex: 1 }];
+    const dup = appendCheckResponse(2, prior, { checkId: "c-1", choiceIndex: 2 });
     expect(dup).toEqual({ responses: prior, allAnswered: false, duplicate: true });
   });
 });

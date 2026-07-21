@@ -19,7 +19,7 @@ export const liquidity: FinancialConcept = {
   dataMetricKey: "metric:liquid_runway_months",
   status: "published",
   lesson: {
-    intro:
+    opening:
       "Owning something valuable and being able to spend that value today are two different things. A home is worth a lot, but you can't hand a piece of it to a landlord tomorrow. That gap — between owning value and being able to use it right now — is what liquidity measures.",
     standardTerm:
       "“Liquidity” is the standard business and investing term for how quickly an asset converts to cash without losing value. Cash is the most liquid asset there is; real estate and long-term investments sit at the illiquid end of the spectrum. Businesses and households are both judged partly on how liquid their position is, separately from how much they're worth overall.",
@@ -38,8 +38,9 @@ export const liquidity: FinancialConcept = {
     },
     commonMisunderstanding:
       "Being wealthy is not the same as being liquid. A household with substantial home equity and retirement savings can still be unable to cover an unexpected bill next week if none of that value is in a liquid form. A household's total balance can even climb while its liquidity weakens, if a growing share of that balance is committed to near-term obligations rather than sitting available as cash.",
-    knowledgeCheck: [
+    knowledgeChecks: [
       {
+        id: "liquidity-check-1",
         kind: "interpretation",
         prompt:
           "Two households have the same net worth. One holds most of it as home equity; the other holds six months of essential expenses in cash. Which household is more liquid, and why?",
@@ -54,6 +55,7 @@ export const liquidity: FinancialConcept = {
           "Net worth measures total value owned; liquidity measures how quickly that value converts to spendable cash. Six months of cash is far more liquid than the same value locked in home equity, even though both households have identical net worth.",
       },
       {
+        id: "liquidity-check-2",
         kind: "which-action",
         prompt: "Which action would increase a household's liquidity?",
         choices: [

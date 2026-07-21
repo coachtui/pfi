@@ -81,7 +81,7 @@ export function LessonView({
         <LessonSections concept={concept} />
         <KnowledgeChecks
           conceptId={conceptId}
-          checks={concept.lesson!.knowledgeCheck}
+          checks={concept.lesson!.knowledgeChecks}
           initialResponses={initialResponses}
           initialCompleted={initialCompleted}
         />

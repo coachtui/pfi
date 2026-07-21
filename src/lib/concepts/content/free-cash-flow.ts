@@ -22,7 +22,7 @@ export const freeCashFlow: FinancialConcept = {
   dataMetricKey: "report:freeCashFlow",
   status: "published",
   lesson: {
-    intro:
+    opening:
       "Think of your household as a small company. Money comes in; running the household costs money; whatever is left over is yours to direct. That leftover amount has a name professionals use constantly: free cash flow.",
     standardTerm:
       "“Free cash flow” (often abbreviated FCF) is one of the most-watched numbers in business and investing. When analysts ask whether a company “generates cash,” this is the number they mean.",
@@ -41,8 +41,9 @@ export const freeCashFlow: FinancialConcept = {
     },
     commonMisunderstanding:
       "Free cash flow is not the same as the balance in your checking account, and it is not the same as your savings rate. The balance is a snapshot of what you hold; free cash flow measures what one period of operating produced; the savings rate measures how much of revenue you kept as cash.",
-    knowledgeCheck: [
+    knowledgeChecks: [
       {
+        id: "free-cash-flow-check-1",
         kind: "identify-figure",
         prompt: "Sample figures: a household earns $5,000 in a month and its operating expenses are $4,200. What is its free cash flow?",
         choices: ["$800", "$5,000", "$4,200", "Whatever is in its checking account"],
@@ -50,6 +51,7 @@ export const freeCashFlow: FinancialConcept = {
         explanation: "Free cash flow = revenue − operating expenses = $5,000 − $4,200 = $800. The checking balance is a snapshot, not a flow.",
       },
       {
+        id: "free-cash-flow-check-2",
         kind: "which-action",
         prompt: "Which action would increase a household's free cash flow next month?",
         choices: [

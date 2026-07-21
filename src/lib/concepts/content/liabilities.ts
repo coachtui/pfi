@@ -18,7 +18,7 @@ export const liabilities: FinancialConcept = {
   prerequisiteConceptIds: ["assets"],
   status: "published",
   lesson: {
-    intro:
+    opening:
       "Now flip the question from the last lesson: instead of what your household owns, what does it owe? A mortgage, a car loan, a credit-card balance — anything your household is obligated to pay back to someone else is a liability.",
     standardTerm:
       "“Liabilities” is the standard business and accounting term for amounts owed to others. Every balance sheet pairs assets with liabilities, because what an entity owns only tells half the story without knowing what's owed against it.",
@@ -31,8 +31,9 @@ export const liabilities: FinancialConcept = {
       "Sample figures: the Rivera household has a $195,000 mortgage balance, a $12,000 car loan, a $3,200 student loan, and a $1,800 revolving credit-card balance. Added together, their total liabilities come to $212,000 in this sample scenario — the figure this module's net worth lesson subtracts from their assets.",
     commonMisunderstanding:
       "A monthly payment is not the liability — the payment services the liability. The Rivera household's $12,000 car loan might carry a $280 monthly payment, but the liability on their balance sheet is the full $12,000 remaining balance, not the $280 installment. Confusing the two understates how much is actually owed.",
-    knowledgeCheck: [
+    knowledgeChecks: [
       {
+        id: "liabilities-check-1",
         kind: "identify-figure",
         prompt: "Sample figures: a household has a $12,000 loan balance and makes a $280 monthly payment toward it. What is the liability?",
         choices: ["$12,000", "$280", "$12,280", "$0, since it's being paid down"],

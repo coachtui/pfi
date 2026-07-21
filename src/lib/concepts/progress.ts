@@ -6,7 +6,7 @@ import type { ConceptRegistry } from "./registry";
 import type { ConceptId, FinancialConcept } from "./types";
 
 export interface CheckResponse {
-  checkIndex: number;
+  checkId: string;
   choiceIndex: number;
 }
 
@@ -110,16 +110,13 @@ export function lessonConcept(registry: ConceptRegistry, conceptId: string): Fin
 export function validateCheckAnswer(
   registry: ConceptRegistry,
   conceptId: string,
-  checkIndex: number,
+  checkId: string,
   choiceIndex: number,
 ): string | null {
   const c = lessonConcept(registry, conceptId);
   if (!c) return "Unknown lesson";
-  const checks = c.lesson!.knowledgeCheck;
-  if (!Number.isInteger(checkIndex) || checkIndex < 0 || checkIndex >= checks.length) {
-    return "Unknown knowledge check";
-  }
-  const check = checks[checkIndex]!;
+  const check = c.lesson!.knowledgeChecks.find((k) => k.id === checkId);
+  if (!check) return "Unknown knowledge check";
   if (!Number.isInteger(choiceIndex) || choiceIndex < 0 || choiceIndex >= check.choices.length) {
     return "Unknown choice";
   }
@@ -132,8 +129,8 @@ export function appendCheckResponse(
   responses: CheckResponse[],
   response: CheckResponse,
 ): { responses: CheckResponse[]; allAnswered: boolean; duplicate: boolean } {
-  const duplicate = responses.some((r) => r.checkIndex === response.checkIndex);
+  const duplicate = responses.some((r) => r.checkId === response.checkId);
   const next = duplicate ? responses : [...responses, response];
-  const answered = new Set(next.map((r) => r.checkIndex));
+  const answered = new Set(next.map((r) => r.checkId));
   return { responses: next, allAnswered: answered.size >= totalChecks, duplicate };
 }

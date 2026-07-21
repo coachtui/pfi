@@ -20,13 +20,13 @@ export function KnowledgeChecks({
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
-  const answerFor = (checkIndex: number) => responses.find((r) => r.checkIndex === checkIndex);
+  const answerFor = (checkId: string) => responses.find((r) => r.checkId === checkId);
 
-  function choose(checkIndex: number, choiceIndex: number) {
-    if (answerFor(checkIndex) || pending) return;
+  function choose(checkId: string, choiceIndex: number) {
+    if (answerFor(checkId) || pending) return;
     setError("");
     startTransition(async () => {
-      const result = await answerKnowledgeCheck(conceptId, checkIndex, choiceIndex);
+      const result = await answerKnowledgeCheck(conceptId, checkId, choiceIndex);
       if (result.error) {
         setError(result.error);
         return;
@@ -41,10 +41,10 @@ export function KnowledgeChecks({
       <h2 className="text-sm font-semibold text-primary">Check your understanding</h2>
 
       {checks.map((check, i) => {
-        const answered = answerFor(i);
+        const answered = answerFor(check.id);
         return (
           <div
-            key={i}
+            key={check.id}
             role="group"
             aria-label={`Knowledge check ${i + 1} of ${checks.length}`}
             className="flex flex-col gap-2 rounded-xl border border-border-subtle bg-inset p-3"
@@ -58,7 +58,7 @@ export function KnowledgeChecks({
                   key={c}
                   type="button"
                   disabled={!!answered || pending}
-                  onClick={() => choose(i, c)}
+                  onClick={() => choose(check.id, c)}
                   className={`flex items-center justify-between gap-2 rounded-lg border p-2.5 text-left text-sm transition-colors ${
                     isChosen ? "border-border-strong text-primary" : "border-border-subtle text-secondary"
                   } ${answered ? "" : "hover:border-border-strong hover:text-primary"}`}
