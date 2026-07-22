@@ -1,6 +1,6 @@
 # Financial Health Score (PFI Score)
 
-Status: **specified for implementation** (Phase 2). `PFI_SCORE_VERSION = "1.0"`. This document is the formal scoring specification — scoring rules live here, not only in code. The engine implementation must match this document; changes to either require changing both, and methodology changes require a version bump (see Versioning).
+Status: **specified for implementation** (Phase 2). `PFI_SCORE_VERSION = "1.1"`. This document is the formal scoring specification — scoring rules live here, not only in code. The engine implementation must match this document; changes to either require changing both, and methodology changes require a version bump (see Versioning).
 
 ## What it is
 
@@ -35,6 +35,20 @@ Six weighted dimensions. Weights total 100%.
 - **Windows**: metrics use a trailing 90-day window ending at the as-of date; the "monthly" series is three consecutive 30-day buckets ending at the as-of date (deterministic regardless of calendar alignment). Volatility/consistency metrics require the full 90 days of history (3 complete buckets), else the metric is unavailable (`null`).
 - **Eligible liquid assets** = balances in `checking`, `savings`, `money_market` accounts with `include_in_calculations`. Retirement, brokerage, property, and other illiquid or penalty-encumbered assets are **never** auto-treated as liquid.
 - **Guards**: income ≤ 0 in the window makes income-denominated metrics unavailable (never ±Infinity). Ratio inputs are clamped to [−100%, +100%] before curving (outlier handling); curve outputs clamp to [0, 100].
+
+### Essential-spend classification (v1.1)
+
+`totals.essential` counts an outflow when its per-transaction `essential` flag is
+`true`, or — when that flag is unset (`null`, i.e. all imported/manual data) —
+when its **category** is essential by default:
+
+- **Essential:** housing, utilities, insurance, groceries, health, debt_payment, transport
+- **Non-essential:** dining, shopping, discretionary, savings, other, income, and any unknown/uncategorized outflow
+
+An explicit `essential` flag always overrides the category default. Source of the
+map: `src/lib/financial-engine/essential.ts`. This makes the score reachable once
+transactions are categorized, without a separate manual essential flag (which has
+no input path in v1.1 — deferred to slice B).
 
 ## Metric registry (v1)
 
@@ -205,7 +219,7 @@ Internal ids stay precise; user-facing copy is plain-language. Do not use "FCF",
 
 ## Versioning
 
-The scoring formula is versioned (`PFI_SCORE_VERSION`, currently `"1.0"`). Every computed score records the version that produced it. Methodology changes bump the version and never silently rewrite history: keep the original score + version and, where appropriate, a recalculated comparable score with an explanation. (v1 computes scores at read time from immutable-source data — see DECISIONS #14 for how this interacts with versioning until persisted scores arrive with real provider data.)
+The scoring formula is versioned (`PFI_SCORE_VERSION`, currently `"1.1"`). Every computed score records the version that produced it. Methodology changes bump the version and never silently rewrite history: keep the original score + version and, where appropriate, a recalculated comparable score with an explanation. (v1 computes scores at read time from immutable-source data — see DECISIONS #14 for how this interacts with versioning until persisted scores arrive with real provider data.) `1.1` (2026-07-22) derives `totals.essential` from category when the per-transaction `essential` flag is unset (see Essential-spend classification above) — the underlying metric formulas and curves are unchanged; this is a data-inclusion fix, not a formula/weight change.
 
 ## Edge cases (normative)
 
