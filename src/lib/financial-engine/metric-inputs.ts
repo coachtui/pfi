@@ -5,6 +5,7 @@
  */
 import type { DailySnapshot, ISODate } from "./types";
 import { addDays, type AccountType } from "./snapshot-builder";
+import { essentialForCategory } from "./essential";
 
 export const WINDOW_DAYS = 90;
 export const BUCKETS = 3;
@@ -179,7 +180,7 @@ export function buildMetricInputs(
       bucket.debtPayments += t.amount; // also real spending (an obligation)
     }
     bucket.spending += t.amount;
-    if (t.essential === true) bucket.essential += t.amount;
+    if (t.essential ?? essentialForCategory(t.category)) bucket.essential += t.amount;
   }
 
   const totals = buckets.reduce(
