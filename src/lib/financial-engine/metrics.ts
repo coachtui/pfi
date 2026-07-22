@@ -59,7 +59,7 @@ export const METRICS: MetricDef[] = [
   {
     id: "fixed_cost_ratio", name: "Essential-cost share", dimension: "cash_flow", scored: true,
     definition: "Essential (must-pay) spending as a share of income over the last 90 days.",
-    assumptions: ["Uses the transaction 'essential' flag; unflagged spending counts as non-essential"],
+    assumptions: ["Essential is the transaction's own flag when set, otherwise derived from its category (housing, utilities, insurance, groceries, health, debt payment, transport)"],
     limitations: ["Depends on categorization quality"],
     format: pct,
     compute: (i) => i.totals.income <= 0
@@ -93,7 +93,7 @@ export const METRICS: MetricDef[] = [
     id: "liquid_runway_months", name: "Emergency runway", dimension: "liquidity", scored: true,
     definition: "How many months of essential expenses your liquid accounts (checking, savings, money market) could cover.",
     assumptions: ["Retirement, brokerage, and property never count as liquid"],
-    limitations: ["Essential expenses come from flagged transactions in the last 90 days"],
+    limitations: ["Essential expenses come from flagged or category-derived transactions in the last 90 days"],
     format: months,
     compute: (i) => {
       if (i.snapshot === null) return { unavailable: "No balance history yet" };
