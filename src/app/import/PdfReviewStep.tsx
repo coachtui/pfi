@@ -11,6 +11,7 @@ import type { AccountSummary } from "@/lib/data/mappers";
 import { formatDollars } from "@/lib/financial-engine/format";
 import type { PdfReviewData, ReviewTransaction, StatementMetadata } from "@/lib/pdf-import/types";
 import type { ImportResult } from "@/lib/validation/imports";
+import { InlineError } from "@/components/ui/InlineError";
 
 const inputCls = "rounded-xl border border-border-subtle bg-inset px-3 py-2 text-sm text-primary";
 const labelCls = "text-xs font-medium text-primary";
@@ -306,7 +307,7 @@ export function PdfReviewStep({
         </table>
       </div>
 
-      {error && <p role="alert" className="text-sm text-negative">x {error}</p>}
+      <InlineError message={error} />
       <div className="flex flex-wrap gap-2 pt-2">
         <button type="button" disabled={pending} onClick={cancel} className="rounded-xl border border-negative px-4 py-3 text-sm font-semibold text-negative disabled:opacity-60">
           Cancel import

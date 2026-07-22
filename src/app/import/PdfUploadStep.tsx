@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { FileText, Upload } from "lucide-react";
 import { uploadStatementPdf } from "@/app/actions/imports";
 import type { PdfReviewData } from "@/lib/pdf-import/types";
+import { InlineError } from "@/components/ui/InlineError";
 
 export function PdfUploadStep({
   accountId,
@@ -73,7 +74,7 @@ export function PdfUploadStep({
         <Upload size={18} aria-hidden /> {pending ? "Uploading and extracting..." : "Choose PDF file"}
       </button>
       {pending && <p role="status" className="text-sm text-secondary">Extracting statement text. This may take a moment.</p>}
-      {error && <p role="alert" className="text-sm text-negative">x {error}</p>}
+      <InlineError message={error} />
       <p className="text-xs text-tertiary">
         Statements are stored privately for your account. Keep this screen open until review appears; background uploads are not enabled yet.
       </p>
