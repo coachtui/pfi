@@ -65,7 +65,15 @@ export function PdfUploadStep({
         }}
       />
 
-      <div className="rounded-card border border-dashed border-border-strong bg-inset p-6">
+      <div
+        className="rounded-card border border-dashed border-border-strong bg-inset p-6"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          const f = e.dataTransfer.files?.[0];
+          if (f) submit(f);
+        }}
+      >
         <div className="flex flex-col items-center gap-3">
           <div className="rounded-lg bg-positive-strong/10 p-3">
             <Upload size={24} className="text-positive-strong" aria-hidden />

@@ -9,7 +9,7 @@ export function ImportStepper<T extends string>({
 }) {
   const index = Math.max(0, steps.indexOf(current));
   return (
-    <div className="mb-6 flex flex-col gap-2" aria-label="Import progress">
+    <div className="mb-6 flex flex-col gap-2" role="group" aria-label="Import progress">
       <div className="flex gap-1" aria-hidden>
         {steps.map((s, i) => (
           <span
