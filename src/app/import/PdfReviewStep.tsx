@@ -204,11 +204,11 @@ export function PdfReviewStep({
     });
   }
 
-  function cancel() {
+  function cancel(onDone: () => void) {
     startTransition(async () => {
       const result = await cancelPdfImport(review.importId);
       if (result.error) setError(result.error);
-      else onCancelled();
+      else onDone();
     });
   }
 
@@ -245,15 +245,17 @@ export function PdfReviewStep({
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={onCancelled}
-                  className="rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base"
+                  disabled={pending}
+                  onClick={() => cancel(onCancelled)}
+                  className="rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base disabled:opacity-60"
                 >
                   Import a CSV instead
                 </button>
                 <button
                   type="button"
-                  onClick={onBack ?? onCancelled}
-                  className="rounded-xl border border-border-strong px-4 py-3 text-sm font-semibold text-primary"
+                  disabled={pending}
+                  onClick={() => cancel(onBack ?? onCancelled)}
+                  className="rounded-xl border border-border-strong px-4 py-3 text-sm font-semibold text-primary disabled:opacity-60"
                 >
                   Try a different PDF
                 </button>
@@ -433,7 +435,7 @@ export function PdfReviewStep({
               Back
             </button>
           )}
-          <button type="button" disabled={pending} onClick={cancel} className="rounded-xl border border-negative px-4 py-3 text-sm font-semibold text-negative disabled:opacity-60">
+          <button type="button" disabled={pending} onClick={() => cancel(onCancelled)} className="rounded-xl border border-negative px-4 py-3 text-sm font-semibold text-negative disabled:opacity-60">
             Cancel import
           </button>
           <button type="button" disabled={pending || accepted.length === 0} onClick={confirm} className="flex-1 rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base disabled:opacity-60">
