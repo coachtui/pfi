@@ -77,7 +77,7 @@ export function AccountsView({
           href="/import"
           className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border-subtle px-2.5 py-1.5 text-xs font-medium text-secondary transition-colors hover:text-primary"
         >
-          <Upload size={14} aria-hidden /> Import CSV
+          <Upload size={14} aria-hidden /> Import
         </Link>
       </div>
 
