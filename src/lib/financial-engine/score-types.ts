@@ -1,6 +1,6 @@
 import type { ISODate } from "./types";
 
-export const PFI_SCORE_VERSION = "1.0";
+export const PFI_SCORE_VERSION = "1.1";
 
 export type DimensionKey =
   | "cash_flow" | "liquidity" | "debt" | "stability" | "growth" | "concentration";

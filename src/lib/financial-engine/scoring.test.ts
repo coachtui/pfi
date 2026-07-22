@@ -53,7 +53,7 @@ describe("computeScore", () => {
   it("produces a full 0–900 score with all dimensions eligible and version stamped", () => {
     const b = computeScore(fullResults(), HIGH, "2026-07-15");
     expect(b.state).toBe("full");
-    expect(b.version).toBe("1.0");
+    expect(b.version).toBe("1.1");
     expect(b.overall).toBeGreaterThan(700); // healthy values → high score
     expect(b.overall).toBeLessThanOrEqual(900);
     expect(b.band).toBe(bandFor(b.overall!));
