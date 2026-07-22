@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Upload } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { InlineError } from "@/components/ui/InlineError";
 import { setAccountArchived, setAccountIncluded } from "@/app/actions/accounts";
 import { formatDollars } from "@/lib/financial-engine/format";
 import type { AccountType } from "@/lib/financial-engine";
@@ -46,12 +47,14 @@ export function AccountsView({
   const [editing, setEditing] = useState<AccountSummary | null>(null);
   const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const mutate = (fn: () => Promise<{ error: string; warning?: string }>) => {
+    setError(null);
     setNotice(null);
     startTransition(async () => {
       const result = await fn();
-      if (result.error) setNotice(`✕ ${result.error}`);
+      if (result.error) setError(result.error);
       else if (result.warning) setNotice(`⚠ ${result.warning}`);
       router.refresh();
     });
@@ -78,6 +81,7 @@ export function AccountsView({
         </Link>
       </div>
 
+      <InlineError message={error ?? ""} />
       {notice && (
         <p role="status" className="text-sm text-warning">
           {notice}
