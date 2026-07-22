@@ -1,4 +1,5 @@
 import type { DailySnapshot, ISODate } from "./types";
+import { essentialForCategory } from "./essential";
 import {
   detectRecurringSeries, nextOccurrenceAfter, occurrencesAfter,
   type RecurringOverride, type RecurringSeries,
@@ -239,7 +240,7 @@ function computeObligations(
       continue;
     }
     nearTerm += t.amount;
-    if (t.essential === true) essential += t.amount;
+    if (t.essential ?? essentialForCategory(t.category)) essential += t.amount;
   }
 
   if (beyondHistory && canProject) {

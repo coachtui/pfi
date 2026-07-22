@@ -106,6 +106,25 @@ describe("buildDailySnapshots — obligations", () => {
     expect(snaps.find((s) => s.date === "2026-01-16")!.nearTermObligations).toBe(1200);
     expect(snaps.find((s) => s.date === "2026-01-16")!.essentialObligations).toBe(1200);
   });
+
+  it("derives essential obligations from category when the flag is null, and not for non-essential categories", () => {
+    const catAccounts: AccountInput[] = [
+      { id: "chk", type: "checking", currentBalance: 5000, includeInCalculations: true },
+    ];
+    const catConfig = { startDate: "2026-01-01", endDate: "2026-01-16", safetyBuffer: 500 };
+    const catTransactions: TransactionInput[] = [
+      txn({ id: "ci1", accountId: "chk", postedDate: "2026-01-01", amount: 2000, direction: "inflow", category: "income" }),
+      txn({ id: "ci2", accountId: "chk", postedDate: "2026-01-02", amount: 300, direction: "outflow", category: "housing" }),
+      txn({ id: "ci3", accountId: "chk", postedDate: "2026-01-05", amount: 150, direction: "outflow", category: "dining" }),
+      txn({ id: "ci4", accountId: "chk", postedDate: "2026-01-15", amount: 2000, direction: "inflow", category: "income" }),
+    ];
+    const snaps = buildDailySnapshots(catAccounts, catTransactions, catConfig);
+    // Window (Jan01, Jan15]: housing 300 (category-essential, flag left null)
+    // counts as essential; dining 150 (category non-essential, flag left null)
+    // does not, but both count toward nearTermObligations.
+    expect(snaps.find((s) => s.date === "2026-01-01")!.essentialObligations).toBe(300);
+    expect(snaps.find((s) => s.date === "2026-01-01")!.nearTermObligations).toBe(450);
+  });
 });
 
 const account = (

@@ -1,4 +1,5 @@
 import type { ISODate } from "./types";
+import { essentialForCategory } from "./essential";
 import {
   addDays, daysBetween, LIABILITY_TYPES, LIQUID_TYPES,
   type AccountInput, type TransactionInput,
@@ -170,7 +171,7 @@ export function detectRecurringSeries(
     if (within / amounts.length < AMOUNT_QUALIFYING_SHARE) continue;
     const variableAmount = amounts.some((a) => Math.abs(a - typical) > typical * VARIABLE_THRESHOLD);
 
-    const essentialCount = g.txns.filter((t) => t.essential === true).length;
+    const essentialCount = g.txns.filter((t) => t.essential ?? essentialForCategory(t.category)).length;
     const incomeCount = g.txns.filter((t) => t.category === "income").length;
     const lastDate = dates[dates.length - 1];
     const base: RecurringConfidence = dates.length >= 6 ? "high" : dates.length >= 4 ? "medium" : "low";
