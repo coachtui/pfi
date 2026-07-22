@@ -301,13 +301,13 @@ export function ImportWizard(props: {
                 setMode("csv");
                 setStep("upload");
               }}
-              className="rounded-card border border-border-subtle bg-elevated p-4 text-left transition-colors hover:border-border-strong"
+              className="flex flex-col gap-2 rounded-card border border-border-subtle bg-elevated p-4 text-left shadow-card transition-colors hover:border-border-strong"
             >
-              <FileSpreadsheet size={22} className="mb-3 text-secondary" aria-hidden />
-              <span className="block text-sm font-semibold text-primary">Upload CSV</span>
-              <span className="mt-1 block text-sm text-secondary">
-                Best for accurate transaction history.
+              <span className="grid size-10 place-items-center rounded-xl border border-border-subtle bg-elevated-2 text-secondary">
+                <FileSpreadsheet size={20} aria-hidden />
               </span>
+              <span className="text-sm font-semibold text-primary">Upload CSV</span>
+              <span className="text-sm text-secondary">Best for accurate, complete transaction history.</span>
             </button>
             <button
               type="button"
@@ -315,11 +315,13 @@ export function ImportWizard(props: {
                 setMode("pdf");
                 setStep("upload");
               }}
-              className="rounded-card border border-border-subtle bg-elevated p-4 text-left transition-colors hover:border-border-strong"
+              className="flex flex-col gap-2 rounded-card border border-border-subtle bg-elevated p-4 text-left shadow-card transition-colors hover:border-border-strong"
             >
-              <FileText size={22} className="mb-3 text-secondary" aria-hidden />
-              <span className="block text-sm font-semibold text-primary">Upload statement PDF</span>
-              <span className="mt-1 block text-sm text-secondary">
+              <span className="grid size-10 place-items-center rounded-xl border border-border-subtle bg-elevated-2 text-secondary">
+                <FileText size={20} aria-hidden />
+              </span>
+              <span className="text-sm font-semibold text-primary">Upload statement PDF</span>
+              <span className="text-sm text-secondary">
                 Use a bank or credit-card statement when CSV export is unavailable.
               </span>
             </button>
@@ -345,6 +347,7 @@ export function ImportWizard(props: {
         <PdfUploadStep
           accountId={accountId}
           accountName={selectedAccount?.displayName ?? ""}
+          onBack={() => setStep("choose")}
           onReady={(review) => {
             setPdfReview(review);
             setStep("pdfReview");
@@ -404,6 +407,10 @@ export function ImportWizard(props: {
           accounts={accounts}
           existing={props.existing}
           initialAccountId={accountId}
+          onBack={() => {
+            setPdfReview(null);
+            setStep("upload");
+          }}
           onCancelled={() => {
             setPdfReview(null);
             setMode(null);

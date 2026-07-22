@@ -35,6 +35,7 @@ export function PdfReviewStep({
   accounts,
   existing,
   initialAccountId,
+  onBack,
   onConfirmed,
   onCancelled,
 }: {
@@ -42,6 +43,7 @@ export function PdfReviewStep({
   accounts: AccountSummary[];
   existing: ExistingTxn[];
   initialAccountId: string;
+  onBack?: () => void;
   onConfirmed: (result: ImportResult, rows: NormalizedRow[], accountId: string) => void;
   onCancelled: () => void;
 }) {
@@ -309,6 +311,11 @@ export function PdfReviewStep({
 
       <InlineError message={error} />
       <div className="flex flex-wrap gap-2 pt-2">
+        {onBack && (
+          <button type="button" disabled={pending} onClick={onBack} className="rounded-xl border border-border-strong px-4 py-3 text-sm font-semibold text-primary disabled:opacity-60">
+            Back
+          </button>
+        )}
         <button type="button" disabled={pending} onClick={cancel} className="rounded-xl border border-negative px-4 py-3 text-sm font-semibold text-negative disabled:opacity-60">
           Cancel import
         </button>

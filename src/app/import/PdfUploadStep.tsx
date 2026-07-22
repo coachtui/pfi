@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { FileText, Upload } from "lucide-react";
+import { ArrowLeft, FileText, Upload } from "lucide-react";
 import { uploadStatementPdf } from "@/app/actions/imports";
 import type { PdfReviewData } from "@/lib/pdf-import/types";
 import { InlineError } from "@/components/ui/InlineError";
@@ -9,10 +9,12 @@ import { InlineError } from "@/components/ui/InlineError";
 export function PdfUploadStep({
   accountId,
   accountName,
+  onBack,
   onReady,
 }: {
   accountId: string;
   accountName: string;
+  onBack?: () => void;
   onReady: (review: PdfReviewData) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -36,6 +38,15 @@ export function PdfUploadStep({
 
   return (
     <section className="space-y-4">
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1 text-sm text-secondary hover:text-primary"
+        >
+          <ArrowLeft size={16} aria-hidden /> Back
+        </button>
+      )}
       <div className="rounded-card border border-border-subtle bg-elevated p-4">
         <div className="flex items-start gap-3">
           <FileText className="mt-0.5 shrink-0 text-secondary" size={20} aria-hidden />
