@@ -303,21 +303,19 @@ One finding worth recording, because it contradicts an assumption embedded in th
 
 **Consequences:** Common exports require fewer steps without changing the existing client-side CSV parser, server-side validation, deduplication, transfer detection, or commit flow. AI latency occurs only for ambiguity or unknown category labels, and an AI failure cannot block import. No schema, storage, or RLS changes are required.
 
-## 37. Essential spend derived from category (2026-07-22)
+## 37. 2026-07-22 — Essential spend derived from category
 
 **Decision:** Derive a transaction's `essential` status from its `category` when the
 raw `essential` flag is unset, via `essentialForCategory` in the engine. Bump
-`PFI_SCORE_VERSION` 1.0 → 1.1.
+`PFI_SCORE_VERSION` 1.0 → 1.1. The PFI score hard-suppresses unless
+`liquid_runway_months` is available, which requires `totals.essential > 0`. The
+`essential` flag was writable only by demo seed data — no override or editor path —
+so real users (even with several accounts) could never unlock the score.
 
-**Context:** The PFI score hard-suppresses unless `liquid_runway_months` is available,
-which requires `totals.essential > 0`. The `essential` flag was writable only by demo
-seed data — no override or editor path — so real users (even with several accounts)
-could never unlock the score.
-
-**Alternatives rejected:** (a) A manual per-transaction essential toggle as the only
-path — too much user effort and it left the score unreachable by default; (b) an
-AI-set essential flag — puts AI directly on a score input, violating "deterministic
-code calculates; AI only narrates."
+**Alternatives:** a manual per-transaction essential toggle as the only path (rejected
+— too much user effort and it left the score unreachable by default); an AI-set
+essential flag (rejected — puts AI directly on a score input, violating
+"deterministic code calculates; AI only narrates").
 
 **Consequences:** Score unlocks once spend is categorized (existing editor supports
 this). CSV import still defaults outflows to `other` (non-essential), so a fresh import
