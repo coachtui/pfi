@@ -302,3 +302,29 @@ One finding worth recording, because it contradicts an assumption embedded in th
 **Decision:** Standard bank CSVs bypass the mapping screen when deterministic header, date-order, account-aware sign, and row-shape checks are confident. The preview identifies that PFI mapped the file and provides a `Change mapping` escape hatch. Ambiguous files use a plain-language confirmation screen. An optional authenticated AI Gateway call may suggest unfamiliar column roles and bank category-label mappings, but receives structural column profiles rather than transaction values and never controls monetary parsing. Missing AI configuration falls back to deterministic/manual behavior.
 
 **Consequences:** Common exports require fewer steps without changing the existing client-side CSV parser, server-side validation, deduplication, transfer detection, or commit flow. AI latency occurs only for ambiguity or unknown category labels, and an AI failure cannot block import. No schema, storage, or RLS changes are required.
+
+## 37. 2026-07-22 — Essential spend derived from category
+
+**Decision:** Derive a transaction's `essential` status from its `category` when the
+raw `essential` flag is unset, via `essentialForCategory` in the engine. Bump
+`PFI_SCORE_VERSION` 1.0 → 1.1. The PFI score hard-suppresses unless
+`liquid_runway_months` is available, which requires `totals.essential > 0`. The
+`essential` flag was writable only by demo seed data — no override or editor path —
+so real users (even with several accounts) could never unlock the score.
+
+**Alternatives:** a manual per-transaction essential toggle as the only path (rejected
+— too much user effort and it left the score unreachable by default); an AI-set
+essential flag (rejected — puts AI directly on a score input, violating
+"deterministic code calculates; AI only narrates").
+
+**Consequences:** Score unlocks once spend is categorized (existing editor supports
+this). CSV import still defaults outflows to `other` (non-essential), so a fresh import
+needs its essentials categorized first — reducing that manual effort is slice B
+(AI-assisted categorization + human verify + manual essential override).
+
+**Amendment (2026-07-22):** Extended the same category-derivation to the waterline's
+`essentialObligations` (`snapshot-builder.ts`, `recurring.ts` — previously still gated
+on the unwritable flag) and to `liquidity`'s confidence classification
+(`confidence.ts`'s `CATEGORY_DRIVEN` set, since `liquid_runway_months` now reads
+category-derived essential spend too). Approved by the product owner after the
+whole-branch review surfaced the inconsistency.

@@ -50,7 +50,7 @@ describe("full score pipeline", () => {
   it("produces a full, versioned, explainable breakdown on healthy manual data", () => {
     const b = breakdownAt(AS_OF);
     expect(b.state).toBe("full");
-    expect(b.version).toBe("1.0");
+    expect(b.version).toBe("1.1");
     expect(b.overall).toBeGreaterThanOrEqual(0);
     expect(b.overall).toBeLessThanOrEqual(900);
     expect(b.dimensions).toHaveLength(6);
@@ -75,5 +75,34 @@ describe("full score pipeline", () => {
     const delta = computeScoreDelta(breakdownAt(AS_OF), breakdownAt(addDays(AS_OF, -30)));
     expect(delta.state).toBe("ok");
     expect(Math.abs(delta.change ?? 99)).toBeLessThan(10);
+  });
+
+  it("unlocks a previously-suppressed score once spend is categorized (essential derived)", () => {
+    const AS_OF_U = "2026-07-15";
+    const accounts: ScoreAccountInput[] = [
+      { id: "chk", type: "checking", institution: "First Bank", currentBalance: 9000, creditLimit: null, interestRate: null, includeInCalculations: true, provider: "manual" },
+      { id: "sav", type: "savings", institution: "Ally", currentBalance: 15000, creditLimit: null, interestRate: null, includeInCalculations: true, provider: "manual" },
+    ];
+    const base = { accountId: "chk", category: null as string | null, essential: null as boolean | null, isTransfer: false, transferPairId: null, description: "" };
+    const txns: ScoreTransactionInput[] = [];
+    const snapshots: DailySnapshot[] = [];
+    for (let d = 179; d >= 0; d--) {
+      const date = addDays(AS_OF_U, -d);
+      snapshots.push({ date, liquidAssets: 24000, revolvingBalances: 0, nearTermObligations: 2600, essentialObligations: 2000, safetyBuffer: 1000, netWorth: 24000 });
+      if (d % 30 === 0) {
+        txns.push({ ...base, id: `pay${d}`, postedDate: date, amount: 5500, direction: "inflow", category: "income", description: "Payroll" });
+        // essential:null — the exact shape imported/manual rows have
+        txns.push({ ...base, id: `rent${d}`, postedDate: date, amount: 1700, direction: "outflow", category: "housing" });
+        txns.push({ ...base, id: `gro${d}`, postedDate: date, amount: 600, direction: "outflow", category: "groceries" });
+      }
+    }
+    const inputs = buildMetricInputs(snapshots, txns, accounts, AS_OF_U);
+    const results = computeMetrics(inputs);
+    const confidence = computeConfidence(inputs, results);
+    const b = computeScore(results, confidence.byDimension, AS_OF_U);
+
+    expect(inputs.totals.essential).toBeGreaterThan(0);
+    expect(b.state).not.toBe("suppressed");
+    expect(b.overall).not.toBeNull();
   });
 });

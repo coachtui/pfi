@@ -11,7 +11,7 @@ export interface ConfidenceReport {
 }
 
 const ALL_DIMENSIONS: DimensionKey[] = ["cash_flow", "liquidity", "debt", "stability", "growth", "concentration"];
-const CATEGORY_DRIVEN: ReadonlySet<DimensionKey> = new Set(["cash_flow", "stability", "growth"]);
+const CATEGORY_DRIVEN: ReadonlySet<DimensionKey> = new Set(["cash_flow", "stability", "growth", "liquidity"]);
 /** Dimensions whose windowed flows depend on correctly-paired transfers (contributions/debt payments/income netting). */
 const TRANSFER_SENSITIVE: ReadonlySet<DimensionKey> = new Set(["cash_flow", "stability", "growth"]);
 const ORDER: ConfidenceLevel[] = ["high", "moderate", "limited"];

@@ -152,4 +152,35 @@ describe("buildMetricInputs", () => {
     expect(inputs.dataQuality.demo).toBe(true);
     expect(inputs.snapshot?.liquidAssets).toBe(20000);
   });
+
+  it("derives essential from category when the flag is null", () => {
+    const inputs = buildMetricInputs(
+      [snap("2026-07-14", 19000), snap(AS_OF, 20000)],
+      [
+        // essential: null (as an imported/manual row would be), but categorized essential
+        txn({ id: "r1", postedDate: "2026-07-02", amount: 1700, direction: "outflow", category: "housing" }),
+        txn({ id: "g1", postedDate: "2026-07-03", amount: 500, direction: "outflow", category: "groceries" }),
+        // non-essential category stays out of essential
+        txn({ id: "d1", postedDate: "2026-07-04", amount: 200, direction: "outflow", category: "dining" }),
+      ],
+      ACCOUNTS,
+      AS_OF,
+    );
+    expect(inputs.totals.essential).toBe(2200);
+  });
+
+  it("lets an explicit essential flag override the category default", () => {
+    const inputs = buildMetricInputs(
+      [snap("2026-07-14", 19000), snap(AS_OF, 20000)],
+      [
+        // explicitly NOT essential despite an essential-by-default category
+        txn({ id: "h2", postedDate: "2026-07-02", amount: 1700, direction: "outflow", category: "housing", essential: false }),
+        // explicitly essential despite a non-essential category
+        txn({ id: "s2", postedDate: "2026-07-03", amount: 300, direction: "outflow", category: "shopping", essential: true }),
+      ],
+      ACCOUNTS,
+      AS_OF,
+    );
+    expect(inputs.totals.essential).toBe(300);
+  });
 });

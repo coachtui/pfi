@@ -70,6 +70,26 @@ describe("detectRecurringSeries", () => {
     });
   });
 
+  it("derives series essential status from category when the flag is left null", () => {
+    const txns = [
+      txn({ postedDate: "2026-04-01", amount: 1500, category: "housing" }),
+      txn({ postedDate: "2026-05-01", amount: 1500, category: "housing" }),
+      txn({ postedDate: "2026-06-01", amount: 1500, category: "housing" }),
+    ];
+    const [s] = detectRecurringSeries([CHK], txns, "2026-06-15");
+    expect(s.essential).toBe(true);
+  });
+
+  it("does not derive essential status from a non-essential category when the flag is left null", () => {
+    const txns = [
+      txn({ postedDate: "2026-04-01", amount: 1500, category: "dining" }),
+      txn({ postedDate: "2026-05-01", amount: 1500, category: "dining" }),
+      txn({ postedDate: "2026-06-01", amount: 1500, category: "dining" }),
+    ];
+    const [s] = detectRecurringSeries([CHK], txns, "2026-06-15");
+    expect(s.essential).toBe(false);
+  });
+
   it("classifies a 1st/15th payroll as semimonthly income", () => {
     const dates = ["2026-04-01", "2026-04-15", "2026-05-01", "2026-05-15", "2026-06-01", "2026-06-15"];
     const txns = dates.map((d) =>

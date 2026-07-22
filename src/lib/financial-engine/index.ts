@@ -8,6 +8,7 @@ export * from "./rebuild";
 export * from "./snapshot-builder";
 export * from "./report";
 export * from "./score-types";
+export * from "./essential";
 export * from "./metric-inputs";
 export * from "./metrics";
 export * from "./scoring";
