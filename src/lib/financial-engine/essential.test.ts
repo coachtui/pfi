@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { essentialForCategory } from "./essential";
+import { CATEGORIES } from "../config/categories";
+import { ESSENTIAL_CATEGORIES, essentialForCategory } from "./essential";
 
 describe("essentialForCategory", () => {
   it("classifies must-pay categories as essential", () => {
@@ -17,5 +18,13 @@ describe("essentialForCategory", () => {
 
   it("treats unknown category strings as non-essential", () => {
     expect(essentialForCategory("not_a_real_category")).toBe(false);
+  });
+});
+
+describe("ESSENTIAL_CATEGORIES", () => {
+  it("is a subset of the full category taxonomy", () => {
+    for (const c of ESSENTIAL_CATEGORIES) {
+      expect(CATEGORIES as readonly string[], c).toContain(c);
+    }
   });
 });
