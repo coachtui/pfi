@@ -1,10 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeftRight, CheckCircle2, CopyX } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, CheckCircle2, CopyX, Settings2 } from "lucide-react";
 import type { AccountSummary } from "@/lib/data/mappers";
-import type { ExistingTxn, NormalizedRow, ParseError, RowError, TransferPair } from "@/lib/csv-import/types";
-import { computeDiscrepancy, type AccountInput, type TransactionInput } from "@/lib/financial-engine";
+import type {
+  ExistingTxn,
+  NormalizedRow,
+  ParseError,
+  RowError,
+  TransferPair,
+} from "@/lib/csv-import/types";
+import { CATEGORY_LABELS } from "@/lib/config/categories";
+import {
+  computeDiscrepancy,
+  type AccountInput,
+  type TransactionInput,
+} from "@/lib/financial-engine";
 import { formatDollars } from "@/lib/financial-engine/format";
 
 interface Preview {
@@ -21,18 +32,32 @@ const money = (n: number) => n.toLocaleString("en-US", { style: "currency", curr
 function RowLine({ r }: { r: NormalizedRow }) {
   return (
     <li className="flex items-baseline justify-between gap-2 text-sm">
-      <span className="truncate text-primary">{r.postedDate} · {r.description}</span>
+      <span className="min-w-0">
+        <span className="block truncate text-primary">
+          {r.postedDate} · {r.description}
+        </span>
+        <span className="block text-xs text-secondary">{CATEGORY_LABELS[r.category]}</span>
+      </span>
       <span className="shrink-0 tabular-nums text-primary">
-        {r.direction === "inflow" ? "+" : "−"}{money(r.amount)}
+        {r.direction === "inflow" ? "+" : "−"}
+        {money(r.amount)}
       </span>
     </li>
   );
 }
 
 function Chip({
-  icon, label, count, open, onToggle,
+  icon,
+  label,
+  count,
+  open,
+  onToggle,
 }: {
-  icon: React.ReactNode; label: string; count: number; open: boolean; onToggle: () => void;
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
 }) {
   return (
     <button
@@ -47,8 +72,24 @@ function Chip({
 }
 
 export function PreviewStep({
-  preview, accounts, existing, removedPairs, onTogglePair, submitting, submitError, onBack, onCommit,
-  accountId, anchors, endingBalance, anchorDate, defaultAnchorDate, onEndingBalanceChange, onAnchorDateChange,
+  preview,
+  accounts,
+  existing,
+  removedPairs,
+  onTogglePair,
+  submitting,
+  submitError,
+  onBack,
+  onCommit,
+  accountId,
+  anchors,
+  endingBalance,
+  anchorDate,
+  defaultAnchorDate,
+  onEndingBalanceChange,
+  onAnchorDateChange,
+  mappingNotice,
+  onChangeMapping,
 }: {
   preview: Preview;
   accounts: AccountSummary[];
@@ -66,13 +107,16 @@ export function PreviewStep({
   defaultAnchorDate: string;
   onEndingBalanceChange: (v: string) => void;
   onAnchorDateChange: (v: string) => void;
+  mappingNotice: string;
+  onChangeMapping: () => void;
 }) {
   const [openSection, setOpenSection] = useState<"" | "new" | "dup" | "transfer" | "error">("");
   const toggle = (s: typeof openSection) => setOpenSection((cur) => (cur === s ? "" : s));
   const { fresh, duplicates, pairs, errors } = preview;
   const rowByLine = new Map(fresh.map((r) => [r.line, r]));
   const existingById = new Map(existing.map((t) => [t.id, t]));
-  const accountName = (id: string) => accounts.find((a) => a.id === id)?.displayName ?? "another account";
+  const accountName = (id: string) =>
+    accounts.find((a) => a.id === id)?.displayName ?? "another account";
   const keptPairCount = pairs.filter((p) => !removedPairs.has(p.line)).length;
 
   const account = accounts.find((a) => a.id === accountId);
@@ -80,39 +124,104 @@ export function PreviewStep({
   const effAnchorDate = anchorDate || defaultAnchorDate;
   const recon = useMemo(() => {
     const n = Number(endingBalance.trim());
-    if (endingBalance.trim() === "" || !Number.isFinite(n) || !account || !effAnchorDate) return null;
+    if (endingBalance.trim() === "" || !Number.isFinite(n) || !account || !effAnchorDate)
+      return null;
     const acctForMath: AccountInput = {
-      id: accountId, type: account.type, currentBalance: 0, includeInCalculations: true,
+      id: accountId,
+      type: account.type,
+      currentBalance: 0,
+      includeInCalculations: true,
     };
     const mathTxns: TransactionInput[] = [
       ...existing
         .filter((t) => t.accountId === accountId)
         .map((t) => ({
-          id: t.id, accountId: t.accountId, postedDate: t.postedDate, amount: t.amount,
-          direction: t.direction, description: t.description, category: null,
-          essential: null, isTransfer: t.isTransfer, transferPairId: t.transferPairId,
+          id: t.id,
+          accountId: t.accountId,
+          postedDate: t.postedDate,
+          amount: t.amount,
+          direction: t.direction,
+          description: t.description,
+          category: null,
+          essential: null,
+          isTransfer: t.isTransfer,
+          transferPairId: t.transferPairId,
         })),
       ...preview.fresh.map((r) => ({
-        id: `line-${r.line}`, accountId, postedDate: r.postedDate, amount: r.amount,
-        direction: r.direction, description: r.description, category: null,
-        essential: null, isTransfer: false, transferPairId: null,
+        id: `line-${r.line}`,
+        accountId,
+        postedDate: r.postedDate,
+        amount: r.amount,
+        direction: r.direction,
+        description: r.description,
+        category: null,
+        essential: null,
+        isTransfer: false,
+        transferPairId: null,
       })),
     ];
-    return { discrepancy: computeDiscrepancy(acctForMath, priorAnchor, n, effAnchorDate, mathTxns) };
+    return {
+      discrepancy: computeDiscrepancy(acctForMath, priorAnchor, n, effAnchorDate, mathTxns),
+    };
   }, [endingBalance, effAnchorDate, account, accountId, existing, preview.fresh, priorAnchor]);
 
   return (
     <section className="space-y-4">
+      {mappingNotice && (
+        <div className="flex flex-col gap-2 rounded-card border border-border-subtle bg-elevated p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-medium text-primary">
+              <CheckCircle2 size={16} aria-hidden /> PFI mapped this file automatically
+            </p>
+            <p className="mt-1 text-xs text-secondary">
+              {mappingNotice} Review money in and money out below before importing.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onChangeMapping}
+            className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-border-subtle px-2.5 py-1.5 text-xs text-secondary hover:text-primary"
+          >
+            <Settings2 size={14} aria-hidden /> Change mapping
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
-        <Chip icon={<CheckCircle2 size={14} aria-hidden />} label="new" count={fresh.length} open={openSection === "new"} onToggle={() => toggle("new")} />
-        <Chip icon={<CopyX size={14} aria-hidden />} label="duplicates skipped" count={duplicates.length} open={openSection === "dup"} onToggle={() => toggle("dup")} />
-        <Chip icon={<ArrowLeftRight size={14} aria-hidden />} label="transfer pairs" count={pairs.length} open={openSection === "transfer"} onToggle={() => toggle("transfer")} />
-        <Chip icon={<AlertTriangle size={14} aria-hidden />} label="rows with errors" count={errors.length} open={openSection === "error"} onToggle={() => toggle("error")} />
+        <Chip
+          icon={<CheckCircle2 size={14} aria-hidden />}
+          label="new"
+          count={fresh.length}
+          open={openSection === "new"}
+          onToggle={() => toggle("new")}
+        />
+        <Chip
+          icon={<CopyX size={14} aria-hidden />}
+          label="duplicates skipped"
+          count={duplicates.length}
+          open={openSection === "dup"}
+          onToggle={() => toggle("dup")}
+        />
+        <Chip
+          icon={<ArrowLeftRight size={14} aria-hidden />}
+          label="transfer pairs"
+          count={pairs.length}
+          open={openSection === "transfer"}
+          onToggle={() => toggle("transfer")}
+        />
+        <Chip
+          icon={<AlertTriangle size={14} aria-hidden />}
+          label="rows with errors"
+          count={errors.length}
+          open={openSection === "error"}
+          onToggle={() => toggle("error")}
+        />
       </div>
 
       {openSection === "new" && (
         <ul className="max-h-72 space-y-1 overflow-y-auto rounded-xl border border-border-subtle bg-inset p-3">
-          {fresh.map((r) => <RowLine key={r.line} r={r} />)}
+          {fresh.map((r) => (
+            <RowLine key={r.line} r={r} />
+          ))}
           {fresh.length === 0 && <li className="text-sm text-secondary">No new rows.</li>}
         </ul>
       )}
@@ -120,12 +229,17 @@ export function PreviewStep({
       {openSection === "dup" && (
         <div className="rounded-xl border border-border-subtle bg-inset p-3">
           <p className="mb-2 text-xs text-secondary">
-            Why skipped? An identical transaction (same date, amount, direction, and description) already
-            exists in this account — usually from an earlier export of an overlapping date range.
+            Why skipped? An identical transaction (same date, amount, direction, and description)
+            already exists in this account — usually from an earlier export of an overlapping date
+            range.
           </p>
           <ul className="max-h-72 space-y-1 overflow-y-auto">
-            {duplicates.map((r) => <RowLine key={r.line} r={r} />)}
-            {duplicates.length === 0 && <li className="text-sm text-secondary">No duplicates found.</li>}
+            {duplicates.map((r) => (
+              <RowLine key={r.line} r={r} />
+            ))}
+            {duplicates.length === 0 && (
+              <li className="text-sm text-secondary">No duplicates found.</li>
+            )}
           </ul>
         </div>
       )}
@@ -133,8 +247,9 @@ export function PreviewStep({
       {openSection === "transfer" && (
         <div className="rounded-xl border border-border-subtle bg-inset p-3">
           <p className="mb-2 text-xs text-secondary">
-            Why a transfer? An opposite transaction with the same amount exists within 3 days on another
-            of your accounts. Transfers don&apos;t count as income or spending. Un-check any that are wrong.
+            Why a transfer? An opposite transaction with the same amount exists within 3 days on
+            another of your accounts. Transfers don&apos;t count as income or spending. Un-check any
+            that are wrong.
           </p>
           <ul className="space-y-2">
             {pairs.map((p) => {
@@ -153,13 +268,16 @@ export function PreviewStep({
                   <label htmlFor={`pair-${p.line}`} className="text-primary">
                     {row.postedDate} · {row.description} · {money(row.amount)}
                     <span className="block text-xs text-secondary">
-                      matches {other.postedDate} &ldquo;{other.description}&rdquo; on {accountName(other.accountId)}
+                      matches {other.postedDate} &ldquo;{other.description}&rdquo; on{" "}
+                      {accountName(other.accountId)}
                     </span>
                   </label>
                 </li>
               );
             })}
-            {pairs.length === 0 && <li className="text-sm text-secondary">No transfers detected.</li>}
+            {pairs.length === 0 && (
+              <li className="text-sm text-secondary">No transfers detected.</li>
+            )}
           </ul>
         </div>
       )}
@@ -167,39 +285,55 @@ export function PreviewStep({
       {openSection === "error" && (
         <div className="rounded-xl border border-border-subtle bg-inset p-3">
           <p className="mb-2 text-xs text-secondary">
-            These rows couldn&apos;t be read and will not be imported. Fix them in the file and re-import,
-            or continue without them.
+            These rows couldn&apos;t be read and will not be imported. Fix them in the file and
+            re-import, or continue without them.
           </p>
           <ul className="max-h-72 space-y-1 overflow-y-auto">
             {errors.map((e) => (
-              <li key={e.line} className="text-sm text-warning">Line {e.line}: {e.message}</li>
+              <li key={e.line} className="text-sm text-warning">
+                Line {e.line}: {e.message}
+              </li>
             ))}
             {errors.length === 0 && <li className="text-sm text-secondary">No errors.</li>}
           </ul>
         </div>
       )}
 
-      <section aria-labelledby="anchor-heading" className="rounded-card border border-border-subtle bg-elevated p-3">
-        <h3 id="anchor-heading" className="text-sm font-medium text-primary">Statement ending balance</h3>
+      <section
+        aria-labelledby="anchor-heading"
+        className="rounded-card border border-border-subtle bg-elevated p-3"
+      >
+        <h3 id="anchor-heading" className="text-sm font-medium text-primary">
+          Statement ending balance
+        </h3>
         <p className="mt-1 text-xs text-secondary">
-          Printed on your statement — &ldquo;new balance&rdquo; on credit cards (enter the amount owed as a
-          positive number). This anchors the account&apos;s balance so your score stays accurate.
-          Optional — skip it and the balance stays as of {priorAnchor ? priorAnchor.anchorDate : "its last manual entry"}.
+          Printed on your statement — &ldquo;new balance&rdquo; on credit cards (enter the amount
+          owed as a positive number). This anchors the account&apos;s balance so your score stays
+          accurate. Optional — skip it and the balance stays as of{" "}
+          {priorAnchor ? priorAnchor.anchorDate : "its last manual entry"}.
         </p>
         <div className="mt-2 flex flex-wrap items-end gap-3">
           <div>
-            <label htmlFor="anchor-balance" className="mb-1 block text-xs font-medium text-primary">Ending balance ($)</label>
+            <label htmlFor="anchor-balance" className="mb-1 block text-xs font-medium text-primary">
+              Ending balance ($)
+            </label>
             <input
-              id="anchor-balance" type="number" step="0.01" inputMode="decimal"
+              id="anchor-balance"
+              type="number"
+              step="0.01"
+              inputMode="decimal"
               value={endingBalance}
               onChange={(e) => onEndingBalanceChange(e.target.value)}
               className="w-40 rounded-xl border border-border-subtle bg-inset px-3 py-2 text-sm text-primary"
             />
           </div>
           <div>
-            <label htmlFor="anchor-date" className="mb-1 block text-xs font-medium text-primary">As of</label>
+            <label htmlFor="anchor-date" className="mb-1 block text-xs font-medium text-primary">
+              As of
+            </label>
             <input
-              id="anchor-date" type="date"
+              id="anchor-date"
+              type="date"
               value={effAnchorDate}
               onChange={(e) => onAnchorDateChange(e.target.value)}
               className="rounded-xl border border-border-subtle bg-inset px-3 py-2 text-sm text-primary"
@@ -218,7 +352,9 @@ export function PreviewStep({
       </section>
 
       {submitError && (
-        <p role="alert" className="text-sm text-negative">✕ {submitError} — your preview is unchanged; you can retry.</p>
+        <p role="alert" className="text-sm text-negative">
+          ✕ {submitError} — your preview is unchanged; you can retry.
+        </p>
       )}
 
       <div className="flex gap-2 pt-2">

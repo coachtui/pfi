@@ -41,6 +41,43 @@ export interface MappingProposal {
     amount: boolean;
     category: boolean;
   };
+  confidence: {
+    columns: "high" | "low";
+    dateFormat: "high" | "low";
+    signConvention: "high" | "low";
+    categories: "high" | "low";
+    overall: "high" | "low";
+  };
+  /** Plain-language reasons that require the fallback mapping screen. */
+  reviewReasons: string[];
+  /** Bank category values for which no deterministic mapping was found. */
+  unmatchedCategoryValues: string[];
+}
+
+/** Structural CSV information safe to send to the optional AI mapper.
+ * It intentionally contains no cell values, dates, amounts, descriptions,
+ * filenames, account ids, or other raw financial data. */
+export interface CsvColumnProfile {
+  index: number;
+  header: string;
+  nonEmptyRatio: number;
+  dateLikeRatio: number;
+  amountLikeRatio: number;
+  distinctRatio: number;
+  averageLength: number;
+}
+
+export interface CsvMappingSuggestion {
+  columns: {
+    date: number | null;
+    description: number | null;
+    amount: number | null;
+    debit: number | null;
+    credit: number | null;
+    category: number | null;
+  };
+  signConvention: SignConvention | null;
+  categoryValues: Record<string, Category>;
 }
 
 export interface NormalizedRow {

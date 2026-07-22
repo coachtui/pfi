@@ -66,7 +66,10 @@ test("driver card expands to the calculated explanation", async () => {
   await expect(panel.getByText("Calculated", { exact: true })).toBeVisible();
   // The relocated drill-down keeps its filtered URL.
   const link = panel.getByRole("link", { name: /View transactions/ });
-  await expect(link).toHaveAttribute("href", /\/transactions\?from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&label=/);
+  await expect(link).toHaveAttribute(
+    "href",
+    /\/transactions\?from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}&label=/,
+  );
   // Collapse works.
   await page.getByRole("button", { name: /Hide explanation/ }).click();
   await expect(panel).not.toBeVisible();
@@ -77,7 +80,9 @@ test("score screen renders the breakdown", async () => {
   await expect(page.getByText("/ 900")).toBeVisible();
   // "Cash Flow Health" also appears in the "What changed" driver list and in
   // per-metric contribution text, so scope to the dimension row itself.
-  await expect(page.getByLabel("Score dimensions").getByText("Cash Flow Health", { exact: true })).toBeVisible();
+  await expect(
+    page.getByLabel("Score dimensions").getByText("Cash Flow Health", { exact: true }),
+  ).toBeVisible();
 });
 
 test("tapping a financial term on the score screen opens its definition sheet", async () => {
@@ -117,7 +122,9 @@ test("tapping a financial term opens its definition sheet with related navigatio
   const sheet = page.getByRole("dialog", { name: "Free cash flow" });
   await expect(sheet).toBeVisible();
   await expect(
-    sheet.getByText("The money remaining after the expenses required to operate your household have been paid."),
+    sheet.getByText(
+      "The money remaining after the expenses required to operate your household have been paid.",
+    ),
   ).toBeVisible();
   await expect(sheet.getByText("Revenue − operating expenses")).toBeVisible();
 
@@ -160,7 +167,10 @@ test("dismissing a recurring series moves it under Dismissed and restore undoes 
   // The override triggers a snapshot rebuild before the refresh lands.
   await expect(section.getByText("Dismissed (1)")).toBeVisible({ timeout: 30_000 });
   await section.getByText("Dismissed (1)").click();
-  await section.getByTestId("recurring-dismissed-row").getByRole("button", { name: "Restore" }).click();
+  await section
+    .getByTestId("recurring-dismissed-row")
+    .getByRole("button", { name: "Restore" })
+    .click();
   await expect(section.getByText(/^Dismissed \(/)).toBeHidden({ timeout: 30_000 });
 });
 
@@ -175,11 +185,30 @@ test("anchored CSV import updates the account balance", async () => {
   await page.getByRole("button", { name: "Add account" }).last().click();
   await expect(page.getByText("Anchor QA Checking")).toBeVisible({ timeout: 30_000 });
 
-  // Import the fixture statement. Headers ("Date", "Description", "Amount")
-  // auto-detect, so the map step's "Preview import" is enabled immediately.
+  // Import the fixture statement. Standard headers and ISO dates are
+  // high-confidence, so the wizard goes directly to preview.
   await page.goto("/import");
   await page.locator("#import-account").selectOption({ label: "Anchor QA Checking" });
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Upload CSV" }).click();
   await page.locator("#import-file").setInputFiles("e2e/fixtures/checking-statement.csv");
+  await expect(page.getByText("PFI mapped this file automatically")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Preview import" })).toHaveCount(0);
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+  await page.screenshot({ path: "/tmp/pfi-csv-auto-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+  await page.screenshot({ path: "/tmp/pfi-csv-auto-mobile.png", fullPage: true });
+
+  // The automatic result remains reviewable and reversible.
+  await page.getByRole("button", { name: "Change mapping" }).click();
+  await expect(page.getByRole("heading", { name: "Check how PFI reads this file" })).toBeVisible();
   await page.getByRole("button", { name: "Preview import" }).click();
 
   // Anchor: ending balance 1500 as of today (so this statement anchor
@@ -231,8 +260,10 @@ test("a back-filled earlier-dated statement anchor reconciles but does not super
   // earlier than the creation anchor).
   await page.goto("/import");
   await page.locator("#import-account").selectOption({ label: "Backfill QA Savings" });
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Upload CSV" }).click();
   await page.locator("#import-file").setInputFiles("e2e/fixtures/checking-statement.csv");
-  await page.getByRole("button", { name: "Preview import" }).click();
+  await expect(page.getByText("PFI mapped this file automatically")).toBeVisible();
 
   await page.locator("#anchor-balance").fill("1900");
   await page.locator("#anchor-date").fill("2026-06-01");
@@ -248,6 +279,41 @@ test("a back-filled earlier-dated statement anchor reconciles but does not super
   await page.goto("/accounts");
   const row = page.locator(".rounded-card").filter({ hasText: "Backfill QA Savings" });
   await expect(row.getByText("$2,000")).toBeVisible();
+});
+
+test("a manual account can be permanently deleted with deliberate confirmation", async () => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "Add account" }).first().click();
+  await page.locator("#acct-name").fill("Delete QA Checking");
+  await page.locator("#acct-balance").fill("250");
+  await page.getByRole("button", { name: "Add account" }).last().click();
+
+  const row = page.locator(".rounded-card").filter({ hasText: "Delete QA Checking" });
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await row.getByRole("button", { name: "Edit" }).click();
+
+  const sheet = page.getByRole("dialog", { name: "Edit account" });
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+  await sheet.getByRole("button", { name: "Delete account", exact: true }).click();
+  await expect(
+    sheet.getByText(/Delete Delete QA Checking and all of its transactions/),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+  await sheet.getByRole("button", { name: "Delete account and data" }).click();
+
+  await expect(page.getByRole("dialog")).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByText("Account deleted.")).toBeVisible();
+  await expect(page.getByText("Delete QA Checking", { exact: true })).toHaveCount(0);
 });
 
 test("sign out returns to login", async () => {

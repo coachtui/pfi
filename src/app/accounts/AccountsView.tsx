@@ -18,18 +18,23 @@ import { RecurringSection } from "./RecurringSection";
 const GROUPS: ReadonlyArray<{ title: string; types: readonly AccountType[] }> = [
   { title: "Cash", types: ["checking", "savings", "money_market"] },
   { title: "Credit", types: ["credit_card"] },
-  { title: "Loans", types: ["mortgage", "auto_loan", "student_loan", "personal_loan", "other_liability"] },
+  {
+    title: "Loans",
+    types: ["mortgage", "auto_loan", "student_loan", "personal_loan", "other_liability"],
+  },
   { title: "Investments", types: ["brokerage", "retirement"] },
   { title: "Property & other", types: ["property", "other_asset"] },
 ];
 
-const chipCls =
-  "rounded-full border border-border-subtle px-1.5 py-0.5 text-[10px] text-tertiary";
+const chipCls = "rounded-full border border-border-subtle px-1.5 py-0.5 text-[10px] text-tertiary";
 const actionCls =
   "rounded-lg border border-border-subtle px-2.5 py-1 text-xs text-secondary transition-colors hover:text-primary disabled:opacity-60";
 
 export function AccountsView({
-  accounts, recentImports, recurring, asOfByAccount,
+  accounts,
+  recentImports,
+  recurring,
+  asOfByAccount,
 }: {
   accounts: AccountSummary[];
   recentImports: RecentImport[];
@@ -56,7 +61,11 @@ export function AccountsView({
     <div className="flex flex-col gap-4 pb-24">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/" aria-label="Back to dashboard" className="rounded-lg p-1 text-secondary hover:text-primary">
+          <Link
+            href="/"
+            aria-label="Back to dashboard"
+            className="rounded-lg p-1 text-secondary hover:text-primary"
+          >
             <ArrowLeft size={20} />
           </Link>
           <h1 className="text-lg font-semibold text-primary">Accounts</h1>
@@ -69,13 +78,18 @@ export function AccountsView({
         </Link>
       </div>
 
-      {notice && <p role="status" className="text-sm text-warning">{notice}</p>}
+      {notice && (
+        <p role="status" className="text-sm text-warning">
+          {notice}
+        </p>
+      )}
 
       {accounts.length === 0 ? (
         <Card className="flex flex-col items-center gap-3 p-8 text-center">
           <p className="text-sm font-medium text-primary">No accounts yet</p>
           <p className="max-w-sm text-sm text-secondary">
-            Add your first account to start tracking your real finances, or load demo data from the dashboard.
+            Add your first account to start tracking your real finances, or load demo data from the
+            dashboard.
           </p>
           <button
             type="button"
@@ -91,13 +105,18 @@ export function AccountsView({
           if (group.length === 0) return null;
           return (
             <section key={title} aria-label={title}>
-              <h2 className="mb-2 text-xs font-semibold tracking-wide text-tertiary uppercase">{title}</h2>
+              <h2 className="mb-2 text-xs font-semibold tracking-wide text-tertiary uppercase">
+                {title}
+              </h2>
               <div className="flex flex-col gap-3">
                 {group.map((a) => {
                   const archived = a.archivedAt !== null;
                   const excluded = !a.includeInCalculations;
                   return (
-                    <Card key={a.id} className={`flex flex-col gap-2 p-4 ${archived ? "opacity-70" : ""}`}>
+                    <Card
+                      key={a.id}
+                      className={`flex flex-col gap-2 p-4 ${archived ? "opacity-70" : ""}`}
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <Link
@@ -107,7 +126,9 @@ export function AccountsView({
                             {a.displayName}
                           </Link>
                           <p className="mt-0.5 truncate text-xs text-tertiary">
-                            {[a.institution, a.mask ? `··${a.mask}` : null].filter(Boolean).join(" · ") || "Manual account"}
+                            {[a.institution, a.mask ? `··${a.mask}` : null]
+                              .filter(Boolean)
+                              .join(" · ") || "Manual account"}
                           </p>
                         </div>
                         <p className="tabular shrink-0 text-sm font-semibold text-primary">
@@ -130,8 +151,13 @@ export function AccountsView({
                         </p>
                       )}
                       <div className="flex flex-wrap gap-2">
-                        {a.provider === "manual" && !archived && (
-                          <button type="button" disabled={pending} onClick={() => setEditing(a)} className={actionCls}>
+                        {a.provider === "manual" && (
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => setEditing(a)}
+                            className={actionCls}
+                          >
                             Edit
                           </button>
                         )}
@@ -180,7 +206,18 @@ export function AccountsView({
       <RecurringSection items={recurring} />
 
       <AccountSheet account={null} open={adding} onClose={() => setAdding(false)} />
-      {editing && <AccountSheet key={editing.id} account={editing} open onClose={() => setEditing(null)} />}
+      {editing && (
+        <AccountSheet
+          key={editing.id}
+          account={editing}
+          open
+          onClose={() => setEditing(null)}
+          onDeleted={(deleteWarning) => {
+            setEditing(null);
+            setNotice(deleteWarning ? `⚠ ${deleteWarning}` : "Account deleted.");
+          }}
+        />
+      )}
     </div>
   );
 }

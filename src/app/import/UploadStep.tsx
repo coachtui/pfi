@@ -23,10 +23,11 @@ export function UploadStep({
   accounts: AccountSummary[];
   accountId: string;
   onAccountChange: (id: string) => void;
-  onReady: (parsed: ParsedCsv, fileName: string) => void;
+  onReady: (parsed: ParsedCsv, fileName: string) => void | Promise<void>;
   showAccountPicker?: boolean;
 }) {
   const [error, setError] = useState("");
+  const [preparing, setPreparing] = useState(false);
   const [addingAccount, setAddingAccount] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const accountName = accounts.find((a) => a.id === accountId)?.displayName ?? "";
@@ -51,10 +52,17 @@ export function UploadStep({
       return;
     }
     if (parsed.rows.length > MAX_ROWS) {
-      setError(`That file has ${parsed.rows.length.toLocaleString()} rows (max 10,000). Export a shorter date range.`);
+      setError(
+        `That file has ${parsed.rows.length.toLocaleString()} rows (max 10,000). Export a shorter date range.`,
+      );
       return;
     }
-    onReady(parsed, file.name);
+    setPreparing(true);
+    try {
+      await onReady(parsed, file.name);
+    } finally {
+      setPreparing(false);
+    }
   }
 
   return (
@@ -65,7 +73,8 @@ export function UploadStep({
             Import into which account?
           </label>
           <p className="mb-2 text-xs text-secondary">
-            Best for accurate transaction history. One CSV holds one account&apos;s transactions — pick where these belong.
+            Best for accurate transaction history. One CSV holds one account&apos;s transactions —
+            pick where these belong.
           </p>
           <select
             id="import-account"
@@ -75,7 +84,9 @@ export function UploadStep({
           >
             <option value="">Choose an account...</option>
             {accounts.map((a) => (
-              <option key={a.id} value={a.id}>{a.displayName}</option>
+              <option key={a.id} value={a.id}>
+                {a.displayName}
+              </option>
             ))}
           </select>
           <button
@@ -107,16 +118,26 @@ export function UploadStep({
         />
         <button
           type="button"
-          disabled={!accountId}
+          disabled={!accountId || preparing}
           onClick={() => inputRef.current?.click()}
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base disabled:opacity-60"
         >
-          <Upload size={18} aria-hidden /> Choose CSV file
+          <Upload size={18} aria-hidden /> {preparing ? "Preparing preview…" : "Choose CSV file"}
         </button>
         {!accountId && <p className="mt-1 text-xs text-secondary">Pick an account first.</p>}
-        {error && <p role="alert" className="mt-2 text-sm text-negative">✕ {error}</p>}
+        {preparing && (
+          <p role="status" aria-live="polite" className="mt-2 text-sm text-secondary">
+            Reading your file and checking its format.
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="mt-2 text-sm text-negative">
+            ✕ {error}
+          </p>
+        )}
         <p className="mt-3 text-xs text-tertiary">
-          Your file is read on this device. Only the transactions you approve in the preview are saved.
+          Your file is read on this device. Only the transactions you approve in the preview are
+          saved.
         </p>
       </div>
 
