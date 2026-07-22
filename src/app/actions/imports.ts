@@ -25,6 +25,7 @@ import { extractPdfText } from "@/lib/pdf-import/extract";
 import { fileSha256, likelyDuplicateTransaction } from "@/lib/pdf-import/dedupe";
 import { parseStatementWithRegistry } from "@/lib/pdf-import/registry";
 import { scopeStatementToAccount } from "@/lib/pdf-import/parse";
+import { mapStagedRowsToReviewTransactions, type StagedTransactionRow } from "@/lib/pdf-import/review-rows";
 import {
   PDF_IMPORT_BUCKET,
   PDF_IMPORT_PARSER_VERSION,
@@ -268,7 +269,7 @@ async function readPdfReview(importId: string): Promise<{ data: PdfReviewData | 
 
   const [{ data: meta, error: metaErr }, { data: staged, error: stagedErr }, { data: accounts, error: acctErr }] = await Promise.all([
     supabase.from("staged_statement_metadata").select("*").eq("import_batch_id", importId).maybeSingle(),
-    supabase.from("staged_transactions").select("*").eq("import_batch_id", importId).order("posted_date", { ascending: true }),
+    supabase.from("staged_transactions").select("*").eq("import_batch_id", importId).order("posted_date", { ascending: true }).order("id", { ascending: true }),
     supabase.from("financial_accounts").select("id, institution, type, mask, archived_at"),
   ]);
   if (metaErr) return { data: null, error: metaErr.message };
@@ -319,23 +320,7 @@ async function readPdfReview(importId: string): Promise<{ data: PdfReviewData | 
       reconciliation: asReconciliation(batch.reconciliation_results),
       metadata,
       fieldConfidence: meta?.field_confidence ?? {},
-      transactions: (staged ?? []).map((r) => ({
-        stagedId: r.id,
-        line: 2,
-        postedDate: r.posted_date,
-        transactionDate: r.transaction_date,
-        amount: Number(r.amount),
-        direction: r.direction,
-        description: r.description,
-        category: r.category ?? (r.direction === "inflow" ? "income" : "other"),
-        referenceNumber: r.reference_number,
-        sourcePage: r.source_page,
-        confidence: r.confidence,
-        fieldConfidence: r.field_confidence ?? {},
-        issues: asStringArray(r.issues),
-        excluded: r.excluded,
-        duplicateOfTransactionId: r.duplicate_of_transaction_id,
-      })),
+      transactions: mapStagedRowsToReviewTransactions((staged ?? []) as StagedTransactionRow[]),
       suggestedAccountId: suggested,
     },
   };

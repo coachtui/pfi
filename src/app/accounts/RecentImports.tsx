@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { RecentImport } from "@/lib/data/mappers";
 import { undoImport } from "@/app/actions/imports";
+import { InlineError } from "@/components/ui/InlineError";
 
 const keepCls =
   "rounded-lg border border-border-subtle px-2.5 py-1 text-xs text-secondary transition-colors hover:text-primary disabled:opacity-60";
@@ -44,7 +45,7 @@ export function RecentImports({ imports }: { imports: RecentImport[] }) {
       <p className="mb-2 text-xs text-secondary">
         Imported transactions are corrected, not deleted — but a whole import can be undone here.
       </p>
-      {error && <p role="alert" className="mb-2 text-sm text-negative">✕ {error}</p>}
+      {error && <div className="mb-2"><InlineError message={error} /></div>}
       {warning && <p role="status" className="mb-2 text-sm text-warning">⚠ {warning}</p>}
       <ul className="flex flex-col gap-2">
         {imports.map((imp) => (

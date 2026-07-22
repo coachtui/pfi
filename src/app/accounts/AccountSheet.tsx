@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trash2 } from "lucide-react";
 import { Sheet } from "@/components/ui/Sheet";
+import { InlineError } from "@/components/ui/InlineError";
 import { createAccount, deleteAccount, updateAccount } from "@/app/actions/accounts";
 import {
   accountSchema,
@@ -190,9 +191,7 @@ export function AccountSheet({
         )}
 
         {serverError && (
-          <p role="alert" className="text-sm text-negative">
-            ✕ {serverError}
-          </p>
+          <InlineError message={serverError} />
         )}
         {warning && (
           <p role="status" className="text-sm text-warning">

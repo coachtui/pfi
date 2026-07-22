@@ -1,17 +1,20 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { FileText, Upload } from "lucide-react";
+import { ArrowLeft, Upload } from "lucide-react";
 import { uploadStatementPdf } from "@/app/actions/imports";
 import type { PdfReviewData } from "@/lib/pdf-import/types";
+import { InlineError } from "@/components/ui/InlineError";
 
 export function PdfUploadStep({
   accountId,
   accountName,
+  onBack,
   onReady,
 }: {
   accountId: string;
   accountName: string;
+  onBack?: () => void;
   onReady: (review: PdfReviewData) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,19 +38,17 @@ export function PdfUploadStep({
 
   return (
     <section className="space-y-4">
-      <div className="rounded-card border border-border-subtle bg-elevated p-4">
-        <div className="flex items-start gap-3">
-          <FileText className="mt-0.5 shrink-0 text-secondary" size={20} aria-hidden />
-          <div>
-            <h2 className="text-sm font-semibold text-primary">Upload statement PDF</h2>
-            <p className="mt-1 text-sm text-secondary">
-              Use a bank or credit-card statement when CSV export is unavailable. Extracted data is staged for review before it is added to PFI.
-            </p>
-          </div>
-        </div>
-      </div>
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1 text-sm text-secondary hover:text-primary"
+        >
+          <ArrowLeft size={16} aria-hidden /> Back
+        </button>
+      )}
 
-      <div className="rounded-card border border-border-subtle bg-elevated p-3">
+      <div className="rounded-card border border-border-subtle bg-elevated px-3 py-2">
         <p className="text-xs text-secondary">Importing into</p>
         <p className="text-sm font-semibold text-primary">{accountName}</p>
       </div>
@@ -63,17 +64,43 @@ export function PdfUploadStep({
           if (f) submit(f);
         }}
       />
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => inputRef.current?.click()}
-        aria-busy={pending}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base disabled:opacity-60"
+
+      <div
+        className="rounded-card border border-dashed border-border-strong bg-inset p-6"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          const f = e.dataTransfer.files?.[0];
+          if (f) submit(f);
+        }}
       >
-        <Upload size={18} aria-hidden /> {pending ? "Uploading and extracting..." : "Choose PDF file"}
-      </button>
+        <div className="flex flex-col items-center gap-3">
+          <div className="rounded-lg bg-positive-strong/10 p-3">
+            <Upload size={24} className="text-positive-strong" aria-hidden />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-primary">Drop your statement here</p>
+            <p className="text-xs text-secondary">or choose a file</p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => inputRef.current?.click()}
+          aria-busy={pending}
+          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base disabled:opacity-60"
+        >
+          <Upload size={18} aria-hidden /> {pending ? "Uploading and extracting..." : "Choose PDF file"}
+        </button>
+
+        <p className="mt-4 text-center text-xs text-tertiary">
+          PDF up to 10 MB · checking, savings & credit-card statements
+        </p>
+      </div>
+
       {pending && <p role="status" className="text-sm text-secondary">Extracting statement text. This may take a moment.</p>}
-      {error && <p role="alert" className="text-sm text-negative">x {error}</p>}
+      <InlineError message={error} />
       <p className="text-xs text-tertiary">
         Statements are stored privately for your account. Keep this screen open until review appears; background uploads are not enabled yet.
       </p>

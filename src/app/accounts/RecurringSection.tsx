@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { InlineError } from "@/components/ui/InlineError";
 import { clearRecurringOverride, setRecurringOverride } from "@/app/actions/recurring";
 import { formatDollars } from "@/lib/financial-engine/format";
 import type { RecurringListItem } from "@/lib/data/queries";
@@ -80,12 +81,14 @@ export function RecurringSection({ items }: { items: RecurringListItem[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const mutate = (fn: () => Promise<{ error: string; warning?: string }>) => {
+    setError(null);
     setNotice(null);
     startTransition(async () => {
       const result = await fn();
-      if (result.error) setNotice(`✕ ${result.error}`);
+      if (result.error) setError(result.error);
       else if (result.warning) setNotice(`⚠ ${result.warning}`);
       router.refresh();
     });
@@ -124,6 +127,7 @@ export function RecurringSection({ items }: { items: RecurringListItem[] }) {
           anything that shouldn&apos;t count.
         </p>
 
+        <div className="mt-2"><InlineError message={error ?? ""} /></div>
         {notice && <p role="status" className="mt-2 text-xs text-warning">{notice}</p>}
 
         {items.length === 0 ? (

@@ -9,8 +9,9 @@ import { dedupeKey } from "@/lib/csv-import/dedupe";
 import type { ExistingTxn, NormalizedRow } from "@/lib/csv-import/types";
 import type { AccountSummary } from "@/lib/data/mappers";
 import { formatDollars } from "@/lib/financial-engine/format";
-import type { PdfReviewData, ReviewTransaction, StatementMetadata } from "@/lib/pdf-import/types";
+import type { ConfidenceLevel, PdfReviewData, ReviewTransaction, StatementMetadata } from "@/lib/pdf-import/types";
 import type { ImportResult } from "@/lib/validation/imports";
+import { InlineError } from "@/components/ui/InlineError";
 
 const inputCls = "rounded-xl border border-border-subtle bg-inset px-3 py-2 text-sm text-primary";
 const labelCls = "text-xs font-medium text-primary";
@@ -29,11 +30,68 @@ function reconText(review: PdfReviewData): string {
   return `Does not reconcile${r.difference === null ? "" : ` (${formatDollars(Math.abs(r.difference))} difference)`}`;
 }
 
+/** Reconciliation status as an icon-paired chip — never color-only. */
+function ReconciliationChip({ review }: { review: PdfReviewData }) {
+  const status = review.reconciliation?.status;
+  const positive = status === "reconciled" || status === "reconciled_within_tolerance";
+  const unknown = !review.reconciliation || status === "not_enough_information";
+  const tone = unknown ? "bg-neutral-muted text-secondary" : positive ? "bg-positive-muted text-positive" : "bg-warning-muted text-warning";
+  const Icon = unknown ? ShieldAlert : positive ? CheckCircle2 : AlertTriangle;
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${tone}`}>
+      <Icon size={13} aria-hidden /> {reconText(review)}
+    </span>
+  );
+}
+
+/** Compact count chip for the review summary row. Icon-paired when flagging a non-zero issue count. */
+function StatChip({ value, label, warn }: { value: number; label: string; warn?: boolean }) {
+  const active = Boolean(warn) && value > 0;
+  return (
+    <div className="flex flex-col gap-1 rounded-xl bg-inset px-3 py-2">
+      <span className={`flex items-center gap-1 font-mono text-base font-semibold tabular-nums ${active ? "text-warning" : "text-primary"}`}>
+        {active && <AlertTriangle size={14} aria-hidden />}
+        {value}
+      </span>
+      <span className="text-[10px] font-medium tracking-wide text-tertiary uppercase">{label}</span>
+    </div>
+  );
+}
+
+/** Per-transaction confidence chip. Pairs color with an icon and the word itself — never color alone. */
+function ConfidenceChip({ value }: { value: ConfidenceLevel }) {
+  const label = `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+  const tone = value === "low" ? "bg-warning-muted text-warning" : value === "medium" ? "bg-neutral-muted text-secondary" : "bg-positive-muted text-positive";
+  const Icon = value === "low" ? AlertTriangle : CheckCircle2;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${tone}`}>
+      <Icon size={12} aria-hidden /> {label}
+    </span>
+  );
+}
+
+/** Calm, honest presentation of the duplicate-decision toggle. Logic (setDuplicateImport) is unchanged. */
+function DuplicateStrip({ checked, onToggle }: { checked: boolean; onToggle: (checked: boolean) => void }) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-muted px-3 py-2 text-xs text-warning">
+      <span className="flex items-center gap-1.5">
+        <AlertTriangle size={14} aria-hidden className="shrink-0" />
+        Looks already imported — excluded by default.
+      </span>
+      <label className="flex shrink-0 items-center gap-1.5 font-medium text-warning">
+        <input type="checkbox" checked={checked} onChange={(e) => onToggle(e.target.checked)} />
+        Import anyway
+      </label>
+    </div>
+  );
+}
+
 export function PdfReviewStep({
   review,
   accounts,
   existing,
   initialAccountId,
+  onBack,
   onConfirmed,
   onCancelled,
 }: {
@@ -41,6 +99,7 @@ export function PdfReviewStep({
   accounts: AccountSummary[];
   existing: ExistingTxn[];
   initialAccountId: string;
+  onBack?: () => void;
   onConfirmed: (result: ImportResult, rows: NormalizedRow[], accountId: string) => void;
   onCancelled: () => void;
 }) {
@@ -145,32 +204,67 @@ export function PdfReviewStep({
     });
   }
 
-  function cancel() {
+  function cancel(onDone: () => void) {
     startTransition(async () => {
       const result = await cancelPdfImport(review.importId);
       if (result.error) setError(result.error);
-      else onCancelled();
+      else onDone();
     });
   }
 
   return (
     <section className="space-y-4">
       <div className="rounded-card border border-border-subtle bg-elevated p-4">
-        <div className="flex items-start gap-3">
-          {blocked ? <XCircle className="mt-0.5 text-negative" size={20} aria-hidden /> : <CheckCircle2 className="mt-0.5 text-positive" size={20} aria-hidden />}
-          <div>
-            <h2 className="text-sm font-semibold text-primary">
-              {blocked ? "Statement cannot be imported" : `We found ${rows.length} transactions${metadata.endingBalance === null ? "" : ` and an ending balance of ${formatDollars(metadata.endingBalance)}`}.`}
-            </h2>
-            <p className="mt-1 text-sm text-secondary">
-              Review the extracted data before adding it to PFI. Confidence means the parser matched expected patterns, not independent verification.
-            </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            {blocked ? <XCircle className="mt-0.5 text-negative" size={20} aria-hidden /> : <CheckCircle2 className="mt-0.5 text-positive" size={20} aria-hidden />}
+            <div>
+              <h2 className="text-sm font-semibold text-primary">
+                {blocked ? "Statement cannot be imported" : `We found ${rows.length} transactions${metadata.endingBalance === null ? "" : ` and an ending balance of ${formatDollars(metadata.endingBalance)}`}.`}
+              </h2>
+              <p className="mt-1 text-sm text-secondary">
+                Review the extracted data before adding it to PFI. Confidence means the parser matched expected patterns, not independent verification.
+              </p>
+            </div>
           </div>
+          {!blocked && <ReconciliationChip review={review} />}
         </div>
       </div>
 
-      {review.unsupportedReason && <p role="alert" className="rounded-card border border-warning bg-elevated p-3 text-sm text-warning"><ShieldAlert size={16} className="mr-1 inline" aria-hidden />{review.unsupportedReason}</p>}
-      {review.failureReason && <p role="alert" className="rounded-card border border-negative bg-elevated p-3 text-sm text-negative">{review.failureReason}</p>}
+      {blocked ? (
+        <div className="rounded-card border border-negative/30 bg-elevated p-4">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="mt-0.5 shrink-0 text-negative" size={20} aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-primary">
+                {review.status === "unsupported" ? "This statement type isn't supported yet" : "We couldn't read this statement"}
+              </p>
+              <p className="mt-1 text-sm text-secondary">
+                {review.unsupportedReason ?? review.failureReason ?? "This file could not be processed."}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => cancel(onCancelled)}
+                  className="rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base disabled:opacity-60"
+                >
+                  Import a CSV instead
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => cancel(onBack ?? onCancelled)}
+                  className="rounded-xl border border-border-strong px-4 py-3 text-sm font-semibold text-primary disabled:opacity-60"
+                >
+                  Try a different PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {usedOcr && !blocked && (
         <p role="status" className="rounded-card border border-warning bg-elevated p-3 text-sm text-warning">
           <AlertTriangle size={16} className="mr-1 inline" aria-hidden />
@@ -208,7 +302,6 @@ export function PdfReviewStep({
           <p className={labelCls}>Extraction</p>
           <p className="mt-1 text-sm text-primary">{review.extractionMethod ?? "Unknown"} · {confidenceLabel(review.confidence)}</p>
           {review.ocrProvider && <p className="text-xs text-secondary">OCR: {review.ocrProvider}{review.ocrAverageConfidence === null ? "" : ` · ${review.ocrAverageConfidence.toFixed(1)}% quality`}</p>}
-          <p className="text-xs text-secondary">Reconciliation: {reconText(review)}</p>
         </div>
       </div>
 
@@ -239,82 +332,117 @@ export function PdfReviewStep({
         </label>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-sm">
-        <span className="rounded-full border border-border-subtle px-3 py-1">{rows.length} detected</span>
-        <span className="rounded-full border border-border-subtle px-3 py-1">{duplicateByStagedId.size} possible duplicates</span>
-        <span className="rounded-full border border-border-subtle px-3 py-1">{lowConfidence} low confidence</span>
-        <span className="rounded-full border border-border-subtle px-3 py-1">{issueCount} parsing issues</span>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatChip value={rows.length} label="Detected" />
+        <StatChip value={duplicateByStagedId.size} label="Possible duplicates" warn />
+        <StatChip value={lowConfidence} label="Low confidence" warn />
+        <StatChip value={issueCount} label="Parsing issues" warn />
       </div>
 
-      <div className="overflow-x-auto rounded-card border border-border-subtle">
-        <table className="min-w-[760px] w-full text-sm">
-          <thead className="bg-inset text-left text-xs text-secondary">
-            <tr>
-              <th className="p-2">Use</th>
-              <th className="p-2">Date</th>
-              <th className="p-2">Description</th>
-              <th className="p-2 text-right">Amount</th>
-              <th className="p-2">Direction</th>
-              <th className="p-2">Category</th>
-              <th className="p-2">Confidence</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const dupe = duplicateByStagedId.get(r.stagedId);
-              return (
-                <tr key={r.stagedId} className="border-t border-border-subtle align-top">
-                  <td className="p-2">
-                    <input type="checkbox" checked={!r.excluded} onChange={() => updateRow(r.stagedId, { excluded: !r.excluded })} aria-label={`Include ${r.description}`} />
-                    {dupe && (
-                      <label className="mt-2 block text-xs text-warning">
-                        <input
-                          type="checkbox"
-                          checked={importDuplicates.has(r.stagedId)}
-                          onChange={(e) => setDuplicateImport(r.stagedId, e.target.checked)}
-                        /> import duplicate
-                      </label>
-                    )}
-                  </td>
-                  <td className="p-2"><input type="date" className={`${inputCls} w-36`} value={r.postedDate} onChange={(e) => updateRow(r.stagedId, { postedDate: e.target.value })} /></td>
-                  <td className="p-2"><input className={`${inputCls} w-64`} value={r.description} onChange={(e) => updateRow(r.stagedId, { description: e.target.value })} /></td>
-                  <td className="p-2 text-right"><input type="number" step="0.01" className={`${inputCls} w-28 text-right tabular-nums`} value={r.amount} onChange={(e) => updateRow(r.stagedId, { amount: Number(e.target.value) })} /></td>
-                  <td className="p-2">
-                    <select className={inputCls} value={r.direction} onChange={(e) => updateRow(r.stagedId, { direction: e.target.value as "inflow" | "outflow" })}>
-                      <option value="inflow">Credit</option>
-                      <option value="outflow">Debit</option>
-                    </select>
-                  </td>
-                  <td className="p-2">
-                    <select className={inputCls} value={r.category} onChange={(e) => updateRow(r.stagedId, { category: e.target.value as Category })}>
-                      {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-                    </select>
-                  </td>
-                  <td className="p-2">
-                    <span>{confidenceLabel(r.confidence)}</span>
-                    {(dupe || r.issues.length > 0) && (
-                      <p className="mt-1 text-xs text-warning">
-                        <AlertTriangle size={13} className="mr-1 inline" aria-hidden />
-                        {dupe ? "Possible duplicate. " : ""}{r.issues.join(" ")}
-                      </p>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="divide-y divide-border-subtle rounded-card border border-border-subtle bg-elevated">
+        {rows.length === 0 && (
+          <p className="p-4 text-sm text-secondary">No transactions were extracted from this statement.</p>
+        )}
+        {rows.map((r) => {
+          const dupe = duplicateByStagedId.get(r.stagedId);
+          const inflow = r.direction === "inflow";
+          return (
+            <div key={r.stagedId} className={`p-3 sm:p-4 ${r.excluded ? "opacity-60" : ""}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={!r.excluded}
+                    onChange={() => updateRow(r.stagedId, { excluded: !r.excluded })}
+                    aria-label={`Include ${r.description}`}
+                    className="mt-2 size-4 shrink-0 accent-positive-strong"
+                  />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <input
+                      className={`w-full ${inputCls} font-medium`}
+                      value={r.description}
+                      onChange={(e) => updateRow(r.stagedId, { description: e.target.value })}
+                      aria-label="Description"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="date"
+                        className={`${inputCls} w-auto font-mono text-xs text-tertiary`}
+                        value={r.postedDate}
+                        onChange={(e) => updateRow(r.stagedId, { postedDate: e.target.value })}
+                        aria-label="Date"
+                      />
+                      <select
+                        className={`${inputCls} w-auto text-xs`}
+                        value={r.direction}
+                        onChange={(e) => updateRow(r.stagedId, { direction: e.target.value as "inflow" | "outflow" })}
+                        aria-label="Direction"
+                      >
+                        <option value="inflow">Credit</option>
+                        <option value="outflow">Debit</option>
+                      </select>
+                      <select
+                        className={`${inputCls} w-auto text-xs`}
+                        value={r.category}
+                        onChange={(e) => updateRow(r.stagedId, { category: e.target.value as Category })}
+                        aria-label="Category"
+                      >
+                        {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <div className="flex items-center gap-1">
+                    <span aria-hidden className={`font-mono text-sm font-semibold ${inflow ? "text-positive" : "text-primary"}`}>
+                      {inflow ? "+" : "−"}
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className={`${inputCls} w-24 text-right font-mono text-sm font-semibold tabular-nums ${inflow ? "text-positive" : "text-primary"}`}
+                      value={r.amount}
+                      onChange={(e) => updateRow(r.stagedId, { amount: Number(e.target.value) })}
+                      aria-label="Amount"
+                    />
+                  </div>
+                  <ConfidenceChip value={r.confidence} />
+                </div>
+              </div>
+
+              {dupe && (
+                <DuplicateStrip
+                  checked={importDuplicates.has(r.stagedId)}
+                  onToggle={(checked) => setDuplicateImport(r.stagedId, checked)}
+                />
+              )}
+              {!dupe && r.issues.length > 0 && (
+                <p className="mt-2 flex items-start gap-1.5 text-xs text-warning">
+                  <AlertTriangle size={13} className="mt-0.5 shrink-0" aria-hidden />
+                  {r.issues.join(" ")}
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {error && <p role="alert" className="text-sm text-negative">x {error}</p>}
-      <div className="flex flex-wrap gap-2 pt-2">
-        <button type="button" disabled={pending} onClick={cancel} className="rounded-xl border border-negative px-4 py-3 text-sm font-semibold text-negative disabled:opacity-60">
-          Cancel import
-        </button>
-        <button type="button" disabled={pending || blocked || accepted.length === 0} onClick={confirm} className="flex-1 rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base disabled:opacity-60">
-          {pending ? "Saving..." : `Confirm ${accepted.length} transaction${accepted.length === 1 ? "" : "s"}`}
-        </button>
-      </div>
+      <InlineError message={error} />
+      {!blocked && (
+        <div className="flex flex-wrap gap-2 pt-2">
+          {onBack && (
+            <button type="button" disabled={pending} onClick={onBack} className="rounded-xl border border-border-strong px-4 py-3 text-sm font-semibold text-primary disabled:opacity-60">
+              Back
+            </button>
+          )}
+          <button type="button" disabled={pending} onClick={() => cancel(onCancelled)} className="rounded-xl border border-negative px-4 py-3 text-sm font-semibold text-negative disabled:opacity-60">
+            Cancel import
+          </button>
+          <button type="button" disabled={pending || accepted.length === 0} onClick={confirm} className="flex-1 rounded-xl bg-positive-strong px-4 py-3 text-sm font-semibold text-base disabled:opacity-60">
+            {pending ? "Saving..." : `Confirm ${accepted.length} transaction${accepted.length === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      )}
       <AccountSheet account={null} open={addingAccount} onClose={() => setAddingAccount(false)} />
     </section>
   );

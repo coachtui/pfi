@@ -9,6 +9,7 @@ import { CATEGORY_LABELS, type Category } from "@/lib/config/categories";
 import { undoImport } from "@/app/actions/imports";
 import type { ImportResult } from "@/lib/validation/imports";
 import { formatDollars } from "@/lib/financial-engine/format";
+import { InlineError } from "@/components/ui/InlineError";
 
 export function SummaryStep({
   result, accountId, fresh,
@@ -129,7 +130,7 @@ export function SummaryStep({
             Undo this import
           </button>
         )}
-        {undoError && <p role="alert" className="text-sm text-negative">✕ {undoError}</p>}
+        {undoError && <InlineError message={undoError} />}
       </div>
     </section>
   );
