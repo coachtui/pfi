@@ -6,6 +6,7 @@ import type { AccountSummary } from "@/lib/data/mappers";
 import type { ParsedCsv } from "@/lib/csv-import/types";
 import { parseCsv } from "@/lib/csv-import/parse";
 import { AccountSheet } from "@/app/accounts/AccountSheet";
+import { InlineError } from "@/components/ui/InlineError";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const MAX_ROWS = 10_000;
@@ -131,9 +132,9 @@ export function UploadStep({
           </p>
         )}
         {error && (
-          <p role="alert" className="mt-2 text-sm text-negative">
-            ✕ {error}
-          </p>
+          <div className="mt-2">
+            <InlineError message={error} />
+          </div>
         )}
         <p className="mt-3 text-xs text-tertiary">
           Your file is read on this device. Only the transactions you approve in the preview are

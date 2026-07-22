@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeftRight, CheckCircle2, CopyX, Settings2 } from "lucide-react";
+import { InlineError } from "@/components/ui/InlineError";
 import type { AccountSummary } from "@/lib/data/mappers";
 import type {
   ExistingTxn,
@@ -352,9 +353,10 @@ export function PreviewStep({
       </section>
 
       {submitError && (
-        <p role="alert" className="text-sm text-negative">
-          ✕ {submitError} — your preview is unchanged; you can retry.
-        </p>
+        <div className="space-y-2">
+          <InlineError message={submitError} />
+          <p className="text-xs text-tertiary">Your preview is unchanged; you can retry.</p>
+        </div>
       )}
 
       <div className="flex gap-2 pt-2">

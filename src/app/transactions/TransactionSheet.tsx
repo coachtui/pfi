@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Sheet } from "@/components/ui/Sheet";
+import { InlineError } from "@/components/ui/InlineError";
 import { createTransaction, deleteTransaction, overrideTransaction } from "@/app/actions/transactions";
 import {
   createTransactionSchema, type TransactionFormValues,
@@ -18,7 +19,7 @@ const inputCls =
 const labelCls = "text-sm font-medium text-primary";
 
 function ResultNotice({ warning, error }: { warning: string | null; error: string | null }) {
-  if (error) return <p role="alert" className="text-sm text-negative">✕ {error}</p>;
+  if (error) return <InlineError message={error} />;
   if (warning) return <p role="status" className="text-sm text-warning">⚠ {warning}</p>;
   return null;
 }
