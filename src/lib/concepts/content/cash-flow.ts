@@ -56,6 +56,6 @@ export const cashFlow: FinancialConcept = {
       },
     ],
     reinforcementPreview:
-      "Cash flow underlies your report's statement, the Typical monthly free cash flow metric inside your PFI Score's Cash Flow dimension, and the overall shape of your dashboard's indexed performance chart.",
+      "Cash flow underlies your report's statement, the Typical monthly free cash flow metric inside your Fundamentals Score's Cash Flow dimension, and the overall shape of your dashboard's indexed performance chart.",
   },
 };

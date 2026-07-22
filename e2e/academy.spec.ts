@@ -49,7 +49,7 @@ test("glossary-only row opens the definition sheet, not a lesson", async () => {
 test("demo data loads so term surfaces render", async () => {
   await page.goto("/");
   await page.getByRole("button", { name: /^Load / }).first().click();
-  await expect(page.getByText("Personal Index")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("PFI", { exact: true })).toBeVisible({ timeout: 30_000 });
 });
 
 test("the report's Revenue term offers Take the lesson and deep-links into it", async () => {
@@ -151,6 +151,6 @@ test("Available capital's sheet is a labeled PFI metric with no internal languag
 
 test("no nested interactive content on the dashboard", async () => {
   await page.goto("/");
-  await expect(page.getByText("Personal Index")).toBeVisible();
+  await expect(page.getByText("PFI", { exact: true })).toBeVisible();
   expect(await page.locator("main a button, main button a").count()).toBe(0);
 });

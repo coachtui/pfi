@@ -24,12 +24,12 @@ export const availableCapital: FinancialConcept = {
   interpretation:
     "Available capital can fall while net worth rises — for example, when gains land in illiquid assets while near-term obligations grow. Read it as immediate flexibility, not overall wealth.",
   householdAdaptation:
-    "Available capital is PFI's household measure of available financial position — the quantity your Personal Index, personal baseline, and financial waterline are computed from. It has no single direct corporate-accounting equivalent, so PFI keeps a distinct name for it.",
+    "Available capital is PFI's household measure of available financial position — the quantity your Personal Finance Index (PFI), personal baseline, and financial waterline are computed from. It has no single direct corporate-accounting equivalent, so PFI keeps a distinct name for it.",
   businessContext:
     "Its closest business cousins are working capital and what investors sometimes call \"dry powder\" — cash a business or investor has on hand and free to deploy, net of near-term claims against it.",
   whereUsed: [
     "Home dashboard (Available capital card)",
-    "Personal Index",
+    "PFI",
     "Personal baseline",
     "Financial waterline",
   ],
