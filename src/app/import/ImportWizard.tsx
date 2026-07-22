@@ -16,6 +16,7 @@ import { PreviewStep } from "./PreviewStep";
 import { SummaryStep } from "./SummaryStep";
 import { PdfUploadStep } from "./PdfUploadStep";
 import { PdfReviewStep } from "./PdfReviewStep";
+import { ImportStepper } from "./ImportStepper";
 import { importTransactions } from "@/app/actions/imports";
 import { suggestCsvMapping } from "@/app/actions/csv-mapping";
 import type { ImportResult } from "@/lib/validation/imports";
@@ -227,17 +228,7 @@ export function ImportWizard(props: {
         <h1 className="text-lg font-semibold text-primary">Import financial data</h1>
       </div>
 
-      <ol className="mb-6 flex gap-3 text-xs text-secondary" aria-label="Import steps">
-        {steps.map((s, i) => (
-          <li
-            key={s}
-            aria-current={s === step ? "step" : undefined}
-            className={s === step ? "font-semibold text-primary" : ""}
-          >
-            {i + 1}. {STEP_LABELS[s]}
-          </li>
-        ))}
-      </ol>
+      <ImportStepper steps={steps} current={step} labels={STEP_LABELS} />
 
       {step === "account" && (
         <section className="flex flex-col gap-4">
