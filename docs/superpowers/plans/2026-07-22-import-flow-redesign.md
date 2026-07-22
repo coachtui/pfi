@@ -14,7 +14,7 @@
 - **Design tokens live only in `src/app/globals.css`.** Components reference semantic token utilities (`bg-elevated`, `text-secondary`, `border-border-subtle`, `rounded-card`, `shadow-card`, `bg-positive-strong`, `text-warning`, etc.). Do not introduce raw hex.
 - **Never communicate positive/negative state through color alone** — always pair with icon, sign, or text.
 - **Mobile-first, always.** Design and verify at ~390px before desktop.
-- **Emerald (`bg-positive-strong`) is used once per screen** on the single primary action; secondary actions are ghost/outline/text.
+- **Solid emerald (`bg-positive-strong`) is used once per screen**, on the single primary action; secondary actions are ghost/outline/text. Muted/decorative emerald tints (`bg-positive-strong/10`, `bg-positive-muted`, `text-positive-strong` on an icon, a "good" status chip) are not subject to this cap — they're a distinct, softer visual weight from a solid primary CTA and may appear alongside it (e.g. the upload screen's dropzone icon, the review screen's "Reconciled" chip), matching the approved mockup. _(Clarified 2026-07-22 after Task 6 review flagged the upload icon tile against a too-strict literal reading; user confirmed muted tints are exempt.)_
 - **All money/balances/masks use monospace tabular numerics** (`font-mono` + `tabular-nums` or the `.tabular` class) and are signed + colored by direction where a sign applies.
 - **No new migrations.** `line` is a transient view-model field, never persisted.
 - **CSV path behavior is unchanged** except for shared UI primitives (stepper, `InlineError`) it already routes through.
