@@ -321,3 +321,10 @@ essential flag (rejected — puts AI directly on a score input, violating
 this). CSV import still defaults outflows to `other` (non-essential), so a fresh import
 needs its essentials categorized first — reducing that manual effort is slice B
 (AI-assisted categorization + human verify + manual essential override).
+
+**Amendment (2026-07-22):** Extended the same category-derivation to the waterline's
+`essentialObligations` (`snapshot-builder.ts`, `recurring.ts` — previously still gated
+on the unwritable flag) and to `liquidity`'s confidence classification
+(`confidence.ts`'s `CATEGORY_DRIVEN` set, since `liquid_runway_months` now reads
+category-derived essential spend too). Approved by the product owner after the
+whole-branch review surfaced the inconsistency.
