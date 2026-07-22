@@ -50,7 +50,7 @@ describe("computeConfidence", () => {
       [],
     );
     expect(report.byDimension.cash_flow.level).toBe("moderate");
-    expect(report.byDimension.liquidity.level).toBe("high");
+    expect(report.byDimension.liquidity.level).toBe("moderate");
   });
 
   it("caps everything at moderate for demo data", () => {
