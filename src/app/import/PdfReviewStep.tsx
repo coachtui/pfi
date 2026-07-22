@@ -44,9 +44,21 @@ export function PdfReviewStep({
   onConfirmed: (result: ImportResult, rows: NormalizedRow[], accountId: string) => void;
   onCancelled: () => void;
 }) {
-  const [accountId, setAccountId] = useState(initialAccountId || review.suggestedAccountId || "");
-  const [addingAccount, setAddingAccount] = useState(false);
   const [metadata, setMetadata] = useState<StatementMetadata>(review.metadata);
+  const [accountId, setAccountId] = useState(() => {
+    const compatible = (id: string) => {
+      const account = accounts.find((candidate) => candidate.id === id);
+      return account
+        && account.provider !== "demo"
+        && (!review.metadata.accountType || account.type === review.metadata.accountType);
+    };
+    if (initialAccountId && compatible(initialAccountId)) return initialAccountId;
+    if (review.suggestedAccountId && compatible(review.suggestedAccountId)) {
+      return review.suggestedAccountId;
+    }
+    return "";
+  });
+  const [addingAccount, setAddingAccount] = useState(false);
   const [rows, setRows] = useState<ReviewTransaction[]>(review.transactions);
   const [importDuplicates, setImportDuplicates] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
@@ -68,6 +80,11 @@ export function PdfReviewStep({
   const lowConfidence = rows.filter((r) => r.confidence === "low").length;
   const blocked = review.status === "unsupported" || review.status === "failed";
   const usedOcr = review.extractionMethod === "ocr" || review.extractionMethod === "hybrid";
+  const compatibleAccounts = accounts.filter(
+    (account) =>
+      account.provider !== "demo"
+      && (!metadata.accountType || account.type === metadata.accountType),
+  );
 
   function updateMeta<K extends keyof StatementMetadata>(key: K, value: StatementMetadata[K]) {
     setMetadata((cur) => ({ ...cur, [key]: value }));
@@ -174,10 +191,15 @@ export function PdfReviewStep({
           <label htmlFor="pdf-account" className={labelCls}>Account</label>
           <select id="pdf-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} className={`mt-1 w-full ${inputCls}`}>
             <option value="">Choose an account...</option>
-            {accounts.filter((a) => a.provider !== "demo").map((a) => (
+            {compatibleAccounts.map((a) => (
               <option key={a.id} value={a.id}>{a.displayName}</option>
             ))}
           </select>
+          {metadata.accountType && (
+            <p className="mt-1 text-xs text-secondary">
+              Detected {metadata.accountType.replace("_", " ")} activity. Only matching accounts are shown.
+            </p>
+          )}
           <button type="button" onClick={() => setAddingAccount(true)} className="mt-2 inline-flex items-center gap-1 text-sm text-secondary hover:text-primary">
             <Plus size={16} aria-hidden /> New account
           </button>

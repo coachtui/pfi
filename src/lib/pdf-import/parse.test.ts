@@ -27,6 +27,27 @@ Payment Due Date: 08/20/2026
 07/11 Hotel 100.00 purchase
 `;
 
+const capitalOnePostedActivity = `
+--- Page 1 ---
+7/21/26, 4:26 PM Capital One
+Posted Transactions Since Your Last Statement Account Ending in ...4242
+DATE DESCRIPTION CATEGORY CARD AMOUNT
+Jul 20 FICTIONAL MARKET Grocery Avery Q. $15.65
+...1111
+Jul 19 Payment from FICTIONAL CREDIT UNION Payment -$100.00
+...4242
+Jul 14 FICTIONAL REFUND Merchandise Avery Q. -$5.23
+...1111
+Total: -$89.58
+`;
+
+const capitalOnePendingActivity = `
+Capital One
+Pending Transactions Account Ending in ...4242
+DATE DESCRIPTION CATEGORY CARD AMOUNT
+Pending FICTIONAL MARKET Grocery Avery Q. $15.65
+`;
+
 const combinedCreditUnion = `
 Fictional Community Credit Union
 Member No. Statement Period Page
@@ -59,6 +80,11 @@ describe("classifyStatement", () => {
     expect(classifyStatement(card).accountType).toBe("credit_card");
     expect(classifyStatement("Brokerage statement holdings tax lot options").unsupportedReason).toMatch(/Brokerage/);
   });
+
+  it("recognizes Capital One posted activity and rejects pending activity precisely", () => {
+    expect(classifyStatement(capitalOnePostedActivity).accountType).toBe("credit_card");
+    expect(classifyStatement(capitalOnePendingActivity).unsupportedReason).toMatch(/Pending transactions are not final/);
+  });
 });
 
 describe("parseGenericStatement", () => {
@@ -83,6 +109,28 @@ describe("parseGenericStatement", () => {
     expect(parsed.metadata.paymentDueDate).toBe("2026-08-20");
     expect(parsed.transactions.map((t) => t.direction)).toEqual(["outflow", "inflow", "outflow"]);
     expect(parsed.reconciliation.status).toBe("reconciled");
+  });
+
+  it("stages Capital One posted activity with contextual dates, signs, and page references", () => {
+    const parsed = parseGenericStatement(capitalOnePostedActivity);
+    expect(parsed.unsupportedReason).toBeNull();
+    expect(parsed.metadata.accountType).toBe("credit_card");
+    expect(parsed.metadata.maskedAccountNumber).toBe("4242");
+    expect(parsed.transactions.map((transaction) => [
+      transaction.postedDate,
+      transaction.amount,
+      transaction.direction,
+      transaction.sourcePage,
+    ])).toEqual([
+      ["2026-07-20", 15.65, "outflow", 1],
+      ["2026-07-19", 100, "inflow", 1],
+      ["2026-07-14", 5.23, "inflow", 1],
+    ]);
+    expect(parsed.reconciliation.status).toBe("not_enough_information");
+    expect(parsed.confidence).toBe("low");
+    expect(parsed.issues).toContain(
+      "This is posted transaction activity, not a monthly statement. Statement balances and reconciliation are unavailable.",
+    );
   });
 
   it("reports statements that do not reconcile", () => {

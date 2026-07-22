@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { extractPdfText } from "./extract";
+import { parseGenericStatement } from "./parse";
 
 function pdfWithText(text: string) {
   const escaped = text.replace(/[()\\]/g, "\\$&").replace(/\n/g, ") Tj\n(");
@@ -38,6 +39,35 @@ describe("extractPdfText", () => {
     expect(result.nativeTextPageCount).toBe(1);
     expect(result.text).toContain("Checking Statement");
     expect(result.text).toContain("Beginning Balance $1,000.00");
+  });
+
+  it("extracts and parses a generated Capital One posted-activity PDF", async () => {
+    const document = await PDFDocument.create();
+    const page = document.addPage([612, 792]);
+    const font = await document.embedFont(StandardFonts.Helvetica);
+    const lines = [
+      "7/21/26, 4:26 PM Capital One",
+      "Posted Transactions Since Your Last Statement Account Ending in ...4242",
+      "DATE DESCRIPTION CATEGORY CARD AMOUNT",
+      "Jul 20 FICTIONAL MARKET Grocery Avery Q. $15.65",
+      "...1111",
+      "Jul 19 Payment from FICTIONAL CREDIT UNION Payment -$100.00",
+      "...4242",
+    ];
+    lines.forEach((line, index) => {
+      page.drawText(line, { x: 50, y: 740 - index * 30, size: 11, font });
+    });
+
+    const extracted = await extractPdfText(await document.save());
+    const parsed = parseGenericStatement(extracted.text);
+
+    expect(extracted.method).toBe("native_text");
+    expect(parsed.unsupportedReason).toBeNull();
+    expect(parsed.transactions).toHaveLength(2);
+    expect(parsed.transactions.map((transaction) => transaction.direction)).toEqual([
+      "outflow",
+      "inflow",
+    ]);
   });
 
   it("marks files with no usable text as OCR candidates", async () => {

@@ -38,6 +38,7 @@ const MONTHS: Record<string, number> = {
 
 const numericDatePattern = String.raw`\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2}`;
 const monthDatePattern = String.raw`(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4}`;
+const shortMonthDatePattern = String.raw`(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}`;
 const statementDatePattern = `(?:${numericDatePattern}|${monthDatePattern})`;
 const decimalMoneyRe = /(\(?[-+$€£]?\s*\d[\d,]*\.\d{2}\)?)/g;
 
@@ -61,6 +62,31 @@ function parseLooseDate(raw: string): string | null {
 function statementPeriod(text: string): [string | null, string | null] {
   const match = new RegExp(`(${statementDatePattern})\\s*(?:-|–|to|thru|through)\\s*(${statementDatePattern})`, "i").exec(text);
   return match ? [parseLooseDate(match[1]), parseLooseDate(match[2])] : [null, null];
+}
+
+function documentDate(text: string): string | null {
+  const match = new RegExp(`\\b(${statementDatePattern})\\b`, "i").exec(text);
+  return match ? parseLooseDate(match[1]) : null;
+}
+
+function parseContextualDate(raw: string, contextDate: string | null): string | null {
+  if (/\d{4}/.test(raw) || /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(raw)) {
+    return parseLooseDate(raw);
+  }
+  const contextYear = Number(contextDate?.slice(0, 4) ?? new Date().getFullYear());
+  const withYear = /^[a-z]/i.test(raw) ? `${raw} ${contextYear}` : `${raw}/${contextYear}`;
+  let parsed = parseLooseDate(withYear);
+  if (!parsed || !contextDate) return parsed;
+
+  // Activity printed in early January may include transactions from December.
+  // Treat a short date more than 31 days after the print date as the prior year.
+  const candidateTime = Date.parse(`${parsed}T00:00:00Z`);
+  const contextTime = Date.parse(`${contextDate}T00:00:00Z`);
+  if (candidateTime - contextTime > 31 * 24 * 60 * 60 * 1000) {
+    const priorYear = contextYear - 1;
+    parsed = parseLooseDate(/^[a-z]/i.test(raw) ? `${raw} ${priorYear}` : `${raw}/${priorYear}`);
+  }
+  return parsed;
 }
 
 function columnarSummaryBalances(text: string): { beginningBalance: number | null; endingBalance: number | null } {
@@ -113,6 +139,19 @@ export function classifyStatement(text: string): { accountType: PdfAccountType |
   if (/\b(brokerage|investment|retirement|ira|401k|securities|tax lot|option contract|holdings)\b/.test(t)) {
     return { accountType: null, unsupportedReason: "Brokerage, investment, retirement, and tax-lot statements are not supported in this phase." };
   }
+  if (/\bcapital one\b/.test(t) && /\bpending transactions\b/.test(t)) {
+    return {
+      accountType: null,
+      unsupportedReason: "Pending transactions are not final and cannot be imported. Upload posted activity or a monthly statement instead.",
+    };
+  }
+  if (
+    /\bcapital one\b/.test(t)
+    && /\bposted transactions since your last statement\b/.test(t)
+    && /\bdate\s+description\s+category\s+card\s+amount\b/.test(t.replace(/\n+/g, " "))
+  ) {
+    return { accountType: "credit_card", unsupportedReason: null };
+  }
   if (/\b(credit card|minimum payment|payment due date|credit limit|new balance)\b/.test(t)) {
     return { accountType: "credit_card", unsupportedReason: null };
   }
@@ -126,7 +165,7 @@ function parseMetadata(text: string, accountType: PdfAccountType | null): Statem
   const period = statementPeriod(text);
   const summary = columnarSummaryBalances(text);
   const accountNumber =
-    /(?:account|card)\s*(?:number|no\.?)?\s*[:#\-]?\s*(?:x{2,}|\*{2,}|ending\s+in)?\s*([*\dxX-]{2,20})/i.exec(text);
+    /(?:account|card)\s*(?:number|no\.?)?\s*[:#\-]?\s*(?:x{2,}|\*{2,}|ending\s+in)?\s*([.*\dxX-]{2,20})/i.exec(text);
 
   return {
     ...blankMetadata(),
@@ -149,7 +188,8 @@ function directionFromLine(line: string, amount: number, accountType: PdfAccount
   const l = lower(line);
   if (/\b(payment|credit|refund|deposit|interest paid|transfer from)\b/.test(l)) return "inflow";
   if (/\b(debit|withdrawal|purchase|fee|interest charged|check|card purchase|transfer to)\b/.test(l)) return "outflow";
-  return amount < 0 ? "outflow" : accountType === "credit_card" ? "outflow" : "inflow";
+  if (amount < 0) return accountType === "credit_card" ? "inflow" : "outflow";
+  return accountType === "credit_card" ? "outflow" : "inflow";
 }
 
 function parseColumnarTransactions(
@@ -231,24 +271,34 @@ function parseColumnarTransactions(
 
 function parseTransactions(text: string, accountType: PdfAccountType): ExtractedTransaction[] {
   const rows: ExtractedTransaction[] = [];
-  const dateStartRe = /^\s*(\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|\d{4}-\d{2}-\d{2})\s+/;
-  const moneyRe = /(\(?[-+$€£]?\d[\d,]*(?:\.\d{1,2})?\)?)/g;
+  const dateStartRe = new RegExp(
+    `^\\s*(${shortMonthDatePattern}(?:,?\\s+\\d{4})?|\\d{1,2}[/-]\\d{1,2}(?:[/-]\\d{2,4})?|\\d{4}-\\d{2}-\\d{2})\\s+`,
+    "i",
+  );
+  const moneyRe = /(\(?[+-]?\s*[$€£]?\s*\d[\d,]*(?:\.\d{1,2})?\)?)/g;
   const periodYear = /statement\s+period[\s\S]*?((?:19|20)\d{2})/i.exec(text)?.[1];
-  const year = periodYear ?? /(?:19|20)\d{2}/.exec(text)?.[0] ?? new Date().getFullYear().toString();
+  const contextDate = documentDate(text);
+  const year = periodYear ?? contextDate?.slice(0, 4) ?? /(?:19|20)\d{2}/.exec(text)?.[0] ?? new Date().getFullYear().toString();
   let lineNo = 2;
+  let pageNumber: number | null = null;
   for (const raw of text.split(/\n+/)) {
     const line = raw.trim();
+    const page = /^--- Page (\d+) ---$/.exec(line);
+    if (page) {
+      pageNumber = Number(page[1]);
+      continue;
+    }
     if (/balance|total|summary|minimum payment|credit limit/i.test(line)) continue;
     const dateMatch = dateStartRe.exec(line);
     if (!dateMatch) continue;
     const moneyMatches = [...line.matchAll(moneyRe)];
     const amountMatch = moneyMatches.at(-1);
     if (!amountMatch) continue;
-    const posted = parseLooseDate(dateMatch[1].includes("/") && dateMatch[1].split("/").length === 2 ? `${dateMatch[1]}/${year}` : dateMatch[1]);
+    const posted = parseContextualDate(dateMatch[1], contextDate ?? `${year}-12-31`);
     const afterDate = line.slice(dateMatch[0].length);
     const secondDate = dateStartRe.exec(afterDate);
     const txnDate = secondDate
-      ? parseLooseDate(secondDate[1].includes("/") && secondDate[1].split("/").length === 2 ? `${secondDate[1]}/${year}` : secondDate[1])
+      ? parseContextualDate(secondDate[1], contextDate ?? `${year}-12-31`)
       : null;
     const descriptionStart = secondDate ? secondDate[0].length : 0;
     const description = afterDate
@@ -273,7 +323,7 @@ function parseTransactions(text: string, accountType: PdfAccountType): Extracted
       description,
       category: categoryForDirection(direction),
       referenceNumber: /\b(?:ref|reference|check)\s*#?\s*([a-z0-9-]+)/i.exec(line)?.[1] ?? null,
-      sourcePage: null,
+      sourcePage: pageNumber,
       confidence: hint ? "high" : "medium",
       fieldConfidence: { dates: "medium", amounts: "high", direction: hint ? "high" : "medium" },
       issues: hint ? [] : ["Debit or credit direction inferred from statement wording."],
@@ -442,6 +492,9 @@ export function parseGenericStatement(text: string, extractionMethod: "native_te
   const ocrIssues = extractionMethod === "ocr" || extractionMethod === "hybrid"
     ? ["OCR was used. Review balances and transaction amounts before importing."]
     : [];
+  const activityIssues = /\bposted transactions since your last statement\b/i.test(text)
+    ? ["This is posted transaction activity, not a monthly statement. Statement balances and reconciliation are unavailable."]
+    : [];
   return {
     metadata,
     transactions,
@@ -449,7 +502,9 @@ export function parseGenericStatement(text: string, extractionMethod: "native_te
     confidence: confidence(metadata, transactions, reconciliation, extractionMethod),
     fieldConfidence,
     reconciliation,
-    issues: transactions.length === 0 ? [...ocrIssues, "No transaction table rows were detected."] : ocrIssues,
+    issues: transactions.length === 0
+      ? [...ocrIssues, ...activityIssues, "No transaction table rows were detected."]
+      : [...ocrIssues, ...activityIssues],
     unsupportedReason: null,
     rawTextExcerpt: text.slice(0, 4000),
   };

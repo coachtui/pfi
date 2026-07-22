@@ -702,7 +702,7 @@ export async function confirmPdfImport(input: ConfirmPdfImportInput): Promise<Im
 
   const { data: batch, error: batchErr } = await supabase
     .from("import_batches")
-    .select("id, status, source_type")
+    .select("id, status, source_type, detected_account_type")
     .eq("id", v.importId)
     .eq("source_type", "pdf")
     .maybeSingle();
@@ -710,6 +710,22 @@ export async function confirmPdfImport(input: ConfirmPdfImportInput): Promise<Im
   if (!batch) return { error: "Import not found" };
   if (!["ready_for_review", "needs_review"].includes(batch.status)) {
     return { error: "This PDF import is not ready to confirm." };
+  }
+
+  const { data: targetAccount, error: targetAccountErr } = await supabase
+    .from("financial_accounts")
+    .select("id, type, provider, archived_at")
+    .eq("id", v.accountId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (targetAccountErr) return { error: targetAccountErr.message };
+  if (!targetAccount || targetAccount.archived_at || targetAccount.provider === "demo") {
+    return { error: "Choose an available account from your financial record." };
+  }
+  if (batch.detected_account_type && targetAccount.type !== batch.detected_account_type) {
+    return {
+      error: `This PDF contains ${batch.detected_account_type.replace("_", " ")} activity. Choose a matching account before confirming.`,
+    };
   }
 
   const existingRows = await paginateSelect<{
