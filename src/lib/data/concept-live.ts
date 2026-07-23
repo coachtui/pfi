@@ -171,12 +171,31 @@ export function computeSnapshotLive(metricKey: string, snapshots: DailySnapshot[
   };
 }
 
+/** Pure dispatcher over already-loaded data — routes a metricKey to its namespace's resolver. */
+export function computeConceptLive(
+  metricKey: string,
+  data: { snapshots: DailySnapshot[]; transactions: ScoreTransactionInput[]; accounts: ScoreAccountInput[]; events: FinancialEvent[] },
+): ConceptLiveData | null {
+  const ns = metricKey.split(":")[0];
+  if (ns === "report") return computeReportLive(metricKey, data.snapshots, data.transactions, data.events);
+  if (ns === "metric") return computeMetricLive(metricKey, data.snapshots, data.transactions, data.accounts);
+  if (ns === "snapshot") return computeSnapshotLive(metricKey, data.snapshots);
+  return null; // position: and any future namespace — not supported this slice
+}
+
 export async function getConceptLiveData(
   supabase: SupabaseClient,
   metricKey: string,
 ): Promise<ConceptLiveData | null> {
-  if (!metricKey.startsWith("report:")) return null;
-  const { getReportData } = await import("./queries");
-  const { snapshots, transactions, events } = await getReportData(supabase);
-  return computeReportLive(metricKey, snapshots, transactions, events);
+  const ns = metricKey.split(":")[0];
+  const { getReportData, fetchScoreSources } = await import("./queries");
+  if (ns === "report") {
+    const { snapshots, transactions, events } = await getReportData(supabase);
+    return computeConceptLive(metricKey, { snapshots, transactions, accounts: [], events });
+  }
+  if (ns === "metric" || ns === "snapshot") {
+    const { snapshots, transactions, accounts, events } = await fetchScoreSources(supabase);
+    return computeConceptLive(metricKey, { snapshots, transactions, accounts, events });
+  }
+  return null;
 }

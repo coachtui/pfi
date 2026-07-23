@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DailySnapshot, TransactionInput, ScoreTransactionInput, ScoreAccountInput } from "@/lib/financial-engine";
-import { computeReportLive, computeMetricLive, computeSnapshotLive } from "./concept-live";
+import { computeReportLive, computeMetricLive, computeSnapshotLive, computeConceptLive } from "./concept-live";
 
 // Minimal casts: computeReportLive only touches snapshot date/liquidAssets/
 // revolvingBalances/nearTermObligations and transaction postedDate/amount/
@@ -149,5 +149,15 @@ describe("computeSnapshotLive", () => {
   it("returns null for the wrong namespace/field and for empty snapshots", () => {
     expect(computeSnapshotLive("snapshot:liquidAssets", [snapNet("2026-06-30", 1)])).toBeNull();
     expect(computeSnapshotLive("snapshot:netWorth", [])).toBeNull();
+  });
+});
+
+describe("computeConceptLive (dispatch)", () => {
+  it("routes each namespace to its resolver and returns null for unknown", () => {
+    const snaps = [snapNet("2026-04-30", 100000), snapNet("2026-05-31", 108000), snapNet("2026-06-30", 112000)];
+    const data = { snapshots: snaps, transactions: [] as ScoreTransactionInput[], accounts: [] as ScoreAccountInput[], events: [] };
+    expect(computeConceptLive("snapshot:netWorth", data)).not.toBeNull();          // → computeSnapshotLive
+    expect(computeConceptLive("metric:not_a_metric", data)).toBeNull();            // → computeMetricLive (unknown id)
+    expect(computeConceptLive("position:availablePosition", data)).toBeNull();     // unsupported namespace
   });
 });

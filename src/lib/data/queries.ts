@@ -193,14 +193,14 @@ export interface ScoreData {
   range: ScoreRange;
 }
 
-interface ScoreSourceRows {
+export interface ScoreSourceRows {
   snapshots: DailySnapshot[];
   transactions: ScoreTransactionInput[];
   accounts: ScoreAccountInput[];
   events: FinancialEvent[];
 }
 
-async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceRows> {
+export async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceRows> {
   const [snapRows, txnRows, acctRes, eventRows] = await Promise.all([
     paginateSelect<SnapshotRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
       // date alone is a unique order here only because RLS scopes rows to one
