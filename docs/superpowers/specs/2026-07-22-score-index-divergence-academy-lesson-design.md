@@ -58,7 +58,7 @@ New file: `src/lib/concepts/content/score-index-divergence.ts`.
 | `relatedConceptIds` | `["cash-flow", "liquidity"]` — cash-flow because that's what moves PFI day to day; liquidity because it's one of the Fundamentals Score's 90-day inputs. |
 | `prerequisiteConceptIds` | `[]` — approachable standalone, since this is the one place explaining what the two headline numbers are in relation to each other. |
 | `whereUsed` | `["Home dashboard's divergence explainer line"]` — the only surface today. |
-| `dataMetricKey` | `"signal:divergence"` — authored now for forward compatibility; `concept-live.ts` only resolves the `report:*` namespace today, so this correctly renders sample-only content (same as `available-capital`'s `position:*` key, `cash-flow`'s `metric:*` key, etc.) until a future slice adds a `signal:` resolver. |
+| `dataMetricKey` | Omitted (see "Plan-time corrections" in the implementation plan) — `engine-binding.test.ts` only recognizes `metric:`/`report:`/`snapshot:`/`position:` namespaces, so an unresolvable `signal:` key would fail that test. The lesson ships with no `dataMetricKey`/`personalApplication`, rendering sample-only content via the same `HouseholdApplication` fallback path every other not-yet-live concept already uses. |
 | `memorableDistinction` | `"PFI reacts today; the Fundamentals Score remembers the last 90 days."` |
 | `formula` / `formulaRows` / `comparisonRows` | Omitted — divergence isn't a calculation, so these fields don't apply. `memorableDistinction` carries the one-sentence takeaway instead. |
 
@@ -166,9 +166,10 @@ components exactly like every other lesson concept. No migration.
 
 ## Testing plan
 
-- **`DivergenceExplainer` component test:** replace the "toggle reveals inline
-  paragraph" assertion with a "renders a link to
-  `/academy/score-index-divergence`" assertion.
+- **`DivergenceExplainer` verification:** this codebase has no `*.test.tsx`
+  files — verified via `pnpm typecheck`/`pnpm build` plus live browser visual
+  QA instead, consistent with how every other component change in this
+  project is verified.
 - **Registry validation:** the new concept and module pass
   `validateRegistry()`'s existing structural checks (kebab-case id, related-id
   existence, 1–2 knowledge checks, correct-index bounds, non-empty `whereUsed`)

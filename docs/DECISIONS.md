@@ -366,3 +366,43 @@ added `.claude/**`, `test-results/**`, and `playwright-report/**` to the eslint
 `globalIgnores` (`eslint.config.mjs`): the bare `eslint` `lint` script traversed the
 in-tree `.claude/` plugin directory and reported ~2,900 errors from third-party plugin
 sources, which had been silently failing `pnpm check`'s lint step.
+
+## 39. 2026-07-22 — PFI vs Fundamentals Score gets a full Academy lesson; new "Understanding Your Score" module
+
+**Decision:** Author a full Academy concept/lesson (`score-index-divergence`, classification
+`pfi_metric`) explaining why PFI and the Fundamentals Score can move in opposite
+directions, and repoint the dashboard divergence line's `› Learn` control from its
+interim inline-text expand (shipped in the divergence-explainer slice) to this lesson's
+route. The lesson needed a home in the Academy's module structure; none of the three
+existing modules (household-operations literacy, balance-sheet literacy,
+pressure/flexibility literacy) fit a lesson about interpreting PFI's own headline
+numbers, so a fourth module, "Understanding Your Score," was added, seeded with just
+this one lesson. The lesson ships without a `dataMetricKey`/`personalApplication` —
+`engine-binding.test.ts` only resolves the `metric:`/`report:`/`snapshot:`/`position:`
+namespaces derived from the real financial engine, and a real household-level
+divergence signal is transient (computed per-request by `computeDivergence`, never
+stored), so there is nothing yet to bind a live namespace to. The lesson renders
+sample-only content, the same fallback path 6 of the other 15 concepts already use
+pending their own resolver work.
+
+**Alternatives:** leave the lesson unlisted/moduleless like `available-capital`
+(rejected — divergence is rare and no demo profile naturally triggers it, so most users
+would never discover a lesson they can only reach mid-event); tack the lesson onto the
+existing "Financial Pressure and Flexibility" module (rejected — thematically it's about
+interpreting PFI's own product mechanics, not household financial-statement literacy,
+and a dedicated module leaves room for future product-literacy lessons); author a
+`signal:` engine-binding namespace now to make the lesson live (rejected as
+out-of-scope — it requires first deciding whether/where to persist divergence
+occurrences, which the divergence-explainer slice explicitly deferred).
+
+**Consequences:** Academy now has 4 modules and 16 concepts (11 with lessons, up from
+15/10). `AcademyHome`'s dynamic tallies (`academyTallies()`) and `lessonSequence()`
+required no code changes — only the hardcoded test-count assertions in
+`content.test.ts`, `progress.test.ts`, and `e2e/academy.spec.ts` needed updating. A
+future slice that wires a real `signal:` namespace (or persists divergence
+occurrences) can attach a `dataMetricKey` to this concept without any other change.
+This concept's title is the first that is an acronym-bearing phrase rather than a plain
+noun, which exposed that `LessonSections` lowercases the title into its opening heading
+("What is pfi vs fundamentals score?"); rather than lowercase-mangle an acronym, an
+additive optional `Lesson.openingHeading` override was introduced (default behavior
+unchanged for all other lessons) and set to "What is a divergence?" here.
