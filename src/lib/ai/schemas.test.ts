@@ -310,3 +310,41 @@ describe("explanationsDoNotMislabelScore", () => {
     expect(explanationsDoNotMislabelScore(bad)).toBe(false);
   });
 });
+
+import {
+  DIVERGENCE_SURFACE,
+  divergenceInputSchema,
+  divergenceOutputSchema,
+  bodyIsDirectionConsistent,
+} from "./schemas";
+
+describe("divergence surface schemas", () => {
+  const input = divergenceInputSchema.parse({
+    surface: DIVERGENCE_SURFACE,
+    companyName: "Koa Holdings",
+    direction: "index_down_score_up",
+    scoreMomentum: "improving",
+  });
+
+  it("rejects unknown keys (strict)", () => {
+    expect(() => divergenceInputSchema.parse({ ...input, extra: 1 })).toThrow();
+  });
+
+  it("bounds the output body length", () => {
+    expect(() => divergenceOutputSchema.parse({ body: "too short" })).toThrow();
+  });
+
+  it("passes a body consistent with the direction", () => {
+    const output = divergenceOutputSchema.parse({
+      body: "Its share-price proxy slipped this week, yet the underlying fundamentals kept improving over the quarter.",
+    });
+    expect(bodyIsDirectionConsistent(input, output)).toBe(true);
+  });
+
+  it("rejects a body that inverts the score direction", () => {
+    const output = divergenceOutputSchema.parse({
+      body: "Its share-price proxy rose, and the underlying fundamentals weakened over the quarter as well.",
+    });
+    expect(bodyIsDirectionConsistent(input, output)).toBe(false);
+  });
+});
