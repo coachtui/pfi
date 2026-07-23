@@ -166,7 +166,12 @@ export async function getOrGenerateNarration(
     }
 
     if (input.surface === DIVERGENCE_SURFACE) {
-      const cachedOutput = await readCachedOutput(supabase, surface, inputHash, divergenceOutputSchema);
+      const cachedOutput = await readCachedOutput(
+        supabase,
+        surface,
+        inputHash,
+        divergenceOutputSchema,
+      );
       if (cachedOutput) return { output: cachedOutput, input };
       const output = await generateNarration(input);
       if (!output) return null;
