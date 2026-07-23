@@ -38,7 +38,7 @@ export interface ProfileRow {
   onboarding_completed_at: string | null;
 }
 
-export interface CompanyRow { id: string; user_id: string; name: string; ticker: string; }
+export interface CompanyRow { id: string; user_id: string; name: string; ticker: string; logo_path: string | null; }
 
 export async function getProfile(supabase: SupabaseClient): Promise<ProfileRow | null> {
   const { data: { user } } = await supabase.auth.getUser();

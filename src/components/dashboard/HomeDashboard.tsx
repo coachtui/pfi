@@ -64,6 +64,7 @@ export interface DashboardIdentity {
   companyName: string;
   ticker: string;
   username: string;
+  logoPath: string | null;
   level?: number;
 }
 
@@ -128,6 +129,7 @@ export function HomeDashboard({
         companyName={profile.companyName}
         ticker={profile.ticker}
         username={profile.username}
+        logoPath={profile.logoPath}
         level={profile.level}
       />
 

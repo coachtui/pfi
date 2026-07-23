@@ -406,3 +406,13 @@ noun, which exposed that `LessonSections` lowercases the title into its opening 
 ("What is pfi vs fundamentals score?"); rather than lowercase-mangle an acronym, an
 additive optional `Lesson.openingHeading` override was introduced (default behavior
 unchanged for all other lessons) and set to "What is a divergence?" here.
+
+## 40. 2026-07-22 — Editable company identity via a bottom sheet; emblem as icon presets
+
+**Decision:** The dashboard's top-left company block is tappable, opening a bottom sheet to edit company name, ticker, username, and emblem. The emblem is stored in the existing `personal_companies.logo_path` column as a tagged string (`preset:<id>` | `null`; `upload:<path>` reserved). Presets are curated lucide icons — no storage.
+
+**Alternatives considered:** (a) a dedicated `/profile` page — rejected in favor of the in-context sheet matching the existing `Sheet` pattern; (b) custom image upload in this slice — deferred to the rankings slice, since an uploaded logo only becomes meaningful once other users can see it, and it brings a storage bucket + public-read policy + content moderation that are premature before rankings exists; (c) a public storage bucket now — deferred with upload.
+
+**Reasoning:** Deliver editable identity + a non-default emblem immediately with zero storage and zero moderation surface. A company logo is part of the *fictional* public identity (name, ticker, emblem) that public surfaces are explicitly allowed to show, so it does not conflict with privacy-by-design; only raw financial data stays private.
+
+**Consequences:** `personal_companies.logo_path` is now read/written (was unused). Onboarding's name/ticker/username validation is now shared with the edit sheet via `src/lib/validation/company-profile.ts`. Custom upload, the public bucket, and moderation are recorded in KNOWN_LIMITATIONS for the rankings slice.
