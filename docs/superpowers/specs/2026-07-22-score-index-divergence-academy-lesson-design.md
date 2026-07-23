@@ -113,10 +113,11 @@ movement); the Fundamentals Score is unchanged (it measures the steady
 spending/saving pattern over the last 90 days, which this one payment doesn't
 change).
 
-`lesson.personalApplication`: `metricKey: "signal:divergence"`,
-`requiresData: ["balance-history"]`, `interpretationRules` describing how to
-read a real occurrence once live data exists. Renders sample-only today via the
-same `HouseholdApplication` fallback path every not-yet-resolved concept uses.
+`lesson.personalApplication`: omitted (see "Plan-time corrections" in the
+implementation plan and the `dataMetricKey` row above) — there is no `signal:`
+engine-binding namespace to bind a `metricKey` to, so authoring one would fail
+`engine-binding.test.ts`. The lesson renders sample-only today via the same
+`HouseholdApplication` fallback path every not-yet-resolved concept uses.
 
 `lesson.commonMisunderstanding`: "My score is broken / contradicting itself" —
 reframed as: they're not disagreeing, they're answering different questions
