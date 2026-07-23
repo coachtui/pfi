@@ -139,6 +139,38 @@ export function computeMetricLive(
   };
 }
 
+export function computeSnapshotLive(metricKey: string, snapshots: DailySnapshot[]): ConceptLiveData | null {
+  const [ns, field] = metricKey.split(":");
+  if (ns !== "snapshot" || field !== "netWorth") return null;
+
+  const bounds = currentAndPriorPeriods(snapshots);
+  if (!bounds) return null;
+
+  const netWorthAt = (endDate: string): number | null => {
+    const upto = snapshots.filter((s) => s.date <= endDate);
+    const last = upto.at(-1);
+    return last ? last.netWorth : null;
+  };
+
+  const current = netWorthAt(bounds.current.end);
+  if (current === null) return null;
+  const prior = bounds.prior ? netWorthAt(bounds.prior.end) : null;
+
+  let deltaDisplay: string | null = null;
+  if (prior !== null && bounds.prior) {
+    const delta = current - prior;
+    deltaDisplay = `${delta >= 0 ? "+" : "−"}${formatDollars(Math.abs(delta))} vs ${bounds.prior.label}`;
+  }
+
+  return {
+    periodLabel: bounds.current.label,
+    display: formatDollars(current),
+    priorLabel: bounds.prior?.label ?? null,
+    priorDisplay: prior !== null ? formatDollars(prior) : null,
+    deltaDisplay,
+  };
+}
+
 export async function getConceptLiveData(
   supabase: SupabaseClient,
   metricKey: string,

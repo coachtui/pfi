@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DailySnapshot, TransactionInput, ScoreTransactionInput, ScoreAccountInput } from "@/lib/financial-engine";
-import { computeReportLive, computeMetricLive } from "./concept-live";
+import { computeReportLive, computeMetricLive, computeSnapshotLive } from "./concept-live";
 
 // Minimal casts: computeReportLive only touches snapshot date/liquidAssets/
 // revolvingBalances/nearTermObligations and transaction postedDate/amount/
@@ -113,5 +113,41 @@ describe("computeMetricLive", () => {
     // old flat-$0 fixture. Uses the code's actual minus glyph (U+2212 "−",
     // not ASCII "-").
     expect(live!.deltaDisplay).toBe("−$150 vs May 2026");
+  });
+});
+
+const snapNet = (date: string, netWorth: number): DailySnapshot =>
+  ({ date, liquidAssets: 0, revolvingBalances: 0, nearTermObligations: 0, netWorth }) as DailySnapshot;
+
+describe("computeSnapshotLive", () => {
+  it("resolves current and prior net worth for snapshot:netWorth with positive delta", () => {
+    const snaps = [
+      snapNet("2026-04-30", 100000),
+      snapNet("2026-05-31", 108000),
+      snapNet("2026-06-30", 112000),
+    ];
+    const live = computeSnapshotLive("snapshot:netWorth", snaps);
+    expect(live).not.toBeNull();
+    expect(live!.display).toMatch(/112,?000/);
+    expect(live!.priorDisplay).toMatch(/108,?000/);
+    expect(live!.deltaDisplay).toBe("+$4,000 vs May 2026");
+  });
+
+  it("resolves current and prior net worth for snapshot:netWorth with negative delta", () => {
+    const snaps = [
+      snapNet("2026-04-30", 112000),
+      snapNet("2026-05-31", 108000),
+      snapNet("2026-06-30", 100000),
+    ];
+    const live = computeSnapshotLive("snapshot:netWorth", snaps);
+    expect(live).not.toBeNull();
+    expect(live!.display).toMatch(/100,?000/);
+    expect(live!.priorDisplay).toMatch(/108,?000/);
+    expect(live!.deltaDisplay).toBe("−$8,000 vs May 2026");
+  });
+
+  it("returns null for the wrong namespace/field and for empty snapshots", () => {
+    expect(computeSnapshotLive("snapshot:liquidAssets", [snapNet("2026-06-30", 1)])).toBeNull();
+    expect(computeSnapshotLive("snapshot:netWorth", [])).toBeNull();
   });
 });
