@@ -5,16 +5,18 @@ import Link from "next/link";
 import { ArrowUpRight, ArrowRight, ArrowDownRight, Info } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { FinancialChart, type ChartMarker, type StemMarker } from "@/components/chart/FinancialChart";
+import { AIDivergenceExplainer } from "@/components/dashboard/AIDivergenceExplainer";
 import { AIPerformanceBrief } from "@/components/dashboard/AIPerformanceBrief";
 import { AIWhatMovedYourLine } from "@/components/dashboard/AIWhatMovedYourLine";
 import { CompanyHeader } from "@/components/dashboard/CompanyHeader";
+import { DivergenceExplainer } from "@/components/dashboard/DivergenceExplainer";
 import { MetricCard, type MetricTone } from "@/components/dashboard/MetricCard";
 import { PerformanceBrief } from "@/components/dashboard/PerformanceBrief";
 import { ScoreCard } from "@/components/dashboard/ScoreCard";
 import { Segmented } from "@/components/ui/Segmented";
 import { StaleDataBanner } from "@/components/dashboard/StaleDataBanner";
 import { WhatMovedYourLine } from "@/components/dashboard/WhatMovedYourLine";
-import type { BriefNarrationResult, DriverExplanationsResult } from "@/lib/data/narration";
+import type { BriefNarrationResult, DivergenceNarrationResult, DriverExplanationsResult } from "@/lib/data/narration";
 import type { ScoreSummary } from "@/lib/data/queries";
 import {
   availablePosition,
@@ -28,6 +30,7 @@ import {
   indexDayChange,
   waterline,
   type DailySnapshot,
+  type DivergenceDirection,
   type FinancialEvent,
   type Momentum,
 } from "@/lib/financial-engine";
@@ -74,6 +77,8 @@ interface HomeDashboardProps {
   freshness: { currentThrough: string | null; showNudge: boolean };
   narration: Promise<BriefNarrationResult | null>;
   driverNarration: Promise<DriverExplanationsResult | null>;
+  divergence: { direction: DivergenceDirection; template: string } | null;
+  divergenceNarration: Promise<DivergenceNarrationResult | null>;
 }
 
 export function HomeDashboard({
@@ -85,6 +90,8 @@ export function HomeDashboard({
   freshness,
   narration,
   driverNarration,
+  divergence,
+  divergenceNarration,
 }: HomeDashboardProps) {
   const [range, setRange] = useState<RangeKey>("30D");
 
@@ -180,6 +187,11 @@ export function HomeDashboard({
         </p>
       )}
 
+      {divergence && (
+        <Suspense fallback={<DivergenceExplainer sentence={divergence.template} />}>
+          <AIDivergenceExplainer template={divergence.template} narration={divergenceNarration} />
+        </Suspense>
+      )}
       <ScoreCard summary={scoreSummary} />
 
       {/* Key metrics */}
