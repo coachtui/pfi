@@ -31,7 +31,7 @@ test("academy tab routes to the zero-progress home with no locks", async () => {
   await page.getByRole("link", { name: "Academy" }).click();
   await page.waitForURL("**/academy");
   await expect(page.getByRole("heading", { name: "Academy" })).toBeVisible();
-  await expect(page.getByText("0 of 10 lessons")).toBeVisible();
+  await expect(page.getByText("0 of 11 lessons")).toBeVisible();
   await expect(page.getByText("Not started").first()).toBeVisible();
   await expect(page.getByText(/locked/i)).toHaveCount(0); // comprehension is never locked
 });
@@ -122,7 +122,7 @@ test("answering all checks completes the lesson — right or wrong", async () =>
 test("home reflects the completion", async () => {
   await page.getByRole("link", { name: "Back to Academy" }).click();
   await page.waitForURL("**/academy");
-  await expect(page.getByText("1 of 10 lessons")).toBeVisible();
+  await expect(page.getByText("1 of 11 lessons")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recently completed" })).toBeVisible();
   await expect(page.getByText("Completed").first()).toBeVisible();
 });
