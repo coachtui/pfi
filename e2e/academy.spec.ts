@@ -154,3 +154,15 @@ test("no nested interactive content on the dashboard", async () => {
   await expect(page.getByText("PFI", { exact: true })).toBeVisible();
   expect(await page.locator("main a button, main button a").count()).toBe(0);
 });
+
+test("a metric-bound lesson renders the migrated pattern with live household data", async () => {
+  // Demo data is already loaded (see "demo data loads..." earlier in this
+  // file) — navigate directly rather than via the report's term-sheet flow,
+  // since debt-pressure doesn't need a report-surfaced term button for this.
+  await page.goto("/academy/debt-pressure");
+  await expect(
+    page.getByText("Debt pressure is the burden of payments, not the size of the debt."),
+  ).toBeVisible(); // memorable distinction
+  await expect(page.getByText("Share of income going to debt payments")).toBeVisible(); // comparison row label, not color-only
+  await expect(page.getByText("Calculated from your data")).toBeVisible(); // live household application via the metric: resolver
+});
