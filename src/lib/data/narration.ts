@@ -3,15 +3,24 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { z } from "zod";
 import { env } from "@/lib/config/env";
 import { narrationInputHash } from "@/lib/ai/hash";
-import { buildBriefInput, buildDriverExplanationsInput, type NarrationSource } from "@/lib/ai/input";
+import {
+  buildBriefInput,
+  buildDivergenceInput,
+  buildDriverExplanationsInput,
+  type NarrationSource,
+} from "@/lib/ai/input";
 import { generateNarration } from "@/lib/ai/narrator";
 import {
   BRIEF_SURFACE,
+  DIVERGENCE_SURFACE,
   DRIVER_EXPLANATIONS_SURFACE,
   briefOutputSchema,
+  divergenceOutputSchema,
   driverExplanationsOutputSchema,
   type BriefInput,
   type BriefOutput,
+  type DivergenceInput,
+  type DivergenceOutput,
   type DriverExplanationsInput,
   type DriverExplanationsOutput,
 } from "@/lib/ai/schemas";
@@ -26,6 +35,11 @@ export interface DriverExplanationsResult {
   input: DriverExplanationsInput;
 }
 
+export interface DivergenceNarrationResult {
+  output: DivergenceOutput;
+  input: DivergenceInput;
+}
+
 /** Per-surface wiring: input assembly for each surface. */
 const SURFACES = {
   [BRIEF_SURFACE]: {
@@ -33,6 +47,9 @@ const SURFACES = {
   },
   [DRIVER_EXPLANATIONS_SURFACE]: {
     buildInput: buildDriverExplanationsInput,
+  },
+  [DIVERGENCE_SURFACE]: {
+    buildInput: buildDivergenceInput,
   },
 } as const;
 
@@ -118,9 +135,14 @@ export async function getOrGenerateNarration(
 ): Promise<DriverExplanationsResult | null>;
 export async function getOrGenerateNarration(
   supabase: SupabaseClient,
+  surface: typeof DIVERGENCE_SURFACE,
+  source: NarrationSource,
+): Promise<DivergenceNarrationResult | null>;
+export async function getOrGenerateNarration(
+  supabase: SupabaseClient,
   surface: keyof typeof SURFACES,
   source: NarrationSource,
-): Promise<BriefNarrationResult | DriverExplanationsResult | null> {
+): Promise<BriefNarrationResult | DriverExplanationsResult | DivergenceNarrationResult | null> {
   try {
     if (!env.AI_GATEWAY_API_KEY) return null;
     const config = SURFACES[surface];
@@ -137,6 +159,20 @@ export async function getOrGenerateNarration(
       const cachedOutput = await readCachedOutput(supabase, surface, inputHash, briefOutputSchema);
       if (cachedOutput) return { output: cachedOutput, input };
 
+      const output = await generateNarration(input);
+      if (!output) return null;
+      await writeCachedOutput(supabase, surface, inputHash, input, output);
+      return { output, input };
+    }
+
+    if (input.surface === DIVERGENCE_SURFACE) {
+      const cachedOutput = await readCachedOutput(
+        supabase,
+        surface,
+        inputHash,
+        divergenceOutputSchema,
+      );
+      if (cachedOutput) return { output: cachedOutput, input };
       const output = await generateNarration(input);
       if (!output) return null;
       await writeCachedOutput(supabase, surface, inputHash, input, output);

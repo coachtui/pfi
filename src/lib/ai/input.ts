@@ -1,22 +1,26 @@
 import {
   availablePosition,
   buildIndexSeries,
+  computeDivergence,
   computeDrivers,
   computeMomentum,
   cushion,
   driverDisplay,
+  indexDayChange,
   waterline,
   type DailySnapshot,
   type FinancialEvent,
+  type MomentumState,
 } from "@/lib/financial-engine";
 import {
   BRIEF_SURFACE,
   briefInputSchema,
+  DIVERGENCE_SURFACE,
   DRIVER_EXPLANATIONS_SURFACE,
   driverExplanationsInputSchema,
   type BriefInput,
+  type DivergenceInput,
   type DriverExplanationsInput,
-  type NarrationInput,
 } from "./schemas";
 
 /** Matches the dashboard's default 30D view. */
@@ -31,7 +35,7 @@ export interface NarrationSource {
 
 interface WindowDrivers {
   periodDays: number;
-  driverInputs: NarrationInput["drivers"];
+  driverInputs: BriefInput["drivers"];
 }
 
 /**
@@ -136,4 +140,25 @@ export function buildDriverExplanationsInput(
     netImpact: cents(netImpact),
     drivers: window.driverInputs,
   });
+}
+
+/**
+ * Divergence input: null unless the PFI "Today" delta and the Fundamentals
+ * Score momentum clash in sign. Score-suppressed sources (score === null) never
+ * diverge. Recomputes via the same pure detector page.tsx uses, so they agree.
+ */
+export function buildDivergenceInput(source: NarrationSource): DivergenceInput | null {
+  if (!source.score) return null;
+  const points = buildIndexSeries(source.snapshots).points;
+  if (points.length < 2) return null;
+  const today = indexDayChange(points[points.length - 1].actual, points[points.length - 2]?.actual).points;
+  const momentum = source.score.momentum as MomentumState;
+  const result = computeDivergence(today, momentum);
+  if (!result) return null;
+  return {
+    surface: DIVERGENCE_SURFACE,
+    companyName: source.companyName,
+    direction: result.direction,
+    scoreMomentum: momentum,
+  };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SYSTEM_PROMPTS, BRIEF_SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
+import { SYSTEM_PROMPTS, BRIEF_SYSTEM_PROMPT, DIVERGENCE_SYSTEM_PROMPT, buildUserPrompt } from "./prompts";
 import { BRIEF_SURFACE, briefInputSchema } from "./schemas";
 
 const input = briefInputSchema.parse({
@@ -56,5 +56,22 @@ describe("driver_explanations prompt", () => {
     });
     expect(prompt).toContain("last 30 days");
     expect(prompt).toContain('"d1"');
+  });
+});
+
+describe("divergence prompt", () => {
+  it("encodes the reconciliation rules", () => {
+    for (const phrase of [
+      "Fundamentals Score",
+      "not a credit score",
+      "different time horizons",
+      "do not invert",
+    ]) {
+      expect(SYSTEM_PROMPTS.score_index_divergence.toLowerCase()).toContain(phrase.toLowerCase());
+    }
+  });
+
+  it("is wired into the surface map", () => {
+    expect(SYSTEM_PROMPTS.score_index_divergence).toBe(DIVERGENCE_SYSTEM_PROMPT);
   });
 });

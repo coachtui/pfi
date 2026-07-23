@@ -11,7 +11,11 @@ import { z } from "zod";
 
 export const BRIEF_SURFACE = "performance_brief" as const;
 export const DRIVER_EXPLANATIONS_SURFACE = "driver_explanations" as const;
-export type NarrationSurface = typeof BRIEF_SURFACE | typeof DRIVER_EXPLANATIONS_SURFACE;
+export const DIVERGENCE_SURFACE = "score_index_divergence" as const;
+export type NarrationSurface =
+  | typeof BRIEF_SURFACE
+  | typeof DRIVER_EXPLANATIONS_SURFACE
+  | typeof DIVERGENCE_SURFACE;
 
 /** Mirrors FinancialEventType in src/lib/financial-engine/types.ts. */
 const driverKindSchema = z.enum([
@@ -93,10 +97,32 @@ export const driverExplanationsInputSchema = z
   })
   .strict();
 
+export const divergenceInputSchema = z
+  .object({
+    surface: z.literal(DIVERGENCE_SURFACE),
+    companyName: z.string().min(1),
+    direction: z.enum(["index_down_score_up", "index_up_score_down"]),
+    /** Fundamentals Score momentum state, for nuance only. */
+    scoreMomentum: z.string().min(1),
+  })
+  .strict();
+
+export type DivergenceInput = z.infer<typeof divergenceInputSchema>;
+
+export const divergenceOutputSchema = z
+  .object({
+    /** One compact reconciliation sentence. */
+    body: z.string().min(40).max(240),
+  })
+  .strict();
+
+export type DivergenceOutput = z.infer<typeof divergenceOutputSchema>;
+
 /** All AI inputs, discriminated on surface — the one type hash/narrator accept. */
 export const narrationInputSchema = z.discriminatedUnion("surface", [
   briefInputSchema,
   driverExplanationsInputSchema,
+  divergenceInputSchema,
 ]);
 
 export type DriverExplanationsInput = z.infer<typeof driverExplanationsInputSchema>;
@@ -240,4 +266,27 @@ export function explanationAmountsAreKnown(
 /** Policy check: no body mislabels the PFI Score (defense-in-depth). */
 export function explanationsDoNotMislabelScore(output: DriverExplanationsOutput): boolean {
   return output.explanations.every((e) => textDoesNotMislabelScore(e.body));
+}
+
+/**
+ * Best-effort lexical guard: reject only a body that describes the SCORE moving
+ * in the KNOWN-wrong direction, phrased as "...fundamentals/health <wrong-word>"
+ * (the natural order). Matching only AFTER the anchor avoids tripping on the
+ * index's own down-words ("slipped", "dipped") that legitimately precede a
+ * "...fundamentals kept improving" clause. False positives are harmless here —
+ * they just fall back to the (correct) deterministic template — so the guard is
+ * deliberately lenient; the template is the real safety net.
+ */
+export function bodyIsDirectionConsistent(
+  input: DivergenceInput,
+  output: DivergenceOutput,
+): boolean {
+  const UP = ["improv", "strengthen", "grew", "rose", "solid", "healthier", "better"];
+  const DOWN = ["soften", "weaken", "fell", "declin", "deteriorat", "slipp", "worse"];
+  const wrong = input.direction === "index_down_score_up" ? DOWN : UP;
+  const anchored = new RegExp(
+    `(?:fundamental|health)s?[^.]{0,40}(?:${wrong.join("|")})`,
+    "i",
+  );
+  return !anchored.test(output.body);
 }

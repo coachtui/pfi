@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DailySnapshot, FinancialEvent } from "@/lib/financial-engine";
-import { buildBriefInput, buildDriverExplanationsInput } from "./input";
+import { buildBriefInput, buildDriverExplanationsInput, buildDivergenceInput, type NarrationSource } from "./input";
 
 /**
  * Fixture helpers mirror the convention established in
@@ -178,5 +178,45 @@ describe("buildDriverExplanationsInput", () => {
     expect(input!.totalInflow).toBeCloseTo(4_200, 2);
     expect(input!.totalOutflow).toBeCloseTo(900, 2);
     expect(input!.netImpact).toBeCloseTo(3_300, 2);
+  });
+});
+
+function snap(date: string, liquid: number): DailySnapshot {
+  return {
+    date,
+    liquidAssets: liquid,
+    revolvingBalances: 0,
+    nearTermObligations: 0,
+    essentialObligations: 0,
+    safetyBuffer: 0,
+    netWorth: liquid,
+  };
+}
+
+const base: NarrationSource = {
+  companyName: "Koa Holdings",
+  snapshots: [snap("2026-07-20", 5000), snap("2026-07-21", 2000)],
+  events: [],
+  score: { overall: 640, band: "Fair", momentum: "improving" },
+};
+
+describe("buildDivergenceInput", () => {
+  it("produces an input on a clash", () => {
+    expect(buildDivergenceInput(base)).toEqual({
+      surface: "score_index_divergence",
+      companyName: "Koa Holdings",
+      direction: "index_down_score_up",
+      scoreMomentum: "improving",
+    });
+  });
+
+  it("returns null when the score is suppressed (no score object)", () => {
+    expect(buildDivergenceInput({ ...base, score: null })).toBeNull();
+  });
+
+  it("returns null when there is no clash (score also declining)", () => {
+    expect(
+      buildDivergenceInput({ ...base, score: { overall: 640, band: "Fair", momentum: "weakening" } }),
+    ).toBeNull();
   });
 });
