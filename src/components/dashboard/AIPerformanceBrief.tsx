@@ -52,7 +52,7 @@ export function AIPerformanceBrief({
               </li>
             ))}
             {input.score && input.score.overall !== null && (
-              <li>PFI Score {input.score.overall} ({input.score.band})</li>
+              <li>Fundamentals Score {input.score.overall} ({input.score.band})</li>
             )}
           </ul>
         </div>

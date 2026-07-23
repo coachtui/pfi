@@ -6,7 +6,6 @@ import { ArrowLeft, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
 import { momentumLabel, type ConfidenceLevel, type MomentumState } from "@/lib/financial-engine";
-import { branding } from "@/lib/config/branding";
 import { FinancialTerm } from "@/components/concepts/FinancialTerm";
 import { SCORE_METRIC_CONCEPT_IDS } from "@/lib/concepts/score-term-map";
 import type { ScoreData, ScoreRange } from "@/lib/data/queries";
@@ -54,7 +53,7 @@ export function ScoreView({ data }: { data: ScoreData }) {
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-lg font-semibold text-primary">{branding.productName} Score</h1>
+          <h1 className="text-lg font-semibold text-primary">Fundamentals Score</h1>
           <p className="text-xs text-secondary">Measures your financial operating health. Not a credit score.</p>
         </div>
       </div>

@@ -75,6 +75,6 @@ export const debtPressure: FinancialConcept = {
       },
     ],
     reinforcementPreview:
-      "Debt pressure is measured by the Debt burden metric inside your PFI Score's Debt dimension, and connects to short-term obligations, financial flexibility, retained cash, and capital allocation — this module's remaining terms, each covering one more piece of how a household manages what it owes and what it keeps.",
+      "Debt pressure is measured by the Debt burden metric inside your Fundamentals Score's Debt dimension, and connects to short-term obligations, financial flexibility, retained cash, and capital allocation — this module's remaining terms, each covering one more piece of how a household manages what it owes and what it keeps.",
   },
 };

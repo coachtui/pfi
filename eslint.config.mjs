@@ -12,6 +12,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Non-source paths that live in the working tree but are not project
+    // code: Claude Code's config/plugins and test-run artifacts. Without
+    // these, bare `eslint` (the `lint` script) traverses them and reports
+    // tens of thousands of problems from third-party plugin sources.
+    ".claude/**",
+    "test-results/**",
+    "playwright-report/**",
   ]),
 ]);
 

@@ -131,13 +131,13 @@ export function HomeDashboard({
         level={profile.level}
       />
 
-      {/* Personal index + chart */}
+      {/* PFI index + chart */}
       <Card className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-sm font-medium text-secondary">
-              Personal Index
-              <Info size={14} aria-label="Indexed to 100 at your starting financial position" />
+              PFI
+              <Info size={14} aria-label="Personal Finance Index (PFI) — indexed to 100 at your starting financial position" />
             </p>
             <p className="tabular mt-1 text-4xl font-semibold text-primary">
               {latestPoint.actual.toFixed(1)}

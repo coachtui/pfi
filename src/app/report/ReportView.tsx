@@ -112,7 +112,7 @@ export function ReportView({ companyName, ticker, snapshots, transactions, event
           <FinancialChart
             points={periodPoints}
             markers={[]}
-            ariaDescription={`Personal index over ${selectedPeriod.label}: from ${statement.indexStart.toFixed(1)} to ${statement.indexEnd.toFixed(1)}.`}
+            ariaDescription={`Personal Finance Index over ${selectedPeriod.label}: from ${statement.indexStart.toFixed(1)} to ${statement.indexEnd.toFixed(1)}.`}
           />
         </Card>
       )}
