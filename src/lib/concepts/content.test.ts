@@ -111,6 +111,7 @@ describe("authored content", () => {
   describe("Slice C — glossary definition-sheet migration", () => {
     it.each([
       { id: "retained-cash", formula: true },
+      { id: "financial-flexibility", formula: true },
     ])("$id carries the definition-sheet fields", ({ id, formula }) => {
       const c = ALL_CONCEPTS.find((x) => x.id === id);
       expect(c?.plainEnglishSummary, id).toBeTruthy();
