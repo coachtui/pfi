@@ -24,7 +24,7 @@ export function CompanyHeader({ companyName, ticker, username, logoPath, level }
       <button
         type="button"
         onClick={() => setEditing(true)}
-        aria-label="Edit company profile"
+        aria-label="Edit company profile — verified data coverage"
         className="flex items-center gap-3 rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
       >
         <CompanyEmblem logoPath={logoPath} />
