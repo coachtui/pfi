@@ -6,17 +6,50 @@ export const debtPressure: FinancialConcept = {
   title: "Debt pressure",
   classification: "household_adaptation" as const,
   shortDefinition: "How much of your revenue is committed to required debt payments.",
+  plainEnglishSummary:
+    "The share of monthly income committed to debt payments — a measure of burden, not the balance owed.",
+  memorableDistinction: "Debt pressure is the burden of payments, not the size of the debt.",
   fullDefinition:
     "Debt pressure measures the share of your household's revenue that must go toward required debt payments — the minimums on loans and credit cards, with housing measured separately. It's a measure of strain, not size: it compares what you owe monthly against what you earn monthly, rather than the total balance owed.",
   whyItMatters:
     "Two households can owe very different total amounts and still face the same pressure, or owe the same amount and face very different pressure, depending on their required payments relative to income. Debt pressure shows how much room a household has to absorb a surprise — a repair, a slow month, a rate change — after required payments are made.",
   formula: "Required debt payments ÷ revenue",
+  formulaRows: [
+    { label: "Monthly debt payments", staticValue: "$360" },
+    { label: "÷ Monthly income", staticValue: "$6,200" },
+    { label: "Debt burden", operator: "=", staticValue: "5.8%" },
+  ],
+  comparisonRows: [
+    {
+      label: "Share of income going to debt payments",
+      included: true,
+      explanation: "This is exactly what debt pressure measures: required payments set against what comes in.",
+    },
+    {
+      label: "Required minimums plus scheduled loan payments",
+      included: true,
+      explanation: "These are the required outflows that make up the numerator — what must be paid, not what could be paid.",
+    },
+    {
+      label: "The total balance owed",
+      included: false,
+      explanation: "A large balance at a low required payment can carry less monthly pressure than a small balance with a punishing minimum — balance alone doesn't show strain.",
+    },
+    {
+      label: "A one-time large purchase paid in cash",
+      included: false,
+      explanation: "Paying cash creates no required future payment, so it adds nothing to debt pressure regardless of size.",
+    },
+  ],
+  interpretation:
+    "A lower debt burden means fewer income dollars committed to debt service each month — generally the healthier position, since it leaves more room to absorb a surprise. A rising ratio means more of each dollar is committed to debt; state that factually, as a change in how much room a household has, never as failure or a moral verdict on the household.",
   householdAdaptation:
     "Business analysts call this family of measures “debt service” ratios — comparing required debt payments against income or cash flow. PFI's Debt burden metric applies the same idea to a household: loan and credit-card payments as a share of income, with housing measured separately so it's counted once rather than twice.",
   businessContext:
     "Lenders and analysts read a company's debt service against its income to judge how much strain existing obligations create. A company with heavy required payments has less room to absorb a bad quarter — the same logic applies to a household absorbing a bad month.",
   commonMisunderstanding:
     "Total debt and debt pressure are different measurements. A large mortgage with a low required payment can pressure a budget less than a small credit-card balance with a punishing minimum payment. Looking at the balance owed alone tells you size, not strain — pressure requires comparing the required payment against income.",
+  whereUsed: ["Fundamentals Score (Debt dimension)", "Management commentary", "“What moved your line”"],
   relatedConceptIds: ["liabilities", "short-term-obligations", "financial-flexibility", "free-cash-flow"],
   prerequisiteConceptIds: ["liabilities", "free-cash-flow"],
   dataMetricKey: "metric:debt_service_ratio",
@@ -74,7 +107,7 @@ export const debtPressure: FinancialConcept = {
           "Debt pressure moves only when the required payment or revenue changes. Refinancing to a lower required payment reduces it directly; moving cash between accounts or checking a balance doesn't change what's required, and a one-time extra payment doesn't change the ongoing required minimum.",
       },
     ],
-    reinforcementPreview:
-      "Debt pressure is measured by the Debt burden metric inside your Fundamentals Score's Debt dimension, and connects to short-term obligations, financial flexibility, retained cash, and capital allocation — this module's remaining terms, each covering one more piece of how a household manages what it owes and what it keeps.",
+    completionSummary:
+      "You can now read debt pressure as the monthly burden relative to income — lower is easier to carry — separate from the total balance owed.",
   },
 };
