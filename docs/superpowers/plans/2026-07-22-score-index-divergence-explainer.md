@@ -634,7 +634,7 @@ describe("buildDivergenceInput", () => {
 });
 ```
 
-> If `buildIndexSeries` requires more history than two snapshots to produce a non-null day-over-day delta, extend the fixture with a few more descending days (still ending on a drop) — the asserted behavior (clash → input; suppressed / no-clash → null) is the contract.
+> Verified: `buildIndexSeries` maps 1:1 over snapshots (no minimum window for `.actual`; only `.baseline` needs 7 days, which this code path never reads), so two snapshots are sufficient to exercise a real day-over-day delta.
 
 - [ ] **Step 2: Run test to verify it fails**
 
