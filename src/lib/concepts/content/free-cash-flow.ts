@@ -6,17 +6,40 @@ export const freeCashFlow: FinancialConcept = {
   title: "Free cash flow",
   classification: "standard_finance" as const,
   shortDefinition: "The money remaining after the expenses required to operate your household have been paid.",
+  plainEnglishSummary:
+    "Revenue minus operating expenses — what the household keeps and can direct toward saving, investing, or paying down debt.",
+  memorableDistinction: "Free cash flow is what you keep, not what you make.",
   fullDefinition:
     "Free cash flow is what's left of your household's revenue after operating expenses are paid. It is the cash your household is free to allocate — to savings, investments, or paying down debt. A household can own valuable things and still have weak free cash flow, or own little and generate strong free cash flow.",
   whyItMatters:
     "Free cash flow is the engine of financial progress. Every dollar of savings, investing, and debt paydown comes out of it. Investors watch a company's free cash flow because it shows what the business really generates after keeping the lights on — the same question applies to a household.",
   formula: "Revenue − operating expenses",
+  formulaRows: [
+    { label: "Revenue", staticValue: "$6,200" },
+    { label: "Operating expenses", operator: "-", staticValue: "$4,750" },
+    { label: "Free cash flow", operator: "=", staticValue: "$1,450" },
+  ],
+  comparisonRows: [
+    { label: "Revenue left after operating expenses", included: true, explanation: "What remains once the cost of operating the household has been paid." },
+    { label: "Money available to save, invest, or pay down debt", included: true, explanation: "The cash the household is free to direct once operating costs are covered." },
+    { label: "Total revenue for the period", included: false, explanation: "Revenue is the top line, counted before operating expenses come out of it." },
+    { label: "Money moved into savings", included: false, explanation: "A savings transfer is an allocation of free cash flow, not free cash flow itself." },
+  ],
+  interpretation:
+    "Free cash flow can fall even as revenue rises, if operating expenses grow faster — so it's read alongside both, never on its own. More free cash flow means more room to save, invest, or pay down debt in a given period; it describes room, not virtue, and a lower or negative period is a change to note, not a verdict on the household.",
   householdAdaptation:
     "In corporate accounting, free cash flow is operating cash flow minus capital expenditures. PFI's household version is simpler: revenue minus operating expenses. The idea is the same — cash generated after the cost of operating — without corporate adjustments that don't apply to households.",
   businessContext:
     "Public companies report free cash flow to show how much cash the business generates beyond what it must spend to operate. It funds dividends, buybacks, debt paydown, and growth — a company's version of your allocation choices.",
   commonMisunderstanding:
     "Free cash flow is not the balance in your checking account. A balance is what you hold right now; free cash flow is what a period of operating produced. You can hold a large balance while your free cash flow is negative — spending down what you saved earlier.",
+  whereUsed: [
+    "Household statement (Report)",
+    "Management commentary",
+    "Savings-rate calculation",
+    "Personal Index (PFI)",
+    "“What moved your line”",
+  ],
   relatedConceptIds: ["cash-flow", "savings-rate", "retained-cash", "capital-allocation"],
   prerequisiteConceptIds: ["revenue", "operating-expenses"],
   dataMetricKey: "report:freeCashFlow",
@@ -65,7 +88,7 @@ export const freeCashFlow: FinancialConcept = {
           "Free cash flow only moves when revenue or operating expenses move. Transfers between your own accounts and relabeling don't change it.",
       },
     ],
-    reinforcementPreview:
-      "Free cash flow appears throughout PFI: the report's statement and management commentary, the Free cash flow margin metric inside your Fundamentals Score's Cash Flow dimension, and drivers on your dashboard's “What moved your line.”",
+    completionSummary:
+      "You can now separate what your household makes — revenue — from what it keeps — free cash flow — the number that funds every choice you make with what's left over.",
   },
 };

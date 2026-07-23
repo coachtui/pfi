@@ -6,17 +6,43 @@ export const operatingExpenses: FinancialConcept = {
   title: "Operating expenses",
   classification: "standard_finance" as const,
   shortDefinition: "The recurring cost of running your household — housing, food, utilities, transport, and similar spending.",
+  plainEnglishSummary:
+    "The recurring cost of running your household — housing, food, utilities, and transport — measured against revenue, and excluding money moved to savings or investments.",
+  memorableDistinction: "An allocation is not an expense.",
   fullDefinition:
     "Operating expenses are what it costs to run your household day to day: housing, food, utilities, transport, and comparable recurring spending. They are measured against revenue to see how much of what came in was consumed by the cost of operating. Money moved into savings or investments is not an operating expense — it's a choice about what to do with what's left.",
   whyItMatters:
     "Operating expenses are the other half of the free cash flow equation. A household's financial position can weaken even when revenue holds steady, if operating expenses quietly grow. Tracking this number is how a household understands the cost of its own operation, separate from what it chooses to save or invest.",
   formula: "Sum of household spending in the period (transfers, savings, and investment contributions excluded)",
+  formulaRows: [
+    { label: "Housing", staticValue: "$1,900" },
+    { label: "Food", operator: "+", staticValue: "$780" },
+    { label: "Utilities", operator: "+", staticValue: "$320" },
+    { label: "Transport", operator: "+", staticValue: "$450" },
+    { label: "Other recurring", operator: "+", staticValue: "$1,300" },
+    { label: "Operating expenses", operator: "=", staticValue: "$4,750" },
+  ],
+  comparisonRows: [
+    { label: "Rent or mortgage payment", included: true, explanation: "The cost of keeping the household housed this period." },
+    { label: "Groceries and utilities", included: true, explanation: "The cost of keeping the household running this period." },
+    { label: "401(k) contribution", included: false, explanation: "An allocation of money already kept, not a cost of operating." },
+    { label: "Transfer to savings", included: false, explanation: "An allocation of money already kept, not a cost of operating." },
+    { label: "Extra mortgage principal", included: false, explanation: "An allocation of money already kept, not a cost of operating." },
+  ],
+  interpretation:
+    "Rising operating expenses shrink free cash flow when revenue holds steady, so a lower number is generally healthier — but a rise is a change to note and, where useful, to look into, never a verdict on the household. Read operating expenses together with revenue: expenses climbing alongside revenue can simply be a household growing along with its income, while expenses climbing on flat revenue is worth a closer look.",
   householdAdaptation:
     "Corporate operating expenses exclude the cost of goods sold and capital purchases — categories that don't map onto a household. PFI's version is simply all operating spending: the cost of keeping the household running. Money moved to savings or investments is not counted here — it's an allocation of free cash flow, not a cost of operating.",
   businessContext:
     "Investors track a company's operating expenses against its revenue to judge discipline — a pattern often called “operating leverage,” where revenue growing faster than expenses signals a business getting more efficient over time.",
   commonMisunderstanding:
     "Putting money into savings or an investment account is not an operating expense. It's an allocation of free cash flow — a choice about where to direct money that's already been earned and kept, not a cost of running the household.",
+  whereUsed: [
+    "Household statement (Report)",
+    "Management commentary",
+    "Free cash flow calculation",
+    "“What moved your line” on the dashboard",
+  ],
   relatedConceptIds: ["revenue", "free-cash-flow"],
   prerequisiteConceptIds: ["revenue"],
   dataMetricKey: "report:operatingExpenses",
@@ -71,7 +97,7 @@ export const operatingExpenses: FinancialConcept = {
           "Free cash flow is revenue minus operating expenses. With revenue flat and operating expenses rising, free cash flow necessarily shrank.",
       },
     ],
-    reinforcementPreview:
-      "Operating expenses appear in your report's statement and management commentary, feed directly into free cash flow, and show up as drivers on your dashboard's “What moved your line.”",
+    completionSummary:
+      "You can now separate the true cost of running your household from allocations of what's left over, and see how operating expenses drive free cash flow.",
   },
 };

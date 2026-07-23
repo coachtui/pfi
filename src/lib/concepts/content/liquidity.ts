@@ -6,14 +6,48 @@ export const liquidity: FinancialConcept = {
   title: "Liquidity",
   classification: "household_adaptation" as const,
   shortDefinition: "How quickly your household's money can be used — cash you can spend now versus value that takes time to unlock.",
+  plainEnglishSummary:
+    "How many months of essential costs the household could cover using cash it can access right now.",
+  memorableDistinction: "Liquidity is access to cash now, not wealth on paper.",
   fullDefinition:
     "Liquidity describes how quickly an asset can be turned into spendable cash without a loss of value. Cash in a checking account is fully liquid — it can be used immediately. A home or a retirement account is far less liquid: turning either into spendable cash takes time, paperwork, or may come with a penalty or a sale price you don't control. A household's overall liquidity is about how much of its value sits in that readily usable form.",
   whyItMatters:
     "Liquidity determines whether a household can meet a near-term need — rent, an emergency repair, a medical bill — without selling something at a bad time or going into debt. A household can be wealthy on paper and still be caught short if that wealth isn't liquid.",
+  formula: "Liquid assets ÷ monthly essential costs = runway in months",
+  formulaRows: [
+    { label: "Liquid assets", staticValue: "$9,300" },
+    { label: "÷ Monthly essential costs", staticValue: "$3,100" },
+    { label: "Emergency runway", operator: "=", staticValue: "3.0 mo" },
+  ],
+  comparisonRows: [
+    {
+      label: "Cash and immediately available savings",
+      included: true,
+      explanation: "Already sitting in checking or savings, spendable the moment it's needed.",
+    },
+    {
+      label: "Money reachable within days without penalty",
+      included: true,
+      explanation: "A short delay to move the money doesn't make it illiquid — it still counts if no penalty or forced discount is required to reach it.",
+    },
+    {
+      label: "Home equity",
+      included: false,
+      explanation: "Real, owned value, but converting it to cash means selling the home or borrowing against it — not something done on short notice.",
+    },
+    {
+      label: "Retirement funds locked until later",
+      included: false,
+      explanation: "Usually carries an early-withdrawal penalty or tax cost, so it isn't available to cover a near-term need without a loss.",
+    },
+  ],
+  interpretation:
+    "A longer emergency runway means more resilience to a sudden shock — a job loss, a medical bill, an unplanned repair — not that the household is wealthier overall. A household can carry a large net worth and still be cash-strapped if most of that value sits in a home or a retirement account rather than in liquid form; net worth and liquidity measure different things and can move in opposite directions. Runway is also not a target to maximize on its own — a household holding an unusually large cash balance isn't automatically managing better than one with a shorter runway and more of its value invested for the future. Read liquidity alongside net worth and short-term obligations, not as a verdict by itself.",
   businessContext:
     "Companies fail from running out of liquid cash far more often than from having too few assets on paper. Analysts specifically track a company's current ratio and quick ratio — measures of liquid assets against near-term obligations — separately from its total asset value, because the two tell very different stories.",
   commonMisunderstanding:
     "Wealthy is not the same as liquid. A household rich in home equity can still miss a rent payment if none of that value is available as cash. A household's total balance can even rise while its liquidity weakens, if more and more of that balance is committed to near-term obligations rather than sitting available.",
+  whereUsed: ["Fundamentals Score (Liquidity & Resilience dimension)", "Available Capital", "Financial-flexibility assessment"],
   relatedConceptIds: ["assets", "short-term-obligations", "available-capital"],
   prerequisiteConceptIds: ["assets"],
   dataMetricKey: "metric:liquid_runway_months",
@@ -69,7 +103,7 @@ export const liquidity: FinancialConcept = {
           "Moving investment gains into a savings account converts less-liquid value into cash, increasing liquidity. Buying a car with cash or prepaying a year of insurance does the opposite — it converts liquid cash into a less liquid asset or a committed obligation.",
       },
     ],
-    reinforcementPreview:
-      "Liquidity is measured by the Emergency runway metric inside your Fundamentals Score's Liquidity & Resilience dimension, and connects to short-term obligations and available capital — both defined in the glossary wherever they appear in PFI.",
+    completionSummary:
+      "You can now tell liquidity — cash reachable right now — apart from overall wealth that may be locked up, and read your household's emergency runway.",
   },
 };

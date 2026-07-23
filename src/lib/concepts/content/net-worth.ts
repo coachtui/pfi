@@ -6,15 +6,53 @@ export const netWorth: FinancialConcept = {
   title: "Net worth",
   classification: "household_adaptation" as const,
   shortDefinition: "What your household owns minus what it owes — also called household equity.",
+  plainEnglishSummary:
+    "What the household owns minus what it owes, measured at a point in time.",
+  memorableDistinction: "Net worth is a level, not a paycheck.",
   fullDefinition:
     "Net worth is what your household owns (assets) minus what it owes (liabilities). It is also called household equity — the same concept as shareholder equity in a business, just applied to a household instead of a company. Net worth is a snapshot at a point in time, not a flow: it captures where things stand today, the way assets and liabilities do, rather than what moved during a period.",
   whyItMatters:
     "Net worth is the single number that combines everything a household owns and owes into one measure of financial position. It's the household equivalent of shareholder equity — the number investors watch to see whether a company's ownership stake is growing or shrinking over time.",
   formula: "Assets − liabilities",
+  formulaRows: [
+    { label: "Total assets", staticValue: "$260,000" },
+    { label: "Total liabilities", operator: "-", staticValue: "$212,000" },
+    { label: "Net worth", operator: "=", staticValue: "$48,000" },
+  ],
+  comparisonRows: [
+    {
+      label: "Assets minus liabilities",
+      included: true,
+      explanation: "The base calculation itself — everything owned less everything owed, at a point in time.",
+    },
+    {
+      label: "Equity built by paying down debt",
+      included: true,
+      explanation: "Owner-created: reducing a liability raises net worth even though what's owned hasn't changed.",
+    },
+    {
+      label: "A gain from rising home or market value",
+      included: true,
+      explanation: "Market appreciation: assets rise on their own, not through household action, but it still raises the same number.",
+    },
+    {
+      label: "This month's income",
+      included: false,
+      explanation: "A flow over a period, not a balance-sheet snapshot — income isn't captured directly in net worth.",
+    },
+    {
+      label: "Money in checking right now",
+      included: false,
+      explanation: "Only one slice of total assets, not the full owned-minus-owed calculation.",
+    },
+  ],
+  interpretation:
+    "Net worth is a stock measured at a moment, not a flow, and it can rise for three distinct reasons that are worth telling apart. Paying down debt reduces liabilities, which raises net worth even though it doesn't change what the household owns — that's owner-created, built through behavior. Depositing into savings, an investment account, or a retirement account raises assets directly, which also raises net worth — also owner-created. But a home's value or an investment balance can rise simply because the market moved on its own, with no action from the household at all — that's market appreciation, not something the household did. All three show up as the same single number going up, so a rising net worth is healthy but doesn't by itself say how it got there — only the first two reflect real household behavior.",
   businessContext:
     "Net worth takes the same form as shareholder equity on a company's balance sheet: assets minus liabilities equals equity. When people talk about a company or household “building equity,” they mean growing this exact number — increasing what's owned relative to what's owed.",
   commonMisunderstanding:
     "Net worth is not cash and not income. It can grow while cash on hand is tight — for example, when a mortgage payment reduces a liability, that paydown moves value onto the equity side even though it also reduces the checking balance. And net worth can shrink even during a high-income period if liabilities grow faster than assets. Net worth measures position, not cash flow.",
+  whereUsed: ["Household balance sheet (Report)", "Baseline and Waterline framing", "Long-run progress view"],
   relatedConceptIds: ["assets", "liabilities", "free-cash-flow"],
   prerequisiteConceptIds: ["assets", "liabilities"],
   dataMetricKey: "snapshot:netWorth",
@@ -63,7 +101,7 @@ export const netWorth: FinancialConcept = {
           "Paying down a mortgage or loan reduces the checking balance but also reduces liabilities by the same amount, which increases net worth — cash moved into equity rather than disappearing.",
       },
     ],
-    reinforcementPreview:
-      "Net worth appears throughout PFI: the report's statement, your dashboard's indexed performance chart and personal baseline, and drivers on “What moved your line” whenever owner-created change or market movement affects your household's position.",
+    completionSummary:
+      "You can now read net worth as owned-minus-owed at a point in time, and separate the equity your household built from the effect of market movement.",
   },
 };
