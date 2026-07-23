@@ -582,6 +582,41 @@ git commit -m "feat(ai): narrator branch for divergence with mislabel + directio
 - Consumes: `NarrationSource` (fields `companyName`, `snapshots`, `score`), `buildIndexSeries`, `indexDayChange`, `computeDivergence`, `type MomentumState` from `@/lib/financial-engine`; `DIVERGENCE_SURFACE`, `type DivergenceInput` from `./schemas`.
 - Produces: `function buildDivergenceInput(source: NarrationSource): DivergenceInput | null`
 
+- [ ] **Step 0: Fix a pre-existing typecheck regression introduced by Task 3**
+
+Task 3 added `divergenceInputSchema` to the `narrationInputSchema` discriminated union.
+`src/lib/ai/input.ts`'s `WindowDrivers` interface types `driverInputs` as
+`NarrationInput["drivers"]` — an indexed-access type over the WHOLE union, which
+requires every union member to have a `.drivers` property. `DivergenceInput` has no
+`.drivers` field, so `pnpm typecheck` now fails at this line with "Property 'drivers'
+does not exist on type ... ". `windowDrivers`/`WindowDrivers` are only ever consumed by
+`buildBriefInput` and `buildDriverExplanationsInput` (never anything divergence-related),
+and `BriefInput["drivers"]` and `DriverExplanationsInput["drivers"]` are both
+`z.array(narrationDriverSchema)` (identical element type, only the min/max bounds
+differ) — so narrowing to either is safe. Before touching anything else in this task,
+change:
+
+```ts
+interface WindowDrivers {
+  periodDays: number;
+  driverInputs: NarrationInput["drivers"];
+}
+```
+
+to:
+
+```ts
+interface WindowDrivers {
+  periodDays: number;
+  driverInputs: BriefInput["drivers"];
+}
+```
+
+(`BriefInput` is already imported in this file.) Run `pnpm typecheck` — this specific
+error should be gone (errors in `narrator.ts`/`prompts.ts` about the missing
+`score_index_divergence` handling are Tasks 4–5's responsibility, not this task's — they
+are expected to still be present until those tasks land; do not fix them here).
+
 - [ ] **Step 1: Write the failing test**
 
 Append to `src/lib/ai/input.test.ts`. `DailySnapshot`'s exact fields are
