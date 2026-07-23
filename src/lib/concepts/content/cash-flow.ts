@@ -52,7 +52,7 @@ export const cashFlow: FinancialConcept = {
         "Look at everything that came into the household over a period and everything that went out. The difference is the net cash flow for that period — positive if more came in than went out, negative if the reverse.",
     },
     genericExample:
-      "Sample figures: over a typical month, the Rivera household takes in $6,200 and pays out $4,750 in operating expenses. Their net cash flow for that month is positive — more came in than went out.",
+      "Sample figures: over a typical month, the Rivera household takes in $6,200 and pays out $5,400 — $4,750 in operating expenses plus a $650 debt payment. Their net cash flow for that month is $800 — more came in than went out.",
     personalApplication: {
       metricKey: "metric:recurring_surplus",
       interpretationRules:
