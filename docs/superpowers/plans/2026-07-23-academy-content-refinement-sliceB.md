@@ -45,7 +45,7 @@ Notes for the implementer:
 Add to `src/lib/data/concept-live.test.ts` (extend the existing `snap`/`SNAPSHOTS` helpers; add typed builders for score-shaped transactions/accounts):
 
 ```ts
-import { computeMetricLive, computeSnapshotLive } from "./concept-live";
+import { computeMetricLive } from "./concept-live";
 import type { ScoreTransactionInput, ScoreAccountInput } from "@/lib/financial-engine";
 
 // liquid_runway_months → "N.N mo"; recurring_surplus → "$N"; debt_service_ratio → "NN%".
@@ -71,7 +71,7 @@ describe("computeMetricLive", () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `pnpm test src/lib/data/concept-live.test.ts`
-Expected: FAIL — `computeMetricLive` / `computeSnapshotLive` not exported.
+Expected: FAIL — `computeMetricLive` not exported.
 
 - [ ] **Step 3: Implement `computeMetricLive`**
 
@@ -134,7 +134,7 @@ export function computeMetricLive(
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `pnpm test src/lib/data/concept-live.test.ts`
-Expected: PASS (the three `computeMetricLive` cases; `computeSnapshotLive` import still unresolved is fine only if Task 2 lands together — if running this task alone, temporarily skip the `computeSnapshotLive` import line, then restore in Task 2). Prefer implementing Task 2 before running the full file.
+Expected: PASS (all three `computeMetricLive` cases, plus the pre-existing `computeReportLive` cases still passing unchanged).
 
 - [ ] **Step 5: Commit**
 
@@ -160,6 +160,8 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 Notes: only `snapshot:netWorth` is supported this slice. Current value = the last snapshot dated `<= current period end`'s `netWorth`; prior = last snapshot `<= prior period end`. `formatDollars` is already imported at the top of the file.
 
 - [ ] **Step 1: Write the failing tests**
+
+Update this test file's existing top import line to add `computeSnapshotLive` alongside `computeMetricLive` and `computeReportLive` (from `./concept-live`), then add:
 
 ```ts
 const snapNet = (date: string, netWorth: number): DailySnapshot =>
@@ -259,9 +261,9 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Write the failing test for the pure dispatcher**
 
-```ts
-import { computeConceptLive } from "./concept-live";
+Add `computeConceptLive` to this test file's existing top import line (from `./concept-live`), reusing the `snapNet` helper already defined earlier in the file (Task 2), then add:
 
+```ts
 describe("computeConceptLive (dispatch)", () => {
   it("routes each namespace to its resolver and returns null for unknown", () => {
     const snaps = [snapNet("2026-04-30", 100000), snapNet("2026-05-31", 108000), snapNet("2026-06-30", 112000)];
