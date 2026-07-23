@@ -4,6 +4,8 @@ import { generateNarration } from "./narrator";
 import {
   BRIEF_SURFACE,
   briefInputSchema,
+  DIVERGENCE_SURFACE,
+  divergenceInputSchema,
   DRIVER_EXPLANATIONS_SURFACE,
   driverExplanationsInputSchema,
   type DriverExplanationsInput,
@@ -142,5 +144,41 @@ describe("generateNarration (driver_explanations)", () => {
       ],
     });
     expect(await generateNarration(driverInput, { model })).toBeNull();
+  });
+});
+
+const divergenceInput = divergenceInputSchema.parse({
+  surface: DIVERGENCE_SURFACE,
+  companyName: "Test Co",
+  direction: "index_down_score_up",
+  scoreMomentum: "improving",
+});
+
+describe("generateNarration — divergence", () => {
+  it("returns the body when the narration is direction-consistent", async () => {
+    const out = await generateNarration(divergenceInput, {
+      model: mockModelReturning({
+        body: "Its share-price proxy slipped this week, yet the underlying fundamentals kept improving over the quarter.",
+      }),
+    });
+    expect(out?.body).toContain("fundamentals");
+  });
+
+  it("fails closed (null) when the body inverts the score direction", async () => {
+    const out = await generateNarration(divergenceInput, {
+      model: mockModelReturning({
+        body: "Its share-price proxy rose while the fundamentals weakened further over the 90-day window here.",
+      }),
+    });
+    expect(out).toBeNull();
+  });
+
+  it("fails closed (null) when the body mislabels the score", async () => {
+    const out = await generateNarration(divergenceInput, {
+      model: mockModelReturning({
+        body: "Its credit score fell even though the fundamentals kept improving over the 90-day window here today.",
+      }),
+    });
+    expect(out).toBeNull();
   });
 });

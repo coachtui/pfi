@@ -6,16 +6,22 @@ import { SYSTEM_PROMPTS, buildUserPrompt } from "./prompts";
 import {
   briefOutputSchema,
   driverExplanationsOutputSchema,
+  divergenceOutputSchema,
   referencesOnlyKnownDrivers,
   bodyOnlyReferencesKnownAmounts,
   bodyDoesNotMislabelScore,
   explanationsCoverExactlyKnownDrivers,
   explanationAmountsAreKnown,
   explanationsDoNotMislabelScore,
+  bodyIsDirectionConsistent,
+  textDoesNotMislabelScore,
+  DIVERGENCE_SURFACE,
   type BriefInput,
   type BriefOutput,
   type DriverExplanationsInput,
   type DriverExplanationsOutput,
+  type DivergenceInput,
+  type DivergenceOutput,
   type NarrationInput,
 } from "./schemas";
 
@@ -40,9 +46,13 @@ export async function generateNarration(
   opts?: NarratorOptions,
 ): Promise<DriverExplanationsOutput | null>;
 export async function generateNarration(
+  input: DivergenceInput,
+  opts?: NarratorOptions,
+): Promise<DivergenceOutput | null>;
+export async function generateNarration(
   input: NarrationInput,
   opts: NarratorOptions = {},
-): Promise<BriefOutput | DriverExplanationsOutput | null> {
+): Promise<BriefOutput | DriverExplanationsOutput | DivergenceOutput | null> {
   const model =
     opts.model ?? (env.AI_GATEWAY_API_KEY ? env.PFI_AI_MODEL : undefined);
   if (!model) return null;
@@ -52,6 +62,13 @@ export async function generateNarration(
     if (!referencesOnlyKnownDrivers(input, output)) return null;
     if (!bodyOnlyReferencesKnownAmounts(input, output)) return null;
     if (!bodyDoesNotMislabelScore(output)) return null;
+    return output;
+  }
+  if (input.surface === DIVERGENCE_SURFACE) {
+    const output = await generate(model, input, divergenceOutputSchema, opts);
+    if (!output) return null;
+    if (!textDoesNotMislabelScore(output.body)) return null;
+    if (!bodyIsDirectionConsistent(input, output)) return null;
     return output;
   }
   const output = await generate(model, input, driverExplanationsOutputSchema, opts);
