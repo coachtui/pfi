@@ -6,17 +6,55 @@ export const savingsRate: FinancialConcept = {
   title: "Savings rate",
   classification: "household_adaptation" as const,
   shortDefinition: "The share of your revenue you kept as cash this period.",
+  plainEnglishSummary:
+    "The share of revenue a household keeps as cash rather than spends — retained cash divided by revenue.",
+  memorableDistinction: "Savings rate is a share of what came in, not a dollar amount.",
   fullDefinition:
     "Savings rate is the portion of your household's revenue that stayed as cash during the period, rather than being spent on operating expenses or directed elsewhere. It measures cash retention specifically — it does not include money sent to investments or used to pay down debt, even though those are also productive uses of free cash flow.",
   whyItMatters:
     "Savings rate shows how much of what a household earns actually accumulates as cash on hand, which matters for short-term flexibility and emergency readiness. It's a narrower and more specific number than people often assume, so understanding exactly what it does and doesn't count avoids drawing the wrong conclusion from it.",
-  formula: "Retained cash ÷ revenue",
+  formula: "Retained cash ÷ revenue = savings rate",
+  formulaRows: [
+    { label: "Retained cash", staticValue: "$620" },
+    { label: "÷ Revenue", staticValue: "$6,200" },
+    { label: "Savings rate", operator: "=", staticValue: "10%" },
+  ],
+  comparisonRows: [
+    {
+      label: "Cash kept as a percentage of revenue",
+      included: true,
+      explanation: "A percentage of revenue is exactly what savings rate measures — a rate, not a raw amount.",
+    },
+    {
+      label: "PFI's retained-cash ÷ revenue measure",
+      included: true,
+      explanation: "This is the precise calculation behind PFI's savings rate: retained cash divided by revenue.",
+    },
+    {
+      label: "The looser (income − spending) ÷ income rule",
+      included: false,
+      explanation: "That everyday shorthand is PFI's free cash flow margin — a related but separate metric.",
+    },
+    {
+      label: "A flat dollar amount saved",
+      included: false,
+      explanation: "A dollar figure has no revenue in it, so it can't be a rate — savings rate always needs revenue as the denominator.",
+    },
+  ],
+  interpretation:
+    "A higher savings rate means more of each revenue dollar stayed as cash, but it only means something read alongside revenue and essential costs — a household carrying high essential costs isn't failing by showing a lower rate. Because savings rate counts only cash retained, a lower reading can just as easily reflect free cash flow being directed to investments or debt paydown rather than held as cash. It isn't a verdict either way: an unusually high rate isn't evidence of admirable discipline, and a low one isn't a shortfall.",
   householdAdaptation:
     "People often use “savings rate” loosely to mean (income − spending) ÷ income. In PFI, that broader idea is a different metric — Free cash flow margin. PFI's savings rate is the canonical, narrower definition: retained cash ÷ revenue. It counts only the share of revenue that stayed as cash; money allocated to investments or debt paydown is tracked separately and doesn't count toward it.",
   businessContext:
     "Savings rate is analogous to a company's decision about how much of its free cash flow to hold as cash versus deploy elsewhere — toward buybacks, debt reduction, or reinvestment. A company retaining cash isn't automatically doing better than one deploying it; the same is true for a household.",
   commonMisunderstanding:
     "A low savings rate is not automatically a problem. A household can have a strong free cash flow margin — earning comfortably more than it spends — while deliberately directing most of that free cash flow into investments or extra debt payments instead of a cash account. That household would show a low savings rate despite being in a strong position.",
+  whereUsed: [
+    "Household statement (Report)",
+    "Management commentary",
+    "Fundamentals Score (Cash Flow dimension)",
+    "“What moved your line”",
+  ],
   relatedConceptIds: ["free-cash-flow", "retained-cash", "capital-allocation"],
   prerequisiteConceptIds: ["free-cash-flow"],
   dataMetricKey: "report:savingsRatePct",
@@ -65,7 +103,7 @@ export const savingsRate: FinancialConcept = {
         explanation: "Savings rate = retained cash ÷ revenue = $400 ÷ $4,000 = 10%.",
       },
     ],
-    reinforcementPreview:
-      "Savings rate appears in your report's statement, alongside the related Free cash flow margin metric inside your Fundamentals Score's Cash Flow dimension, and in drivers on your dashboard's “What moved your line.”",
+    completionSummary:
+      "You can now read savings rate as a share of revenue — PFI's retained-cash ÷ revenue — and tell it apart from the looser, everyday (income − spending) ÷ income definition many people mean by the phrase.",
   },
 };
