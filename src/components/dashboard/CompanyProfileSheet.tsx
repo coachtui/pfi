@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -32,6 +32,7 @@ export function CompanyProfileSheet({
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<CompanyProfileValues>({
     resolver: zodResolver(companyProfileSchema),
@@ -42,6 +43,18 @@ export function CompanyProfileSheet({
       logoPath: initial.logoPath,
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      reset({
+        companyName: initial.companyName,
+        ticker: initial.ticker.replace(/^\$/, ""),
+        username: initial.username,
+        logoPath: initial.logoPath,
+      });
+    }
+  }, [open, initial, reset]);
+
   const selected = watch("logoPath");
 
   const submit = (values: CompanyProfileValues) => {
