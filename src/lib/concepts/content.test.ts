@@ -113,6 +113,7 @@ describe("authored content", () => {
       { id: "retained-cash", formula: true },
       { id: "financial-flexibility", formula: true },
       { id: "short-term-obligations", formula: false },
+      { id: "capital-allocation", formula: false },
     ])("$id carries the definition-sheet fields", ({ id, formula }) => {
       const c = ALL_CONCEPTS.find((x) => x.id === id);
       expect(c?.plainEnglishSummary, id).toBeTruthy();
