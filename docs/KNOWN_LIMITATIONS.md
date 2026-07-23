@@ -104,6 +104,10 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **`OnboardingForm.tsx` imports `next/dist/client/components/redirect-error`,** a private Next.js internal path (`isRedirectError` has no public export in this Next version). Build-fails-loud on a Next upgrade that moves/removes it, rather than failing silently.
 - **Lockfile engines want `node>=22`; repo has no `engines` field and pins `@types/node@^20`.** No enforced Node version; works today but is a latent mismatch.
 
+## Company profile edit (2026-07-22)
+
+- **`updateCompanyProfile` writes `user_profiles.username` and `personal_companies` in two sequential, non-transactional Supabase calls** (`src/app/actions/company-profile.ts`). If the username update succeeds but the company-row update then fails, the action reports only the second error — the caller has no way to know the username already changed while name/ticker/emblem did not. Consistent with the same non-atomic-write tradeoff already accepted elsewhere in this codebase (e.g. `completeOnboarding`'s sequential profile+company insert); not fixed here, found during Task 3's review (2026-07-22).
+
 ## Technical (2026-07-15)
 
 - **Chart texture is jagged-er but still subtler than the mockup art** even after the widened demo spending variance (2026-07-15): the mockups are illustrative; further tuning is bounded by the demo tests' solvency/arc constraints.
