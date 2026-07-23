@@ -153,10 +153,56 @@ describe("computeSnapshotLive", () => {
 });
 
 describe("computeConceptLive (dispatch)", () => {
-  it("routes each namespace to its resolver and returns null for unknown", () => {
+  it("routes report:revenue to computeReportLive and returns its real current/prior values", () => {
+    // Same SNAPSHOTS + income() transactions the computeReportLive describe
+    // block proves directly above — reused here so a match confirms the
+    // dispatcher's `report` branch genuinely calls computeReportLive, not
+    // just that it doesn't crash.
+    const data = {
+      snapshots: SNAPSHOTS,
+      // computeReportLive only reads postedDate/amount/direction/category/
+      // isTransfer, all of which income() sets — minimal cast per the
+      // file-level comment above.
+      transactions: [income("2026-05-15", 5800), income("2026-06-15", 6200)] as unknown as ScoreTransactionInput[],
+      accounts: [] as ScoreAccountInput[],
+      events: [],
+    };
+    const live = computeConceptLive("report:revenue", data);
+    expect(live).not.toBeNull();
+    expect(live!.display).toMatch(/6,?200/);
+    expect(live!.priorDisplay).toMatch(/5,?800/);
+  });
+
+  it("routes metric:recurring_surplus to computeMetricLive and returns its real current/prior/delta values", () => {
+    // Same metricFixture()/METRIC_ACCOUNTS the computeMetricLive describe
+    // block proves directly above — reused so a match confirms the
+    // dispatcher's `metric` branch genuinely calls computeMetricLive with
+    // real data, not just that an invalid id returns null.
+    const { snapshots, txns } = metricFixture();
+    const data = { snapshots, transactions: txns, accounts: METRIC_ACCOUNTS, events: [] };
+    const live = computeConceptLive("metric:recurring_surplus", data);
+    expect(live).not.toBeNull();
+    expect(live!.display).toBe("$3,300");
+    expect(live!.priorDisplay).toBe("$3,450");
+    expect(live!.deltaDisplay).toBe("−$150 vs May 2026");
+  });
+
+  it("routes snapshot:netWorth to computeSnapshotLive and returns its real current/prior values", () => {
     const snaps = [snapNet("2026-04-30", 100000), snapNet("2026-05-31", 108000), snapNet("2026-06-30", 112000)];
     const data = { snapshots: snaps, transactions: [] as ScoreTransactionInput[], accounts: [] as ScoreAccountInput[], events: [] };
-    expect(computeConceptLive("snapshot:netWorth", data)).not.toBeNull();          // → computeSnapshotLive
+    const live = computeConceptLive("snapshot:netWorth", data);
+    expect(live).not.toBeNull();
+    expect(live!.display).toMatch(/112,?000/);
+    expect(live!.priorDisplay).toMatch(/108,?000/);
+  });
+
+  it("returns null for an unknown metric id and for an unsupported namespace", () => {
+    // Negative controls: distinct code paths inside the dispatcher both land
+    // on null (one via computeMetricLive rejecting an unknown id, the other
+    // via the dispatcher's own catch-all) — kept alongside, not instead of,
+    // the positive per-namespace checks above.
+    const snaps = [snapNet("2026-04-30", 100000), snapNet("2026-05-31", 108000), snapNet("2026-06-30", 112000)];
+    const data = { snapshots: snaps, transactions: [] as ScoreTransactionInput[], accounts: [] as ScoreAccountInput[], events: [] };
     expect(computeConceptLive("metric:not_a_metric", data)).toBeNull();            // → computeMetricLive (unknown id)
     expect(computeConceptLive("position:availablePosition", data)).toBeNull();     // unsupported namespace
   });
