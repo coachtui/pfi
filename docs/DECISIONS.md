@@ -426,3 +426,15 @@ unchanged for all other lessons) and set to "What is a divergence?" here.
 **Reasoning:** Extending the resolver was bounded, reused an already-established pattern (`fetchScoreSources`, already used by the score engine), and kept the resolver value-neutral (emits only current/prior/signed-delta, never a "good/bad" judgment) so it doesn't violate the "never higher-is-always-good" rule even for metrics where lower is healthier (debt-pressure, and separately operating-expenses' `report:` binding).
 
 **Consequences:** `assets` and `liabilities` still show only the sample household (by design — they're whole-balance-sheet concepts with no single metric binding, not a gap); a future Slice C (13 remaining definition sheets) is unaffected by this decision.
+
+## 42. 2026-07-23 — Academy content-refinement Slice C: 4 glossary definition sheets migrated, content-only
+
+**Context.** Slices A/B migrated all 11 lessons and the Available Capital reference sheet to the refined Academy content schema. Four glossary-only concepts remained on the pre-refinement shape: short-term-obligations, financial-flexibility, retained-cash, capital-allocation (all Module 3, "Financial Pressure and Flexibility").
+
+**Decision.** Migrate the four to the Available Capital definition-sheet reference, **content-only** — no resolver, schema, component, or registry changes. Author only the fields the definition sheet actually renders (`plainEnglishSummary`, `whereUsed`, and `formulaRows`+`formula` where a genuine equation exists); skip `memorableDistinction`/`comparisonRows`/`interpretation`, which are lesson-only and do not render on a glossary sheet. Keep `fullDefinition` in the data (the view model stops rendering it once `plainEnglishSummary` is present, but `content.test.ts` requires it).
+
+**Formula rows** were added only where a real engine equation exists: retained-cash (`Free cash flow − investment contributions − debt reduction = retained cash`, matching `report.ts`'s allocation narration) and financial-flexibility (`Available capital − financial waterline = cushion`, matching `position.ts`). short-term-obligations (a raw component of Available Capital) and capital-allocation (a decision, no arithmetic) get none.
+
+**Live "Your data" block:** only retained-cash renders one, via `report:savings`, which the Slice A resolver already handles. short-term-obligations (`snapshot:nearTermObligations` — the snapshot resolver handles `netWorth` only), financial-flexibility (`position:cushion` — unresolved), and available-capital (`position:availablePosition` — unresolved) stay purely definitional, matching the reference sheet. Extending the resolver to those namespaces is deferred to a possible later resolver-completion slice (see KNOWN_LIMITATIONS).
+
+**Consequence.** Every tappable term in PFI now reads as a plain-English definition sheet with a "Where it appears" list. The Academy content-refinement track is complete; remaining Phase 4.5 work is Slice 4 (personalization + analytics).

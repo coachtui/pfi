@@ -125,3 +125,7 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **No `engines` field in package.json** while Supabase packages declare `node>=22` (local Node 24 fine) (2026-07-15).
 - **Academy concept `relatedConceptIds` links are partly one-directional** (e.g. net-worth→free-cash-flow, financial-flexibility→liquidity have no reverse link). Deliberately deferred from Slice 1's final review: decide curated directionality when Slice 2 renders related-concept lists (2026-07-20).
 - **`validateRegistry` doesn't reject duplicate module ids, a concept in two modules, or self-referencing related/prerequisite ids.** Cheap additions when the Academy curriculum grows beyond the 15-concept MVP (2026-07-20).
+
+## Academy content-refinement (2026-07-23)
+
+- **Three migrated definition sheets carry a `dataMetricKey` the `concept-live` resolver doesn't resolve, so they render no live "Your data" block (2026-07-23, Slice C).** short-term-obligations (`snapshot:nearTermObligations` — the snapshot resolver handles `netWorth` only), financial-flexibility (`position:cushion`), and available-capital (`position:availablePosition`) carry a metric binding but display definition-only, unlike retained-cash (`report:savings`, resolved). This matches the reference sheet's behavior and was an explicit content-only scoping decision for Slice C (DECISIONS #42). A later "resolver-completion" slice could add `snapshot:*`/`position:*` support so these sheets render live household figures too; until then the binding is inert on the sheet.
