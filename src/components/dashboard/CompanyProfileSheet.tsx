@@ -53,7 +53,7 @@ export function CompanyProfileSheet({
         logoPath: initial.logoPath,
       });
     }
-  }, [open, initial, reset]);
+  }, [open, initial.companyName, initial.ticker, initial.username, initial.logoPath, reset]);
 
   const selected = watch("logoPath");
 
