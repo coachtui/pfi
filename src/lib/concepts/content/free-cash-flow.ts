@@ -66,6 +66,6 @@ export const freeCashFlow: FinancialConcept = {
       },
     ],
     reinforcementPreview:
-      "Free cash flow appears throughout PFI: the report's statement and management commentary, the Free cash flow margin metric inside your PFI Score's Cash Flow dimension, and drivers on your dashboard's “What moved your line.”",
+      "Free cash flow appears throughout PFI: the report's statement and management commentary, the Free cash flow margin metric inside your Fundamentals Score's Cash Flow dimension, and drivers on your dashboard's “What moved your line.”",
   },
 };

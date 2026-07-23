@@ -66,6 +66,6 @@ export const savingsRate: FinancialConcept = {
       },
     ],
     reinforcementPreview:
-      "Savings rate appears in your report's statement, alongside the related Free cash flow margin metric inside your PFI Score's Cash Flow dimension, and in drivers on your dashboard's “What moved your line.”",
+      "Savings rate appears in your report's statement, alongside the related Free cash flow margin metric inside your Fundamentals Score's Cash Flow dimension, and in drivers on your dashboard's “What moved your line.”",
   },
 };

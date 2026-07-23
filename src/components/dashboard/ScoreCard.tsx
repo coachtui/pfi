@@ -15,12 +15,12 @@ const MOMENTUM_GLYPH: Record<MomentumState, string> = {
 
 const chipCls = "rounded-full border border-border-subtle px-2 py-0.5 text-xs text-secondary";
 
-/** Dashboard entry point into the PFI score. Not a credit score. */
+/** Dashboard entry point into the Fundamentals Score. Not a credit score. */
 export function ScoreCard({ summary }: { summary: ScoreSummary }) {
   const label =
     summary.state === "suppressed"
-      ? `PFI Score: add data to unlock, momentum ${momentumLabel(summary.momentum)}. View details`
-      : `PFI Score: ${summary.overall} out of 900, ${summary.band}${
+      ? `Fundamentals Score: add data to unlock, momentum ${momentumLabel(summary.momentum)}. View details`
+      : `Fundamentals Score: ${summary.overall} out of 900, ${summary.band}${
           summary.state === "provisional" ? ", provisional" : ""
         }, momentum ${momentumLabel(summary.momentum)}. View details`;
 
@@ -28,7 +28,7 @@ export function ScoreCard({ summary }: { summary: ScoreSummary }) {
     <Link href="/score" aria-label={label} className="block rounded-card">
       <Card className="flex items-center justify-between gap-3 p-4 transition-colors hover:border-border-strong">
         <div>
-          <p className="text-xs font-medium text-secondary">PFI Score</p>
+          <p className="text-xs font-medium text-secondary">Fundamentals Score</p>
           {summary.state === "suppressed" ? (
             <p className="mt-1 text-sm font-medium text-primary">Add data to unlock</p>
           ) : (

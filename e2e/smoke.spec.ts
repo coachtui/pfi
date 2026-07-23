@@ -44,8 +44,8 @@ test("onboarding completes with sample data and lands on the dashboard", async (
   // "Smoke Test Co" also appears in the performance-brief paragraph text, so
   // scope to the company-name heading specifically.
   await expect(page.getByRole("heading", { name: "Smoke Test Co" })).toBeVisible();
-  await expect(page.getByText("Personal Index")).toBeVisible();
-  await expect(page.getByText("PFI Score")).toBeVisible();
+  await expect(page.getByText("PFI", { exact: true })).toBeVisible();
+  await expect(page.getByText("Fundamentals Score")).toBeVisible();
   // Keyless run: the deterministic brief must render (AI fallback path).
   await expect(page.getByRole("heading", { name: "Performance brief" })).toBeVisible();
   await expect(page.getByText("Calculated", { exact: true })).toBeVisible();

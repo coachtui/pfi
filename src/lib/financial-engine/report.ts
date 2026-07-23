@@ -213,7 +213,7 @@ export function buildManagementCommentary(statement: PeriodStatement, companyNam
   return [
     `During ${s.period.label}, ${companyName} recorded ${formatDollars(s.revenue)} of revenue against ${formatDollars(s.operatingExpenses)} of operating expenses, and ${fcfVerb} ${formatSignedDollars(s.freeCashFlow)} of free cash flow.`,
     `That free cash flow was allocated across ${formatDollars(s.savings)} of retained cash, ${formatDollars(s.investments)} of investment contributions, and ${formatSignedDollars(s.debtReduction)} of debt reduction — ${equityVerb}, with no market appreciation recorded this period.`,
-    `The personal index ${indexPhrase} over the period, ending at ${s.indexEnd.toFixed(1)}.`,
+    `The Personal Finance Index ${indexPhrase} over the period, ending at ${s.indexEnd.toFixed(1)}.`,
     `The household retained ${s.savingsRatePct.toFixed(1)}% of revenue as cash this period.`,
   ];
 }

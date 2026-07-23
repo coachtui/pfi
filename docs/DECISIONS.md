@@ -328,3 +328,41 @@ on the unwritable flag) and to `liquidity`'s confidence classification
 (`confidence.ts`'s `CATEGORY_DRIVEN` set, since `liquid_runway_months` now reads
 category-derived essential spend too). Approved by the product owner after the
 whole-branch review surfaced the inconsistency.
+
+## 38. 2026-07-22 — Two dashboard numbers renamed for clarity: "PFI" (the index) and "Fundamentals Score"
+
+**Decision:** Rename the two headline numbers so they read as different *kinds* of
+thing. The indexed performance chart, formerly labeled **"Personal Index,"** becomes
+**"PFI"** (the Personal Finance Index — a price/level that starts near 100, no ceiling,
+moves daily like a share price under the `$TICKER`). The 0–900 health score, formerly
+labeled **"PFI Score,"** becomes **"Fundamentals Score."** User-facing only: the card
+labels, the `/score` page heading (decoupled from `branding.productName`), the AI
+narration prompt and the AIPerformanceBrief line, five Academy glossary references, the
+`available-capital` glossary refs, and the report aria/statement strings. The internal
+`PFI_SCORE_VERSION` constant, `score-types.ts`/`scoring.ts`, and the AI "never a credit
+score" guard + its test keep the internal "PFI Score" concept name — renaming them is
+churn with no user benefit and touches the score-versioning machinery.
+
+**Alternatives:** merge into one number (rejected — the index-vs-score distinction is
+the "household as a public company" thesis: a company has both a share price *and*
+fundamental health, and they can diverge); rename the chart to "PFI Score" and the
+0–900 to "Fundamentals Score" (the user's first proposal, rejected — it leaves *both*
+numbers ending in "Score," reintroducing the sound-alike collision, and mislabels an
+unbounded index as a bounded score); keep "Personal Index" for the chart (rejected — it
+is an abbreviation of the product name "Personal Finance Index," which is exactly why it
+read as a twin of "PFI Score"). Chose "PFI" over the full "Personal Finance Index" for
+the chart card because the `$TICKER` above it already supplies the stock framing and the
+full name is long at 390px; the ⓘ tooltip expands the acronym on first tap.
+
+**Consequences:** the two cards now read unmistakably differently — an index (PFI, e.g.
+139.3) vs a bounded rating (Fundamentals Score, e.g. 695/900). The card→`/score` link is
+consistent (both say "Fundamentals Score"). Blast radius was broad-but-shallow: 13 `src`
+files plus 4 Playwright e2e assertions (`smoke`/`academy` specs, which are not run by
+`pnpm test` and so were caught only during visual QA). The divergence-explanation
+problem — when the index drops on a one-day cash dip while the 90-day Fundamentals Score
+keeps improving — is *not* solved by this rename; it remains for the AI narration +
+deterministic drivers to make legible, and is noted as follow-up. Separately, this slice
+added `.claude/**`, `test-results/**`, and `playwright-report/**` to the eslint
+`globalIgnores` (`eslint.config.mjs`): the bare `eslint` `lint` script traversed the
+in-tree `.claude/` plugin directory and reported ~2,900 errors from third-party plugin
+sources, which had been silently failing `pnpm check`'s lint step.
