@@ -29,6 +29,12 @@ describe("resolveEmblem", () => {
     expect(resolveEmblem("upload:whatever")).toEqual({ kind: "default" });
     expect(resolveEmblem("garbage")).toEqual({ kind: "default" });
   });
+  it("falls back to default for prototype-chain key 'constructor'", () => {
+    expect(resolveEmblem("preset:constructor")).toEqual({ kind: "default" });
+  });
+  it("falls back to default for prototype-chain key '__proto__'", () => {
+    expect(resolveEmblem("preset:__proto__")).toEqual({ kind: "default" });
+  });
 });
 
 describe("isKnownPresetId", () => {

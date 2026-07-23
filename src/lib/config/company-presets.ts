@@ -41,8 +41,11 @@ export type Emblem = { kind: "preset"; preset: CompanyPreset } | { kind: "defaul
  */
 export function resolveEmblem(logoPath: string | null): Emblem {
   if (logoPath && logoPath.startsWith("preset:")) {
-    const preset = PRESET_BY_ID[logoPath.slice("preset:".length)];
-    if (preset) return { kind: "preset", preset };
+    const id = logoPath.slice("preset:".length);
+    if (isKnownPresetId(id)) {
+      const preset = PRESET_BY_ID[id];
+      return { kind: "preset", preset };
+    }
   }
   return { kind: "default" };
 }
