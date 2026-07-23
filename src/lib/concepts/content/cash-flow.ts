@@ -35,7 +35,7 @@ export const cashFlow: FinancialConcept = {
     "Personal Index (PFI) on the dashboard",
     "Management commentary",
     "“What moved your line”",
-    "Typical monthly free cash flow",
+    "Fundamentals Score breakdown (Cash Flow dimension, context only)",
   ],
   relatedConceptIds: ["revenue", "operating-expenses", "free-cash-flow"],
   prerequisiteConceptIds: ["revenue", "operating-expenses"],

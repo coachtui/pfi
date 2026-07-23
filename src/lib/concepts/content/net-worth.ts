@@ -20,11 +20,31 @@ export const netWorth: FinancialConcept = {
     { label: "Net worth", operator: "=", staticValue: "$48,000" },
   ],
   comparisonRows: [
-    { label: "Assets minus liabilities", included: true },
-    { label: "Equity built by paying down debt", included: true },
-    { label: "A gain from rising home or market value", included: true },
-    { label: "This month's income", included: false },
-    { label: "Money in checking right now", included: false },
+    {
+      label: "Assets minus liabilities",
+      included: true,
+      explanation: "The base calculation itself — everything owned less everything owed, at a point in time.",
+    },
+    {
+      label: "Equity built by paying down debt",
+      included: true,
+      explanation: "Owner-created: reducing a liability raises net worth even though what's owned hasn't changed.",
+    },
+    {
+      label: "A gain from rising home or market value",
+      included: true,
+      explanation: "Market appreciation: assets rise on their own, not through household action, but it still raises the same number.",
+    },
+    {
+      label: "This month's income",
+      included: false,
+      explanation: "A flow over a period, not a balance-sheet snapshot — income isn't captured directly in net worth.",
+    },
+    {
+      label: "Money in checking right now",
+      included: false,
+      explanation: "Only one slice of total assets, not the full owned-minus-owed calculation.",
+    },
   ],
   interpretation:
     "Net worth is a stock measured at a moment, not a flow, and it can rise for three distinct reasons that are worth telling apart. Paying down debt reduces liabilities, which raises net worth even though it doesn't change what the household owns — that's owner-created, built through behavior. Depositing into savings, an investment account, or a retirement account raises assets directly, which also raises net worth — also owner-created. But a home's value or an investment balance can rise simply because the market moved on its own, with no action from the household at all — that's market appreciation, not something the household did. All three show up as the same single number going up, so a rising net worth is healthy but doesn't by itself say how it got there — only the first two reflect real household behavior.",
