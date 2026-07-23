@@ -42,6 +42,7 @@ test("glossary-only row opens the definition sheet, not a lesson", async () => {
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("link", { name: /lesson/i })).toHaveCount(0); // no CTA on glossary terms
   await expect(dialog.getByText("Why it matters")).toBeVisible(); // un-gated for glossary concepts too
+  await expect(dialog.getByText("Where it appears")).toBeVisible(); // Slice C: migrated glossary sheet lists its surfaces
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 });

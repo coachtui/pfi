@@ -6,6 +6,8 @@ export const shortTermObligations: FinancialConcept = {
   title: "Short-term obligations",
   classification: "standard_finance" as const,
   shortDefinition: "Payments your household is committed to before your next expected income.",
+  plainEnglishSummary:
+    "The payments your household is already committed to before its next expected income arrives — rent, a loan payment, a card minimum. Only the slice due now, not the full balance owed.",
   fullDefinition:
     "Short-term obligations are the payments a household is already committed to make before its next expected income arrives — rent or a mortgage installment, a loan payment, a credit-card minimum, or any other bill already due. They are distinct from total liabilities: a liability is the full balance owed, while a short-term obligation is only the slice of it that's due right now.",
   whyItMatters:
@@ -14,6 +16,7 @@ export const shortTermObligations: FinancialConcept = {
     "This is the same idea as “current liabilities” on a company's balance sheet — the portion of what a business owes that comes due within the next operating period, tracked separately from longer-term debt because it demands cash sooner.",
   commonMisunderstanding:
     "Money sitting in an account is not automatically available. If a chunk of that balance is already committed to a bill or payment due before the next paycheck, it isn't really free to spend or save elsewhere, even though the account balance looks unchanged until the payment goes out.",
+  whereUsed: ["Home dashboard (Obligations card)", "Available capital"],
   relatedConceptIds: ["liquidity", "available-capital", "debt-pressure"],
   prerequisiteConceptIds: [],
   dataMetricKey: "snapshot:nearTermObligations",
