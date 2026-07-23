@@ -48,7 +48,7 @@ test("glossary-only row opens the definition sheet, not a lesson", async () => {
 
 test("demo data loads so term surfaces render", async () => {
   await page.goto("/");
-  await page.getByRole("button", { name: /^Load / }).first().click();
+  await page.locator("form button").first().click();
   await expect(page.getByText("PFI", { exact: true })).toBeVisible({ timeout: 30_000 });
 });
 
