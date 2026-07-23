@@ -24,11 +24,12 @@ export function CompanyHeader({ companyName, ticker, username, logoPath, level }
       <button
         type="button"
         onClick={() => setEditing(true)}
-        aria-label="Edit company profile — verified data coverage"
+        aria-label="Edit company profile"
+        aria-describedby="company-identity-summary"
         className="flex items-center gap-3 rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-border-strong"
       >
         <CompanyEmblem logoPath={logoPath} />
-        <span className="block">
+        <span id="company-identity-summary" className="block">
           <span className="flex items-center gap-1.5 text-lg leading-tight font-semibold text-primary">
             {companyName}
             <Pencil size={13} aria-hidden className="text-tertiary" />
@@ -37,6 +38,7 @@ export function CompanyHeader({ companyName, ticker, username, logoPath, level }
           <span className="flex items-center gap-1 text-xs text-secondary">
             {username}
             <BadgeCheck size={13} aria-hidden className="text-positive" />
+            <span className="sr-only">Verified data coverage</span>
           </span>
         </span>
       </button>
