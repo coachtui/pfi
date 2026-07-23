@@ -33,10 +33,14 @@ function metricFixture(): { snapshots: DailySnapshot[]; txns: ScoreTransactionIn
   const snapshots: DailySnapshot[] = [];
   const base = { accountId: "chk", category: null as string | null, essential: null as boolean | null, isTransfer: false, transferPairId: null as string | null, description: "" };
   const months = ["2026-04", "2026-05", "2026-06", "2026-07"];
+  // Groceries vary by month (April 750 / May 700 / June 900 / July 900) so the
+  // resolved delta between any two adjacent periods is genuinely non-zero and
+  // sign-meaningful, instead of every month netting to an identical $3,500.
+  const GROCERIES_BY_MONTH = [750, 700, 900, 900];
   months.forEach((m, i) => {
     txns.push({ ...base, id: `pay${i}`, postedDate: `${m}-01`, amount: 6000, direction: "inflow", category: "income", description: "Employer payroll" });
     txns.push({ ...base, id: `rent${i}`, postedDate: `${m}-02`, amount: 1800, direction: "outflow", category: "housing", essential: true });
-    txns.push({ ...base, id: `gro${i}`, postedDate: `${m}-10`, amount: 700, direction: "outflow", category: "groceries", essential: true });
+    txns.push({ ...base, id: `gro${i}`, postedDate: `${m}-10`, amount: GROCERIES_BY_MONTH[i], direction: "outflow", category: "groceries", essential: true });
   });
   for (let d = 0; d < 106; d++) {
     const date = new Date(Date.UTC(2026, 3, 1 + d)).toISOString().slice(0, 10);
@@ -85,18 +89,29 @@ describe("computeMetricLive", () => {
     expect(computeMetricLive("metric:liquid_runway_months", [], [], [])).toBeNull();
   });
 
-  it("resolves current and prior monthly figures for metric:recurring_surplus", () => {
+  it("resolves current and prior monthly figures for metric:recurring_surplus, with a genuine sign-verified delta", () => {
     const { snapshots, txns } = metricFixture();
     const live = computeMetricLive("metric:recurring_surplus", snapshots, txns, METRIC_ACCOUNTS);
     expect(live).not.toBeNull();
-    // recurring_surplus = $6,000 payroll − $1,800 rent − $700 groceries = $3,500,
-    // identical for both June (current) and May (prior) in this fixture, so
-    // the delta is a flat $0 vs May — still a real "+" (delta >= 0) result.
+    // recurring_surplus is the median of three 30-day-bucket (income − spending)
+    // nets within a trailing 90-day window ending at each period's boundary —
+    // NOT a naive per-calendar-month subtraction. Because payroll posts on the
+    // 1st while rent/groceries post on the 2nd/10th, a payroll transaction can
+    // land a whole bucket away from its own month's other transactions (e.g.
+    // May's payroll falls in the *older* bucket alongside April's rent and
+    // groceries once June is the "current" period). So June's/May's real
+    // figures below were confirmed against actual computeMetricLive output,
+    // not hand-derived from the raw $6,000/$1,800/groceries amounts — see
+    // GROCERIES_BY_MONTH above for the perturbation that drives them.
     expect(live!.periodLabel).toBe("June 2026");
-    expect(live!.display).toBe("$3,500");
+    expect(live!.display).toBe("$3,300");
     expect(live!.priorLabel).toBe("May 2026");
-    expect(live!.priorDisplay).toBe("$3,500");
-    expect(live!.deltaDisplay).toContain("vs May 2026");
-    expect(live!.deltaDisplay).toMatch(/^\+/);
+    expect(live!.priorDisplay).toBe("$3,450");
+    // June's surplus is genuinely lower than May's here, so the delta must
+    // take the "−" (negative) branch — the one a reversed-operand
+    // (prior − current) bug would flip to a wrong "+" without failing the
+    // old flat-$0 fixture. Uses the code's actual minus glyph (U+2212 "−",
+    // not ASCII "-").
+    expect(live!.deltaDisplay).toBe("−$150 vs May 2026");
   });
 });
