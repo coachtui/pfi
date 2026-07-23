@@ -60,9 +60,20 @@ describe("authored content", () => {
     ]);
   });
 
-  it("has exactly 15 concepts, 10 with lessons", () => {
-    expect(ALL_CONCEPTS).toHaveLength(15);
-    expect(ALL_CONCEPTS.filter((c) => c.lesson)).toHaveLength(10);
+  it("has Module 4 with its concept in teaching order", () => {
+    const m4 = MODULES.find((m) => m.id === "understanding-your-score");
+    expect(m4?.conceptIds).toEqual(["score-index-divergence"]);
+  });
+
+  it("gives every Module 4 concept a full lesson", () => {
+    for (const id of ["score-index-divergence"]) {
+      expect(ALL_CONCEPTS.find((c) => c.id === id)?.lesson, id).toBeDefined();
+    }
+  });
+
+  it("has exactly 16 concepts, 11 with lessons", () => {
+    expect(ALL_CONCEPTS).toHaveLength(16);
+    expect(ALL_CONCEPTS.filter((c) => c.lesson)).toHaveLength(11);
   });
 
   it("keeps glossary-only records lesson-free but tappable", () => {
@@ -76,7 +87,9 @@ describe("authored content", () => {
 
   it("classifies every concept, matching the spec's assignment table", () => {
     const byId = (id: string) => ALL_CONCEPTS.find((c) => c.id === id);
-    expect(byId("available-capital")?.classification).toBe("pfi_metric");
+    for (const id of ["available-capital", "score-index-divergence"]) {
+      expect(byId(id)?.classification, id).toBe("pfi_metric");
+    }
     for (const id of ["savings-rate", "net-worth", "debt-pressure", "financial-flexibility", "retained-cash", "liquidity"]) {
       expect(byId(id)?.classification, id).toBe("household_adaptation");
     }

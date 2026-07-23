@@ -22,7 +22,7 @@ export function LessonSections({
   const legacyFormula = lesson.calculation?.formula ?? concept.formula;
 
   const sections: { title: string; body: ReactNode }[] = [
-    { title: `What is ${concept.title.toLowerCase()}?`, body: <p>{lesson.opening}</p> },
+    { title: lesson.openingHeading ?? `What is ${concept.title.toLowerCase()}?`, body: <p>{lesson.opening}</p> },
     { title: "The standard term", body: <p>{lesson.standardTerm}</p> },
     {
       title: "Why it matters",

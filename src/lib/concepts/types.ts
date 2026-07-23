@@ -70,6 +70,8 @@ export interface PersonalApplication {
 /** The lesson template (spec §Lesson framework; named fields per decision #7). */
 export interface Lesson {
   opening: string;                    // 1. household scenario, then names the standard term
+  /** Overrides the auto-derived "What is <title>?" heading for the opening section. */
+  openingHeading?: string;
   standardTerm: string;               // 2.
   whyItMattersExtended?: string;      // extends concept.whyItMatters
   calculation?: { formula?: string; walkthrough: string }; // formula legacy — concept.formulaRows preferred

@@ -26,4 +26,10 @@ export const MODULES: Module[] = [
       "capital-allocation",
     ],
   },
+  {
+    id: "understanding-your-score",
+    title: "Understanding Your Score",
+    order: 4,
+    conceptIds: ["score-index-divergence"],
+  },
 ];

@@ -15,6 +15,7 @@ import { financialFlexibility } from "./financial-flexibility";
 import { retainedCash } from "./retained-cash";
 import { capitalAllocation } from "./capital-allocation";
 import { availableCapital } from "./available-capital";
+import { scoreIndexDivergence } from "./score-index-divergence";
 
 export const ALL_CONCEPTS: FinancialConcept[] = [
   revenue,
@@ -32,4 +33,5 @@ export const ALL_CONCEPTS: FinancialConcept[] = [
   retainedCash,
   capitalAllocation,
   availableCapital,
+  scoreIndexDivergence,
 ];
