@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { AGE_COHORTS, COL_CATEGORIES, HOUSEHOLD_TYPES, INCOME_BANDS, OBJECTIVES } from "@/lib/config/cohorts";
+import { companyNameField, tickerField, usernameField } from "@/lib/validation/company-profile";
 
 export const onboardingSchema = z.object({
-  companyName: z.string().trim().min(2).max(40),
-  ticker: z.string().trim().toUpperCase().regex(/^[A-Z]{2,5}$/, "2–5 letters"),
-  username: z.string().trim().regex(/^[a-zA-Z0-9_]{3,20}$/, "3–20 letters, numbers, underscores"),
+  companyName: companyNameField,
+  ticker: tickerField,
+  username: usernameField,
   ageCohort: z.enum(AGE_COHORTS),
   incomeBand: z.enum(INCOME_BANDS),
   householdType: z.enum(HOUSEHOLD_TYPES),
