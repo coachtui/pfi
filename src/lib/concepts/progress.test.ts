@@ -21,9 +21,9 @@ describe("conceptStatus", () => {
 });
 
 describe("lessonSequence", () => {
-  it("is the 10 lesson-bearing published concepts in module order", () => {
+  it("is the 11 lesson-bearing published concepts in module order", () => {
     const seq = lessonSequence(CONCEPT_REGISTRY);
-    expect(seq).toHaveLength(10);
+    expect(seq).toHaveLength(11);
     expect(seq[0]).toBe("revenue"); // module 1 starts the curriculum
     // glossary-only records never appear
     for (const id of ["short-term-obligations", "financial-flexibility", "retained-cash", "capital-allocation", "available-capital"]) {
@@ -37,14 +37,14 @@ describe("lessonSequence", () => {
 describe("academyTallies", () => {
   it("zero progress", () => {
     expect(academyTallies(CONCEPT_REGISTRY, [])).toEqual({
-      lessonsCompleted: 0, lessonsTotal: 10, modulesCompleted: 0, modulesTotal: 3, percentComplete: 0,
+      lessonsCompleted: 0, lessonsTotal: 11, modulesCompleted: 0, modulesTotal: 4, percentComplete: 0,
     });
   });
   it("partial progress; in-progress rows do not count as completed", () => {
     const t = academyTallies(CONCEPT_REGISTRY, [done("revenue"), row("cash-flow")]);
     expect(t.lessonsCompleted).toBe(1);
     expect(t.modulesCompleted).toBe(0);
-    expect(t.percentComplete).toBe(10);
+    expect(t.percentComplete).toBe(9);
   });
   it("a module completes when all its lesson-bearing concepts complete", () => {
     const module1 = ["revenue", "operating-expenses", "cash-flow", "free-cash-flow", "savings-rate"];
@@ -84,7 +84,8 @@ describe("adjacentLessons", () => {
     const seq = lessonSequence(CONCEPT_REGISTRY);
     expect(adjacentLessons(CONCEPT_REGISTRY, seq[0]!)).toEqual({ prev: null, next: seq[1] });
     expect(adjacentLessons(CONCEPT_REGISTRY, seq[5]!)).toEqual({ prev: seq[4], next: seq[6] });
-    expect(adjacentLessons(CONCEPT_REGISTRY, seq[9]!)).toEqual({ prev: seq[8], next: null });
+    expect(adjacentLessons(CONCEPT_REGISTRY, seq[9]!)).toEqual({ prev: seq[8], next: seq[10] });
+    expect(adjacentLessons(CONCEPT_REGISTRY, seq[10]!)).toEqual({ prev: seq[9], next: null });
     expect(adjacentLessons(CONCEPT_REGISTRY, "short-term-obligations")).toEqual({ prev: null, next: null });
   });
 });
