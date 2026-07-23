@@ -416,3 +416,13 @@ unchanged for all other lessons) and set to "What is a divergence?" here.
 **Reasoning:** Deliver editable identity + a non-default emblem immediately with zero storage and zero moderation surface. A company logo is part of the *fictional* public identity (name, ticker, emblem) that public surfaces are explicitly allowed to show, so it does not conflict with privacy-by-design; only raw financial data stays private.
 
 **Consequences:** `personal_companies.logo_path` is now read/written (was unused). Onboarding's name/ticker/username validation is now shared with the edit sheet via `src/lib/validation/company-profile.ts`. Custom upload, the public bucket, and moderation are recorded in KNOWN_LIMITATIONS for the rankings slice.
+
+## 41. 2026-07-23 — `concept-live` resolver extended to `metric:`/`snapshot:` namespaces in Academy content-refinement Slice B
+
+**Decision:** The `concept-live` resolver (`src/lib/data/concept-live.ts`) is extended in this slice to the `metric:` and `snapshot:` namespaces — previously only `report:` was live, per an earlier slice's spec decision #10, which explicitly anticipated this happening "in Slices B/C as their concepts migrate." Cash-flow (`metric:recurring_surplus`), liquidity (`metric:liquid_runway_months`), debt-pressure (`metric:debt_service_ratio`), and net-worth (`snapshot:netWorth`) now render live household figures on their lesson pages instead of only a sample household. `position:` remains unimplemented — no lesson in this slice needs it.
+
+**Alternatives considered:** Ship Slice B as content-authoring only, leaving those 4 lessons on the sample-household fallback until a dedicated future slice extends the resolver — rejected because the Academy's core promise is "learn the concept → apply it to *your* household," and leaving 4 of 9 lessons hollow on that promise for an indeterminate future slice was judged not worth the deferral.
+
+**Reasoning:** Extending the resolver was bounded, reused an already-established pattern (`fetchScoreSources`, already used by the score engine), and kept the resolver value-neutral (emits only current/prior/signed-delta, never a "good/bad" judgment) so it doesn't violate the "never higher-is-always-good" rule even for metrics where lower is healthier (debt-pressure, and separately operating-expenses' `report:` binding).
+
+**Consequences:** `assets` and `liabilities` still show only the sample household (by design — they're whole-balance-sheet concepts with no single metric binding, not a gap); a future Slice C (13 remaining definition sheets) is unaffected by this decision.
