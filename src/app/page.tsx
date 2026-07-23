@@ -75,7 +75,7 @@ export default async function HomePage() {
         <EmptyDashboard companyName={company.name} />
       ) : (
         <HomeDashboard
-          profile={{ companyName: company.name, ticker: company.ticker, username: profile.username, level: VIEWER_LEVEL }}
+          profile={{ companyName: company.name, ticker: company.ticker, username: profile.username, level: VIEWER_LEVEL, logoPath: company.logo_path }}
           snapshots={snapshots}
           events={events}
           scoreSummary={scoreSummary}
