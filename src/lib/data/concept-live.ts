@@ -5,12 +5,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildIndexSeries,
+  buildMetricInputs,
+  computeMetrics,
   computePeriodStatement,
   enumeratePeriods,
   formatDollars,
   latestCompletePeriod,
+  METRICS,
   type DailySnapshot,
   type FinancialEvent,
+  type ReportPeriod,
+  type ScoreAccountInput,
+  type ScoreTransactionInput,
   type TransactionInput,
 } from "@/lib/financial-engine";
 // `./queries` carries a top-level `import "server-only"`, which throws as
@@ -77,6 +83,58 @@ export function computeReportLive(
     display: fmt(value),
     priorLabel: prior?.label ?? null,
     priorDisplay: priorValue !== null ? fmt(priorValue) : null,
+    deltaDisplay,
+  };
+}
+
+/** Current + prior complete monthly period ends, or null when unavailable. */
+function currentAndPriorPeriods(snapshots: DailySnapshot[]): { current: ReportPeriod; prior: ReportPeriod | null } | null {
+  if (snapshots.length === 0) return null;
+  const periods = enumeratePeriods(snapshots, "monthly");
+  const current = latestCompletePeriod(periods);
+  if (!current) return null;
+  const idx = periods.findIndex((p) => p.key === current.key);
+  return { current, prior: idx > 0 ? periods[idx - 1]! : null };
+}
+
+const METRIC_IDS = ["recurring_surplus", "liquid_runway_months", "debt_service_ratio"] as const;
+
+export function computeMetricLive(
+  metricKey: string,
+  snapshots: DailySnapshot[],
+  transactions: ScoreTransactionInput[],
+  accounts: ScoreAccountInput[],
+): ConceptLiveData | null {
+  const [ns, id] = metricKey.split(":");
+  if (ns !== "metric" || !METRIC_IDS.includes(id as (typeof METRIC_IDS)[number])) return null;
+  const def = METRICS.find((m) => m.id === id);
+  if (!def) return null;
+
+  const bounds = currentAndPriorPeriods(snapshots);
+  if (!bounds) return null;
+
+  const resultAt = (asOf: string): { value: number; formatted: string } | null => {
+    const results = computeMetrics(buildMetricInputs(snapshots, transactions, accounts, asOf));
+    const r = results.find((m) => m.id === id);
+    if (!r || r.availability !== "available" || r.value === null || r.formatted === null) return null;
+    return { value: r.value, formatted: r.formatted };
+  };
+
+  const current = resultAt(bounds.current.end);
+  if (!current) return null;
+  const prior = bounds.prior ? resultAt(bounds.prior.end) : null;
+
+  let deltaDisplay: string | null = null;
+  if (prior && bounds.prior) {
+    const delta = current.value - prior.value;
+    deltaDisplay = `${delta >= 0 ? "+" : "−"}${def.format(Math.abs(delta))} vs ${bounds.prior.label}`;
+  }
+
+  return {
+    periodLabel: bounds.current.label,
+    display: current.formatted,
+    priorLabel: bounds.prior?.label ?? null,
+    priorDisplay: prior?.formatted ?? null,
     deltaDisplay,
   };
 }
