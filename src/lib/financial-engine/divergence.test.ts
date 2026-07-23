@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeDivergence } from "./divergence";
+import { computeDivergence, divergenceTemplate } from "./divergence";
 
 describe("computeDivergence", () => {
   it("flags index down + score improving", () => {
@@ -36,5 +36,27 @@ describe("computeDivergence", () => {
   it("returns null when the index delta is zero or unknown", () => {
     expect(computeDivergence(0, "improving")).toBeNull();
     expect(computeDivergence(null, "weakening")).toBeNull();
+  });
+});
+
+describe("divergenceTemplate", () => {
+  it("phrases index-down / score-up", () => {
+    const s = divergenceTemplate(
+      { direction: "index_down_score_up", scoreMomentum: "improving" },
+      "Koa Holdings",
+    );
+    expect(s).toBe(
+      "Koa Holdings's PFI dipped on recent cash movement, but its 90-day fundamentals kept improving — the two track different time horizons.",
+    );
+  });
+
+  it("phrases index-up / score-down", () => {
+    const s = divergenceTemplate(
+      { direction: "index_up_score_down", scoreMomentum: "weakening" },
+      "Koa Holdings",
+    );
+    expect(s).toBe(
+      "Koa Holdings's PFI rose on recent cash inflow, but its 90-day fundamentals softened — the two track different time horizons.",
+    );
   });
 });

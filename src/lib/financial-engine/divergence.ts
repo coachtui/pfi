@@ -40,3 +40,10 @@ export function computeDivergence(
     scoreMomentum,
   };
 }
+
+/** The guaranteed sentence: renders keyless and is the AI fallback. */
+export function divergenceTemplate(result: DivergenceResult, companyName: string): string {
+  return result.direction === "index_down_score_up"
+    ? `${companyName}'s PFI dipped on recent cash movement, but its 90-day fundamentals kept improving — the two track different time horizons.`
+    : `${companyName}'s PFI rose on recent cash inflow, but its 90-day fundamentals softened — the two track different time horizons.`;
+}
