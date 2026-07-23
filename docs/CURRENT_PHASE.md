@@ -193,10 +193,17 @@ DECISIONS #42.
   and capital-allocation have no formula. No `memorableDistinction`/
   `comparisonRows`/`interpretation` — those are lesson-only and don't render on a
   glossary sheet.
-- **Live "Your data" block:** only retained-cash renders one (`report:savings`,
-  already resolved). The other three stay definitional, matching the reference —
-  their `snapshot:`/`position:` bindings are unresolved by design this slice (see
-  KNOWN_LIMITATIONS). No `concept-live.ts` change.
+- **Live "Your data" block:** none of the four renders one. Live-browser
+  verification in this slice's own final task found the real cause is
+  structural, not resolver coverage: `TermDefinitionSheet.tsx` only shows the
+  live block when `progress === "completed"`, and `term-sheet.ts:51`
+  hard-codes `progress` to `"not-started"` for any concept with no `lesson`
+  field — every glossary-only concept, including retained-cash, whose
+  `report:savings` binding is in fact valid and resolvable, and including
+  Available Capital, Slice A's own glossary reference, which has never
+  rendered a live block either. Pre-existing behavior from Slice A/3, not a
+  regression from this slice (see KNOWN_LIMITATIONS). No `concept-live.ts`
+  change.
 - **Tests.** A new `content.test.ts` guardrail asserts all four carry
   `plainEnglishSummary` + `whereUsed` (+ `formulaRows`/`formula` for the two with
   equations); the existing `e2e/academy.spec.ts` glossary-sheet test now also
