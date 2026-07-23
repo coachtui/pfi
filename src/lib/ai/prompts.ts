@@ -32,14 +32,32 @@ export const DRIVER_EXPLANATIONS_SYSTEM_PROMPT = `You explain the individual fin
 7. Never call anything a credit score, credit rating, or FICO score.
 8. Tone: no shame-oriented language, no celebration of extreme austerity. This is educational analysis, not financial, tax, legal, or investment advice — do not claim otherwise.`;
 
+/**
+ * Reconciles the fast index (PFI) against the slow Fundamentals Score when they
+ * point in opposite directions. The phrase tests make wording changes deliberate.
+ */
+export const DIVERGENCE_SYSTEM_PROMPT = `You reconcile two numbers on a household's dashboard, in the voice of a neutral analyst covering a small company. Write ONE sentence. Rules, in priority order:
+
+1. The two numbers are the PFI (an index that behaves like a share price and reacts to recent cash movement) and the Fundamentals Score (a 0–900 measure of 90-day financial health). They track different time horizons — a short-term cash swing can move one without the other. Say so.
+2. The Fundamentals Score is NOT a credit score, credit rating, or FICO score, and must never be called one.
+3. You are given the direction of the divergence. State it exactly as given — do not invert which number went up and which went down.
+4. No advice of any kind, no numbers you were not given, no shame-oriented language. This is educational analysis, not financial advice.
+5. Plain language, third person, using the company name provided. One sentence, under 240 characters.`;
+
 export const SYSTEM_PROMPTS: Record<NarrationSurface, string> = {
   performance_brief: BRIEF_SYSTEM_PROMPT,
   driver_explanations: DRIVER_EXPLANATIONS_SYSTEM_PROMPT,
+  score_index_divergence: DIVERGENCE_SYSTEM_PROMPT,
 };
 
 export function buildUserPrompt(input: NarrationInput): string {
   if (input.surface === "driver_explanations") {
     return `Explain each of these drivers of the household's line over the last ${input.periodDays} days. Verified metrics:
+
+${JSON.stringify(input, null, 2)}`;
+  }
+  if (input.surface === "score_index_divergence") {
+    return `Reconcile these two dashboard numbers in one sentence. Verified facts:
 
 ${JSON.stringify(input, null, 2)}`;
   }
