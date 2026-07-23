@@ -3,7 +3,7 @@ import { z } from "zod";
 // Shared identity fields — the single source of truth for company name,
 // ticker, and username validation, consumed by both onboarding and the
 // profile edit sheet so the two can never drift.
-export const companyNameField = z.string().trim().min(2, "At least 2 characters").max(40, "At most 40 characters");
+export const companyNameField = z.string().trim().min(2).max(40);
 export const tickerField = z.string().trim().toUpperCase().regex(/^[A-Z]{2,5}$/, "2–5 letters");
 export const usernameField = z.string().trim().regex(/^[a-zA-Z0-9_]{3,20}$/, "3–20 letters, numbers, underscores");
 
