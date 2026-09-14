@@ -104,16 +104,16 @@
 **Files:**
 - Create: `src/lib/plaid/sync-plan.ts`, `src/lib/plaid/sync-plan.test.ts`
 
-- [ ] `buildSyncPlan({ pages, accountsGet, existingTxns, pfiAccounts, priorAnchors, item, today }): SyncPlan` composing Tasks 3–7: readiness mapping (`update_status` → `ItemStatus`, `historyComplete` flag), inserts (pending excluded, existing external ids dropped), updates (provider columns; unpair when amount/date/direction changed), deletes with audit records, anchors from `accountsGet` (`freshness='cached'`, `observed_at=today`, `source_updated_at`, `anchor_date` rule, `discrepancy` via `computeDiscrepancy` from `financial-engine/anchors.ts`, skip identical), pairing, item cursor.
-- [ ] Tests: idempotent re-run produces an empty plan; pending excluded; modified keeps user fields (plan contains no user-owned keys); amount change unpairs both; removed → delete + audit record fields; anchor derivation incl. investment account absent from sync `accounts`; readiness transitions incl. `history_complete_at` set once; cursor present only in `item`; `UNKNOWN` keeps prior status.
+- [x] `buildSyncPlan({ pages, accountsGet, existingTxns, pfiAccounts, priorAnchors, item, today }): SyncPlan` composing Tasks 3–7: readiness mapping (`update_status` → `ItemStatus`, `historyComplete` flag), inserts (pending excluded, existing external ids dropped), updates (provider columns; unpair when amount/date/direction changed), deletes with audit records, anchors from `accountsGet` (`freshness='cached'`, `observed_at=today`, `source_updated_at`, `anchor_date` rule, `discrepancy` via `computeDiscrepancy` from `financial-engine/anchors.ts`, skip identical), pairing, item cursor.
+- [x] Tests: idempotent re-run produces an empty plan; pending excluded; modified keeps user fields (plan contains no user-owned keys); amount change unpairs both; removed → delete + audit record fields; anchor derivation incl. investment account absent from sync `accounts`; readiness transitions incl. `history_complete_at` set once; cursor present only in `item`; `UNKNOWN` keeps prior status.
 
 ### Task 9: `client.ts` + `sync.ts` (server-only)
 
 **Files:**
 - Create: `src/lib/plaid/client.ts`, `src/lib/plaid/sync.ts`
 
-- [ ] `client.ts`: `getPlaidClient()` from `plaidConfig()`; a `call(name, fn)` wrapper that returns `{ data, requestId }` and, on error, throws a `PlaidCallError` carrying only `error_type`, `error_code`, `request_id`. `import "server-only"`.
-- [ ] `sync.ts`: `syncPlaidItem(supabase, itemId, { force })`: ownership read → throttle (`last_sync_attempt_at`: 10 min, 1 min while `initializing`/`history_loading`) → set `last_sync_attempt_at` → admin client decrypt → insert batch (`extracting`) → `/accounts/get` → page `/transactions/sync` with `options.personal_finance_category_version: 'v2'` (one restart on mutation-during-pagination) → load existing rows/anchors (paginated) → `buildSyncPlan` → `rpc('commit_connected_sync')` → on RPC error mark batch `failed` with reason and rethrow as `MutationResult.error` → `finishWithRebuild` → set `rebuild_completed_at` on success. Plaid error mapping per §5 (login_required / error / rate limit) writes Item status and batch failure with `request_id` in `sync_metadata`.
+- [x] `client.ts`: `getPlaidClient()` from `plaidConfig()`; a `call(name, fn)` wrapper that returns `{ data, requestId }` and, on error, throws a `PlaidCallError` carrying only `error_type`, `error_code`, `request_id`. `import "server-only"`.
+- [x] `sync.ts`: `syncPlaidItem(supabase, itemId, { force })`: ownership read → throttle (`last_sync_attempt_at`: 10 min, 1 min while `initializing`/`history_loading`) → set `last_sync_attempt_at` → admin client decrypt → insert batch (`extracting`) → `/accounts/get` → page `/transactions/sync` with `options.personal_finance_category_version: 'v2'` (one restart on mutation-during-pagination) → load existing rows/anchors (paginated) → `buildSyncPlan` → `rpc('commit_connected_sync')` → on RPC error mark batch `failed` with reason and rethrow as `MutationResult.error` → `finishWithRebuild` → set `rebuild_completed_at` on success. Plaid error mapping per §5 (login_required / error / rate limit) writes Item status and batch failure with `request_id` in `sync_metadata`.
 
 ### Task 10: Server actions `src/app/actions/plaid.ts`
 
@@ -121,22 +121,22 @@
 - Create: `src/app/actions/plaid.ts`
 - Modify: `src/lib/validation/transactions.ts` (or new `src/lib/validation/plaid.ts`) for Zod inputs
 
-- [ ] `createLinkToken()` and `createUpdateLinkToken(itemId)` (update mode with decrypted `access_token`).
-- [ ] `exchangePublicToken({ publicToken, institutionId, institutionName })`: exchange → duplicate-institution guard (`/accounts/get`, match `(type, mask)` against an existing non-disconnected Item at the same `institution_id`; on match `/item/remove` the new Item and return the "already connected — use Reconnect" error) → insert Item (`initializing`) → encrypt + insert secret (admin) → roster create → `syncPlaidItem(force)` → return summary.
-- [ ] `syncItem(itemId, force?)`, `syncAll()`.
-- [ ] `disconnectItem(itemId)`: `/item/remove` first; success → `disconnected`, delete secret, archive accounts (`roster_status='unshared'`); failure → `disconnect_pending`, keep secret, return retryable error. `deleteItemData(itemId)`: `/item/remove` (if not already disconnected) then `rpc('delete_connected_item_data')` then `finishWithRebuild`.
-- [ ] Every action: `auth.getUser()` → Zod → RLS-scoped Item read → work → `MutationResult`. No Plaid identifiers in error strings beyond `error_code`.
+- [x] `createLinkToken()` and `createUpdateLinkToken(itemId)` (update mode with decrypted `access_token`).
+- [x] `exchangePublicToken({ publicToken, institutionId, institutionName })`: exchange → duplicate-institution guard (`/accounts/get`, match `(type, mask)` against an existing non-disconnected Item at the same `institution_id`; on match `/item/remove` the new Item and return the "already connected — use Reconnect" error) → insert Item (`initializing`) → encrypt + insert secret (admin) → roster create → `syncPlaidItem(force)` → return summary.
+- [x] `syncItem(itemId, force?)`, `syncAll()`.
+- [x] `disconnectItem(itemId)`: `/item/remove` first; success → `disconnected`, delete secret, archive accounts (`roster_status='unshared'`); failure → `disconnect_pending`, keep secret, return retryable error. `deleteItemData(itemId)`: `/item/remove` (if not already disconnected) then `rpc('delete_connected_item_data')` then `finishWithRebuild`.
+- [x] Every action: `auth.getUser()` → Zod → RLS-scoped Item read → work → `MutationResult`. No Plaid identifiers in error strings beyond `error_code`.
 
 ### Task 11: Queries, mappers, dashboard-load sync + rebuild claim
 
 **Files:**
 - Modify: `src/lib/data/queries.ts` (`getConnectedItems`, `getDashboardData` triggers, `getRecentImports` label), `src/lib/data/mappers.ts` (`AccountSummary.provider` union + `rosterStatus`, `ConnectedItemSummary`), `src/lib/data/mappers.test.ts`
-- Create: `src/lib/data/rebuild-claim.ts` (+ test of the conditional-update SQL shape via a live test in Task 14)
+- Create: `src/lib/data/rebuild-claim.ts`, `src/lib/data/dashboard-sync.ts` (dashboard-load sync + lease-guarded repair; called from `src/app/page.tsx` — a render, so it rebuilds without `revalidatePath`; `syncPlaidItem` gained `revalidate: false` for this path) (+ live test in Task 14)
 
-- [ ] `getConnectedItems(supabase)`: Items with status, `last_synced_at`, `history_complete_at`, error code, account count, and `stillBillable` (error/login_required older than 30 days).
-- [ ] `getDashboardData`: (a) if newest `last_synced_at` older than 12h → `syncAll` best-effort; (b) if any confirmed `connected_account` batch has `rebuild_completed_at` null → `claimRebuild(supabase)` (a `randomUUID()` claim token; conditional update sets `rebuild_claim_token` + `rebuild_claimed_at` only when null or older than 2 minutes); on claim → rebuild, set `rebuild_completed_at` on those batches, then token-scoped release in `finally` (`… where rebuild_claim_token = $token`, so an overrun worker never clears a newer lease); no claim → `staleIndex = true`. (c) `historicalDataComplete` boolean in the return.
-- [ ] `getRecentImports`: join `import_batches.source_type` so synced batches label "Synced."
-- [ ] `getFreshnessData`: include `freshness`/`observed_at` on the effective anchor for the confidence inputs (Task 12).
+- [x] `getConnectedItems(supabase)`: Items with status, `last_synced_at`, `history_complete_at`, error code, account count, and `stillBillable` (error/login_required older than 30 days).
+- [x] `getDashboardData`: (a) if newest `last_synced_at` older than 12h → `syncAll` best-effort; (b) if any confirmed `connected_account` batch has `rebuild_completed_at` null → `claimRebuild(supabase)` (a `randomUUID()` claim token; conditional update sets `rebuild_claim_token` + `rebuild_claimed_at` only when null or older than 2 minutes); on claim → rebuild, set `rebuild_completed_at` on those batches, then token-scoped release in `finally` (`… where rebuild_claim_token = $token`, so an overrun worker never clears a newer lease); no claim → `staleIndex = true`. (c) `historicalDataComplete` boolean in the return.
+- [x] `getRecentImports`: join `import_batches.source_type` so synced batches label "Synced."
+- [ ] `getFreshnessData`: include `freshness`/`observed_at` on the effective anchor for the confidence inputs — moved into Task 12 (`fetchScoreSources` is the confidence input path).
 
 ### Task 12: Confidence — source-reliability inputs
 

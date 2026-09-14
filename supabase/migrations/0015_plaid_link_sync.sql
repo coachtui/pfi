@@ -233,7 +233,8 @@ $$;
 --   "updates":  [ { "id": uuid, "posted_date", "authorized_date", "amount",
 --                   "direction", "description", "category", "category_confidence",
 --                   "pfc_primary", "pfc_detailed", "category_taxonomy_version",
---                   "unpair": bool, "pair_key": text|null } ],
+--                   "unpair": bool } ],
+--   "pair_existing": [ { "id": uuid, "pair_key": text } ],   -- existing rows joining a pair
 --   "inserts":  [ { "external_account_id", "posted_date", "authorized_date",
 --                   "amount", "direction", "description", "category",
 --                   "category_confidence", "pfc_primary", "pfc_detailed",
@@ -243,8 +244,8 @@ $$;
 --                   "observed_at", "source_updated_at", "freshness", "discrepancy" } ],
 --   "reconciliation_results": jsonb, "sync_metadata": jsonb
 -- }
--- pair_key: rows sharing a key (exactly two, across inserts and/or updates)
--- are linked as a transfer pair after inserts have ids.
+-- pair_key: rows sharing a key (exactly two, across inserts and/or
+-- pair_existing) are linked as a transfer pair after inserts have ids.
 -- ---------------------------------------------------------------------------
 create or replace function public.commit_connected_sync(p_batch_id uuid, p_plan jsonb)
 returns jsonb
@@ -308,6 +309,14 @@ begin
     where t.id = any(v_ids) and t.user_id = v_uid;
   if v_count <> coalesce(array_length(v_ids, 1), 0) then
     raise exception 'commit_connected_sync: ownership (unpair)';
+  end if;
+
+  select coalesce(array_agg((e->>'id')::uuid), '{}') into v_ids
+  from jsonb_array_elements(coalesce(p_plan->'pair_existing', '[]')) e;
+  select count(*) into v_count from transactions t
+    where t.id = any(v_ids) and t.user_id = v_uid;
+  if v_count <> coalesce(array_length(v_ids, 1), 0) then
+    raise exception 'commit_connected_sync: ownership (pair_existing)';
   end if;
 
   -- (b) Provider-write mode, transaction-local, scoped to this batch.
@@ -424,7 +433,7 @@ begin
   -- Existing rows that take part in a pair with a new row.
   insert into sync_pairs (pair_key, txn_id)
   select e->>'pair_key', (e->>'id')::uuid
-  from jsonb_array_elements(coalesce(p_plan->'updates', '[]')) e
+  from jsonb_array_elements(coalesce(p_plan->'pair_existing', '[]')) e
   where e->>'pair_key' is not null;
 
   -- (h) Pairing: exactly two rows per key, both owned by the caller.

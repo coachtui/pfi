@@ -138,7 +138,12 @@ export interface PlanInsert extends ProviderColumns {
 export interface PlanUpdate extends ProviderColumns {
   id: string;
   unpair: boolean;
-  pair_key: string | null;
+}
+
+/** An existing (unpaired) row joining a transfer pair with a new insert. */
+export interface PlanPairExisting {
+  id: string;
+  pair_key: string;
 }
 
 export interface PlanDelete {
@@ -181,6 +186,7 @@ export interface SyncPlan {
   deletes: PlanDelete[];
   unpair_ids: string[];
   updates: PlanUpdate[];
+  pair_existing: PlanPairExisting[];
   inserts: PlanInsert[];
   anchors: PlanAnchor[];
   reconciliation_results: {
