@@ -145,14 +145,24 @@ export interface AccountRow {
   display_name: string; mask: string | null; current_balance: number | null;
   credit_limit: number | null; interest_rate: number | null;
   include_in_calculations: boolean; archived_at: string | null;
+  // Plaid Slice 1 (migration 0015): optional so older callers/tests need not supply them.
+  plaid_item_id?: string | null; roster_status?: string | null;
+  connection_status?: string | null; last_synced_at?: string | null;
 }
 
+export type AccountProvider = "demo" | "manual" | "csv" | "plaid";
+
 export interface AccountSummary {
-  id: string; provider: "demo" | "manual" | "csv"; institution: string | null;
+  id: string; provider: AccountProvider; institution: string | null;
   type: AccountType; displayName: string; mask: string | null;
   currentBalance: number | null; creditLimit: number | null;
   interestRate: number | null; includeInCalculations: boolean;
   archivedAt: string | null;
+  /** Plaid accounts only (null otherwise). */
+  plaidItemId: string | null;
+  rosterStatus: "shared" | "unshared" | "closed" | null;
+  connectionStatus: string | null;
+  lastSyncedAt: string | null;
 }
 
 export function rowToAccountSummary(row: AccountRow): AccountSummary {
@@ -168,8 +178,14 @@ export function rowToAccountSummary(row: AccountRow): AccountSummary {
     interestRate: row.interest_rate === null ? null : Number(row.interest_rate),
     includeInCalculations: row.include_in_calculations,
     archivedAt: row.archived_at,
+    plaidItemId: row.plaid_item_id ?? null,
+    rosterStatus: (row.roster_status as AccountSummary["rosterStatus"]) ?? null,
+    connectionStatus: row.provider === "plaid" ? (row.connection_status ?? null) : null,
+    lastSyncedAt: row.provider === "plaid" ? (row.last_synced_at ?? null) : null,
   };
 }
+
+export type ImportSource = "csv" | "pdf" | "manual" | "connected_account";
 
 export interface RecentImport {
   batchId: string;
@@ -178,4 +194,19 @@ export interface RecentImport {
   firstDate: string;
   lastDate: string;
   importedAt: string;
+  /** From import_batches.source_type; null for pre-0013 batches with no batch row. */
+  source: ImportSource | null;
+}
+
+/** One linked Plaid Item as the Connected-institutions card shows it. */
+export interface ConnectedItemSummary {
+  id: string;
+  institutionName: string | null;
+  status: "initializing" | "history_loading" | "connected" | "login_required" | "error" | "disconnect_pending" | "disconnected";
+  errorCode: string | null;
+  lastSyncedAt: string | null;
+  historyCompleteAt: string | null;
+  accountCount: number;
+  /** In error/login_required for over 30 days: Plaid may still bill for this Item. */
+  stillBillable: boolean;
 }

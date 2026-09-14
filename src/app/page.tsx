@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCompany, getDashboardData, getFreshnessData, getProfile } from "@/lib/data/queries";
+import { getCompany, getConnectedItems, getDashboardData, getFreshnessData, getProfile } from "@/lib/data/queries";
+import { prepareDashboard } from "@/lib/data/dashboard-sync";
 import { getOrGenerateNarration } from "@/lib/data/narration";
 import { rebuildSnapshots } from "@/lib/data/rebuild-snapshots";
 import { VIEWER_LEVEL } from "@/lib/demo-data/cohorts";
@@ -22,15 +23,19 @@ export default async function HomePage() {
   const company = await getCompany(supabase);
   if (!company) redirect("/onboarding");
 
+  // Plaid Slice 1: sync stale connections and repair any pending post-sync
+  // rebuild under the per-user lease before reading (never throws).
+  const prep = await prepareDashboard(supabase, profile.id);
   let data = await getDashboardData(supabase);
-  if (data.staleIndex) {
+  if (data.staleIndex || prep.repairDeferred) {
     // Idempotent reconciliation: a prior rebuild failed or was skipped. Safe in
     // a GET — rebuildSnapshots never calls revalidatePath and always converges.
     await rebuildSnapshots(supabase);
     data = await getDashboardData(supabase);
   }
   const { snapshots, events, staleIndex, scoreSummary } = data;
-  const freshness = await getFreshnessData(supabase);
+  const [freshness, connected] = await Promise.all([getFreshnessData(supabase), getConnectedItems(supabase)]);
+  void connected; // historicalDataComplete is rendered by Task 13's HistoryLoadingNotice
 
   const narrationSource =
     snapshots.length > 0

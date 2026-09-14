@@ -19,6 +19,7 @@ import {
   rowToAccountSummary, type SnapshotRow, type EventRow, type TransactionRow,
   type TransactionListRow, type AccountRow, type AccountSummary, type TransactionListItem,
   type RecentImport,
+  type ConnectedItemSummary,
 } from "./mappers";
 import type { TransactionFilters } from "@/lib/validation/transactions";
 import { percentToDecimal } from "./unit-conversions";
@@ -61,7 +62,7 @@ export async function getCompany(supabase: SupabaseClient): Promise<CompanyRow |
 export async function getAccountsData(supabase: SupabaseClient): Promise<AccountSummary[]> {
   const { data, error } = await supabase
     .from("financial_accounts")
-    .select("id, provider, institution, type, display_name, mask, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at")
+    .select("id, provider, institution, type, display_name, mask, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at, plaid_item_id, roster_status, connection_status, last_synced_at")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data as AccountRow[]).map(rowToAccountSummary);
@@ -453,6 +454,7 @@ export async function getRecentImports(supabase: SupabaseClient): Promise<Recent
         firstDate: r.posted_date,
         lastDate: r.posted_date,
         importedAt: r.created_at,
+        source: null,
       });
     } else {
       g.rowCount++;
@@ -461,7 +463,51 @@ export async function getRecentImports(supabase: SupabaseClient): Promise<Recent
       if (r.created_at > g.importedAt) g.importedAt = r.created_at;
     }
   }
+  // Label each batch by its source (Synced / CSV / PDF). Batches predating
+  // migration 0013 have no import_batches row and stay unlabeled.
+  const batchIds = [...groups.keys()];
+  if (batchIds.length > 0) {
+    const { data: batchRows } = await supabase.from("import_batches").select("id, source_type").in("id", batchIds);
+    for (const b of (batchRows ?? []) as { id: string; source_type: string }[]) {
+      const g = groups.get(b.id);
+      if (g) g.source = b.source_type as RecentImport["source"];
+    }
+  }
   return [...groups.values()].sort((a, b) => (a.importedAt < b.importedAt ? 1 : -1));
+}
+
+const STILL_BILLABLE_AFTER_DAYS = 30;
+
+/** Linked Plaid Items for the Connected-institutions card, plus the household's history-completeness flag. */
+export async function getConnectedItems(supabase: SupabaseClient, now: Date = new Date()): Promise<{ items: ConnectedItemSummary[]; historicalDataComplete: boolean }> {
+  const [itemRes, acctRes] = await Promise.all([
+    supabase.from("plaid_items")
+      .select("id, institution_name, status, error_code, last_synced_at, history_complete_at, last_sync_attempt_at, created_at")
+      .order("created_at", { ascending: true }),
+    supabase.from("financial_accounts").select("plaid_item_id").not("plaid_item_id", "is", null).is("archived_at", null),
+  ]);
+  if (itemRes.error) throw itemRes.error;
+  if (acctRes.error) throw acctRes.error;
+  const counts = new Map<string, number>();
+  for (const a of (acctRes.data ?? []) as { plaid_item_id: string }[]) counts.set(a.plaid_item_id, (counts.get(a.plaid_item_id) ?? 0) + 1);
+  interface ItemRow {
+    id: string; institution_name: string | null; status: ConnectedItemSummary["status"]; error_code: string | null;
+    last_synced_at: string | null; history_complete_at: string | null; last_sync_attempt_at: string | null; created_at: string;
+  }
+  const items = ((itemRes.data ?? []) as ItemRow[]).map((r) => {
+    const broken = r.status === "error" || r.status === "login_required" || r.status === "disconnect_pending";
+    const since = r.last_synced_at ?? r.created_at;
+    const stillBillable = broken && now.getTime() - Date.parse(since) > STILL_BILLABLE_AFTER_DAYS * 86_400_000;
+    return {
+      id: r.id, institutionName: r.institution_name, status: r.status, errorCode: r.error_code,
+      lastSyncedAt: r.last_synced_at, historyCompleteAt: r.history_complete_at,
+      accountCount: counts.get(r.id) ?? 0, stillBillable,
+    };
+  });
+  const historicalDataComplete = items
+    .filter((i) => i.status !== "disconnected")
+    .every((i) => i.historyCompleteAt !== null);
+  return { items, historicalDataComplete };
 }
 
 export interface RecurringListItem extends RecurringSeries {
