@@ -202,7 +202,7 @@ export interface ScoreSourceRows {
 }
 
 export async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceRows> {
-  const [snapRows, txnRows, acctRes, eventRows] = await Promise.all([
+  const [snapRows, txnRows, acctRes, eventRows, anchorProvRows] = await Promise.all([
     paginateSelect<SnapshotRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
       // date alone is a unique order here only because RLS scopes rows to one
       // user (PK is (user_id, date)) — do not reuse with a service-role client.
@@ -216,16 +216,32 @@ export async function fetchScoreSources(supabase: SupabaseClient): Promise<Score
           .order("id", { ascending: true }) // unique tiebreaker for stable pages
           .range(from, to)),
     // financial_accounts stays unpaginated: bounded by household scale, nowhere near the row cap.
+    // Plaid Slice 1: connection facts + the Item's history flag feed source-reliability confidence.
     supabase
       .from("financial_accounts")
-      .select("id, type, institution, provider, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at"),
+      .select("id, type, institution, provider, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at, connection_status, last_synced_at, plaid_items(history_complete_at)"),
     paginateSelect<EventRow & { id: string }>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
       supabase.from("financial_events").select("*")
         .order("date", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to)),
+    // Effective-anchor provenance per account (freshness, observation time, sync discrepancy).
+    paginateSelect<{ account_id: string; anchor_date: string; balance: number; created_at: string; source: string; freshness: string; observed_at: string; discrepancy: number | null }>(
+      TRANSACTIONS_PAGE_SIZE, (from, to) =>
+        supabase.from("balance_anchors")
+          .select("account_id, anchor_date, balance, created_at, source, freshness, observed_at, discrepancy")
+          .order("id", { ascending: true })
+          .range(from, to)),
   ]);
   if (acctRes.error) throw acctRes.error;
+
+  const anchorsByAccount = new Map<string, Array<BalanceAnchor & { source: string; freshness: string; observedAt: string; discrepancy: number | null }>>();
+  for (const r of anchorProvRows) {
+    const list = anchorsByAccount.get(r.account_id) ?? [];
+    list.push({ accountId: r.account_id, anchorDate: r.anchor_date, balance: Number(r.balance), createdAt: r.created_at,
+      source: r.source, freshness: r.freshness, observedAt: r.observed_at, discrepancy: r.discrepancy === null ? null : Number(r.discrepancy) });
+    anchorsByAccount.set(r.account_id, list);
+  }
 
   return {
     snapshots: snapRows.map(rowToSnapshot),
@@ -244,26 +260,39 @@ export async function fetchScoreSources(supabase: SupabaseClient): Promise<Score
         transferPairId: effective.transferPairId, description: effective.description,
       };
     }),
-    accounts: (acctRes.data as Array<{
+    accounts: (acctRes.data as unknown as Array<{
       id: string; type: string; institution: string | null; provider: string;
       current_balance: number | string; credit_limit: number | string | null;
       interest_rate: number | string | null; include_in_calculations: boolean;
-      archived_at: string | null;
+      archived_at: string | null; connection_status: string | null; last_synced_at: string | null;
+      plaid_items: { history_complete_at: string | null } | null;
     }>)
       .filter((row) => row.archived_at === null)
-      .map((row) => ({
-        id: row.id,
-        type: row.type as ScoreAccountInput["type"],
-        institution: row.institution,
-        currentBalance: Number(row.current_balance),
-        creditLimit: row.credit_limit === null ? null : Number(row.credit_limit),
-        // Stored as a percent (per src/lib/validation/transactions.ts's accountSchema,
-        // e.g. 6.25 meaning 6.25%); the engine's interest-burden metric expects a
-        // decimal APR (0.0625), so convert at this data boundary only.
-        interestRate: percentToDecimal(row.interest_rate === null ? null : Number(row.interest_rate)),
-        includeInCalculations: row.include_in_calculations,
-        provider: row.provider,
-      })),
+      .map((row) => {
+        const eff = effectiveAnchor(anchorsByAccount.get(row.id) ?? []) as
+          | (BalanceAnchor & { source: string; freshness: string; observedAt: string; discrepancy: number | null })
+          | null;
+        const connected = row.provider === "plaid";
+        return {
+          id: row.id,
+          type: row.type as ScoreAccountInput["type"],
+          institution: row.institution,
+          currentBalance: Number(row.current_balance),
+          creditLimit: row.credit_limit === null ? null : Number(row.credit_limit),
+          // Stored as a percent (per src/lib/validation/transactions.ts's accountSchema,
+          // e.g. 6.25 meaning 6.25%); the engine's interest-burden metric expects a
+          // decimal APR (0.0625), so convert at this data boundary only.
+          interestRate: percentToDecimal(row.interest_rate === null ? null : Number(row.interest_rate)),
+          includeInCalculations: row.include_in_calculations,
+          provider: row.provider,
+          connectionStatus: connected ? row.connection_status : null,
+          lastSyncedAt: connected ? row.last_synced_at : null,
+          historyComplete: connected ? row.plaid_items?.history_complete_at !== null && row.plaid_items !== null : null,
+          balanceFreshness: (eff?.freshness as ScoreAccountInput["balanceFreshness"]) ?? null,
+          balanceObservedAt: eff?.observedAt ?? null,
+          latestSyncDiscrepancy: eff && eff.source === "sync" ? eff.discrepancy : null,
+        };
+      }),
     events: eventRows.map(rowToEvent),
   };
 }

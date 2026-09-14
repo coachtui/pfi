@@ -35,6 +35,35 @@ export interface ScoreAccountInput {
   interestRate: number | null;
   includeInCalculations: boolean;
   provider: string;
+  // ---- Source-reliability facts (Plaid Slice 1, DECISIONS #43). Optional:
+  // only connected (`plaid`) accounts carry them; PFI's own facts, never
+  // Plaid's category confidence.
+  /** `ok` | `login_required` | `error` | `disconnected` for connected accounts. */
+  connectionStatus?: string | null;
+  /** ISO timestamp of the last successful sync for connected accounts. */
+  lastSyncedAt?: string | null;
+  /** Whether the Item behind a connected account has finished loading history (null = not connected). */
+  historyComplete?: boolean | null;
+  /** Effective anchor provenance: `entered` (typed/statement), `cached` (sync), `realtime`. */
+  balanceFreshness?: "entered" | "cached" | "realtime" | null;
+  /** ISO timestamp PFI observed the effective anchor's balance. */
+  balanceObservedAt?: string | null;
+  /** Reconciliation discrepancy recorded on the effective anchor when it came from a sync (null otherwise). */
+  latestSyncDiscrepancy?: number | null;
+}
+
+/** Household-level source-reliability signals derived from ScoreAccountInput facts (docs/FINANCIAL_HEALTH_SCORE.md "Confidence"). */
+export interface SourceReliability {
+  /** Any included connected account whose Item has not finished loading history. */
+  historyIncomplete: boolean;
+  /** Share of included connected accounts that are stale (no successful sync within STALE_AFTER_DAYS of asOf) or not `ok`. 0 when none are connected. */
+  staleConnectedShare: number;
+  /** Any included connected account whose effective balance is a cached sync value observed before the as-of day. */
+  cachedBalanceStale: boolean;
+  /** Any included connected account whose latest sync anchor reconciled with a non-zero discrepancy. */
+  syncDiscrepancy: boolean;
+  /** Share of in-window, non-transfer outflows on included accounts categorized `other`. */
+  otherCategoryShare: number;
 }
 
 /** Effective (override-applied) transaction; caller applies overrides. */
@@ -97,6 +126,29 @@ export interface MetricInputs {
     unresolvedTransferShare: number;
     /** Share of included accounts whose provider is "manual" (vs demo/csv/live sync). */
     manualShare: number;
+  };
+  /** Optional so pre-Plaid fixtures stay valid; absent = every signal clean. */
+  sourceReliability?: SourceReliability;
+}
+
+/** Days a connected account may go without a successful sync before it counts as stale (mirrors staleness.ts). */
+export const CONNECTED_STALE_AFTER_DAYS = 35;
+
+export function computeSourceReliability(included: ScoreAccountInput[], windowTxns: ScoreTransactionInput[], asOfDate: ISODate): SourceReliability {
+  const connected = included.filter((a) => a.provider === "plaid");
+  const staleCutoff = addDays(asOfDate, -CONNECTED_STALE_AFTER_DAYS);
+  const stale = connected.filter((a) => {
+    const syncedDay = a.lastSyncedAt ? a.lastSyncedAt.slice(0, 10) : null;
+    return (a.connectionStatus ?? "ok") !== "ok" || syncedDay === null || syncedDay < staleCutoff;
+  });
+  const outflows = windowTxns.filter((t) => t.direction === "outflow" && !t.isTransfer);
+  const other = outflows.filter((t) => t.category === "other");
+  return {
+    historyIncomplete: connected.some((a) => a.historyComplete === false),
+    staleConnectedShare: connected.length > 0 ? stale.length / connected.length : 0,
+    cachedBalanceStale: connected.some((a) => a.balanceFreshness === "cached" && !!a.balanceObservedAt && a.balanceObservedAt.slice(0, 10) < asOfDate),
+    syncDiscrepancy: connected.some((a) => a.latestSyncDiscrepancy !== null && a.latestSyncDiscrepancy !== undefined && a.latestSyncDiscrepancy !== 0),
+    otherCategoryShare: outflows.length > 0 ? other.length / outflows.length : 0,
   };
 }
 
@@ -247,5 +299,6 @@ export function buildMetricInputs(
       unresolvedTransferShare,
       manualShare,
     },
+    sourceReliability: computeSourceReliability(included, windowTxns, asOfDate),
   };
 }

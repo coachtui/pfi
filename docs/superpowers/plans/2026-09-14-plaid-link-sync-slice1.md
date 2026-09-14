@@ -136,7 +136,7 @@
 - [x] `getConnectedItems(supabase)`: Items with status, `last_synced_at`, `history_complete_at`, error code, account count, and `stillBillable` (error/login_required older than 30 days).
 - [x] `getDashboardData`: (a) if newest `last_synced_at` older than 12h → `syncAll` best-effort; (b) if any confirmed `connected_account` batch has `rebuild_completed_at` null → `claimRebuild(supabase)` (a `randomUUID()` claim token; conditional update sets `rebuild_claim_token` + `rebuild_claimed_at` only when null or older than 2 minutes); on claim → rebuild, set `rebuild_completed_at` on those batches, then token-scoped release in `finally` (`… where rebuild_claim_token = $token`, so an overrun worker never clears a newer lease); no claim → `staleIndex = true`. (c) `historicalDataComplete` boolean in the return.
 - [x] `getRecentImports`: join `import_batches.source_type` so synced batches label "Synced."
-- [ ] `getFreshnessData`: include `freshness`/`observed_at` on the effective anchor for the confidence inputs — moved into Task 12 (`fetchScoreSources` is the confidence input path).
+- [x] Effective-anchor `freshness`/`observed_at`/`discrepancy` are loaded in `fetchScoreSources` (Task 12), the confidence input path.
 
 ### Task 12: Confidence — source-reliability inputs
 
@@ -144,8 +144,8 @@
 - Modify: `src/lib/financial-engine/metric-inputs.ts` (`dataQuality` gains `historyIncomplete`, `staleConnectedShare`, `cachedBalanceStale`, `latestAnchorDiscrepancy`, `otherCategoryShare`), `src/lib/financial-engine/confidence.ts`, both tests
 - Modify: `src/lib/data/queries.ts` (`fetchScoreSources` supplies the new facts), `docs/FINANCIAL_HEALTH_SCORE.md`
 
-- [ ] Rules per §10, in this order of reasons: "Transaction history still loading from Plaid" (cap `limited` on all dimensions while `historyIncomplete`); stale/disconnected connected accounts; cached balance older than 24h (mild); non-zero latest sync discrepancy ("some transactions may be missing"); `other`-category outflow share > 25%. `IMPROVEMENTS` gains matching advice lines. `PFI_SCORE_VERSION` unchanged (confidence only).
-- [ ] Tests for each rule and for ordering. Methodology paragraph in FINANCIAL_HEALTH_SCORE.md.
+- [x] Rules per §10, in this order of reasons: "Transaction history still loading from Plaid" (cap `limited` on all dimensions while `historyIncomplete`); stale/disconnected connected accounts; cached balance older than 24h (mild); non-zero latest sync discrepancy ("some transactions may be missing"); `other`-category outflow share > 25%. `IMPROVEMENTS` gains matching advice lines. `PFI_SCORE_VERSION` unchanged (confidence only).
+- [x] Tests for each rule and for ordering. Methodology paragraph in FINANCIAL_HEALTH_SCORE.md.
 
 ### Task 13: UI
 
