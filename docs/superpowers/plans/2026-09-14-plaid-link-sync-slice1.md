@@ -33,10 +33,10 @@
 - Modify: `.env.example`, `playwright.config.ts` (`webServer.env`: `PLAID_CLIENT_ID: ""`, `PLAID_SECRET: ""`)
 - Modify: `docs/SECURITY_MODEL.md` (env + rotation procedure stub, filled in Task 15)
 
-- [ ] Run the `dependency-audit` skill on `plaid@47` and `react-plaid-link@5`; record the verdict in the PR description. Install with `pnpm add plaid react-plaid-link`.
-- [ ] `plaidConfig(source = process.env): PlaidServerConfig | null` — returns `null` when `PLAID_CLIENT_ID` and `PLAID_SECRET` are both absent/empty; throws a clear error on a partial set, a malformed `PLAID_ENV`, or a `PLAID_TOKEN_ENCRYPTION_KEY` that is not 32 bytes base64. `PLAID_TOKEN_ENCRYPTION_KEY_PREVIOUS` optional, same validation. Tests: unset → null; partial → throws naming the missing var; bad key length → throws; full → typed config.
-- [ ] `.env.example` documents the five vars with one-line comments (sandbox default; key generated with `openssl rand -base64 32`).
-- [ ] `pnpm check` green.
+- [x] Run the `dependency-audit` skill on `plaid@47` and `react-plaid-link@5`; record the verdict in the PR description. Install with `pnpm add plaid react-plaid-link`.
+- [x] `plaidConfig(source = process.env): PlaidServerConfig | null` — returns `null` when `PLAID_CLIENT_ID` and `PLAID_SECRET` are both absent/empty; throws a clear error on a partial set, a malformed `PLAID_ENV`, or a `PLAID_TOKEN_ENCRYPTION_KEY` that is not 32 bytes base64. `PLAID_TOKEN_ENCRYPTION_KEY_PREVIOUS` optional, same validation. Tests: unset → null; partial → throws naming the missing var; bad key length → throws; full → typed config.
+- [x] `.env.example` documents the five vars with one-line comments (sandbox default; key generated with `openssl rand -base64 32`).
+- [x] `pnpm check` green.
 
 ### Task 1: Migration `0015_plaid_link_sync` + RPCs + RLS tests
 

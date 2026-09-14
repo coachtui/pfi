@@ -38,6 +38,14 @@ Status: core auth + persistence security landed this phase (magic-link auth, sch
 - **User control:** account disconnection, full data export, full deletion.
 - Data is never sold; individual transaction histories are never used for advertising.
 
+## Plaid bank connections (Phase 7, Slice 1 — in progress, DECISIONS #43)
+
+Spec: `docs/superpowers/specs/2026-09-14-plaid-link-sync-slice1-design.md` §11. Filled in as the slice lands; the configuration boundary is live now.
+
+- **Configuration is server-only.** `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `PLAID_TOKEN_ENCRYPTION_KEY`, and the rotation-only `PLAID_TOKEN_ENCRYPTION_KEY_PREVIOUS` are read exclusively through `plaidConfig()` in `src/lib/config/env.server.ts` — never `env.ts`, never `NEXT_PUBLIC_*`. Unset as a group, the feature is disabled (the Connected-institutions card renders "not configured"); a partial set throws at first use so a misdeployment cannot silently run half-configured. `playwright.config.ts` forces all of them empty so e2e never touches Plaid.
+- **Access tokens** (landing in Task 1–2): AES-256-GCM at the application layer, key from `PLAID_TOKEN_ENCRYPTION_KEY`, stored in `plaid_item_secrets` with RLS enabled, no policies, and no grants to `authenticated`/`anon` — readable by the service role only. Key rotation: set the new key, move the old one to `_PREVIOUS`, run `scripts/rotate-plaid-key.mts`, unset `_PREVIOUS` (procedure documented fully in Task 15).
+- **Logging:** Plaid failures log `error_type`, `error_code`, `request_id` only. `link_token`, `public_token`, `access_token`, account ids, masks, amounts, and descriptions are never logged.
+
 ## Threat-model notes to expand in Phase 3
 
 Cross-tenant leakage (RLS bypass), re-identification through cohort aggregates (minimum cohort sizes, suppression, consider differential privacy in Phase 8), CSV import abuse (size limits, parser hardening), and scraping of public profiles.
