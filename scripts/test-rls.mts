@@ -300,6 +300,103 @@ try {
   const { data: apDel } = await b.client.from("academy_progress")
     .delete().eq("user_id", a.id).select("concept_id");
   check("B cannot delete A's academy progress", (apDel?.length ?? 0) === 0);
+
+  // ---- Plaid Slice 1 (migration 0015, DECISIONS #43): items, secrets, RPC authorization ----
+  const { data: aItem, error: aItemErr } = await a.client.from("plaid_items")
+    .insert({ user_id: a.id, item_id: `rls-item-${randomUUID().slice(0, 8)}`, institution_id: "ins_test", institution_name: "RLS Bank" })
+    .select("id").single();
+  check("plaid_items: owner can insert", !aItemErr && !!aItem, aItemErr?.message ?? "");
+
+  const { data: itemCrossRead } = await b.client.from("plaid_items").select("id");
+  check("plaid_items: cross-user read returns nothing", (itemCrossRead ?? []).length === 0);
+
+  const { error: itemForge } = await b.client.from("plaid_items")
+    .insert({ user_id: a.id, item_id: `rls-forge-${randomUUID().slice(0, 8)}` });
+  check("plaid_items: cross-user insert rejected", !!itemForge);
+
+  // Secrets: no grants to authenticated — the OWNER gets a permission error, not an empty set.
+  const { error: secretOwnerRead } = await a.client.from("plaid_item_secrets").select("plaid_item_id");
+  check(
+    "plaid_item_secrets: owner session cannot even select (permission error, not empty)",
+    !!secretOwnerRead && /permission denied|42501/i.test(secretOwnerRead.message + (secretOwnerRead.code ?? "")),
+    secretOwnerRead?.message ?? "no error returned",
+  );
+  const { error: secretOwnerWrite } = await a.client.from("plaid_item_secrets")
+    .insert({ plaid_item_id: aItem!.id, access_token_ciphertext: "x" });
+  check("plaid_item_secrets: owner session cannot insert", !!secretOwnerWrite);
+  const { error: secretAdminWrite } = await admin.from("plaid_item_secrets")
+    .insert({ plaid_item_id: aItem!.id, access_token_ciphertext: "ciphertext" });
+  check("plaid_item_secrets: service role can insert", !secretAdminWrite, secretAdminWrite?.message ?? "");
+  const { data: secretAdminRead } = await admin.from("plaid_item_secrets")
+    .select("access_token_ciphertext").eq("plaid_item_id", aItem!.id).single();
+  check("plaid_item_secrets: service role can read", secretAdminRead?.access_token_ciphertext === "ciphertext");
+
+  // A sync batch for A's Item, in the in-flight state the RPC requires.
+  const aOwner = a;
+  const newBatch = async () => {
+    const { data, error } = await aOwner.client.from("import_batches")
+      .insert({ user_id: aOwner.id, source_type: "connected_account", status: "extracting", plaid_item_id: aItem!.id })
+      .select("id").single();
+    if (error || !data) throw new Error(`batch insert failed: ${error?.message}`);
+    return data.id as string;
+  };
+  const batch1 = await newBatch();
+
+  // B cannot commit A's batch.
+  const { error: rpcCross } = await b.client.rpc("commit_connected_sync", { p_batch_id: batch1, p_plan: {} });
+  check("commit_connected_sync: cross-user call raises", !!rpcCross && /ownership/.test(rpcCross.message), rpcCross?.message ?? "no error");
+
+  // A cannot smuggle B's transaction id into their own batch's plan.
+  const { data: bTxn } = await b.client.from("transactions")
+    .insert({ account_id: bAcct!.id, user_id: b.id, posted_date: "2026-07-02", amount: 5, direction: "outflow", description: "B row" })
+    .select("id").single();
+  const { error: rpcForeignTxn } = await a.client.rpc("commit_connected_sync", {
+    p_batch_id: batch1,
+    p_plan: { updates: [{ id: bTxn!.id, posted_date: "2026-07-02", amount: 999, direction: "outflow", description: "x" }] },
+  });
+  check(
+    "commit_connected_sync: plan naming another user's transaction raises",
+    !!rpcForeignTxn && /ownership \(updates\)/.test(rpcForeignTxn.message),
+    rpcForeignTxn?.message ?? "no error",
+  );
+
+  // set_config is not reachable through PostgREST.
+  const { error: setConfigErr } = await a.client.rpc("set_config", { setting_name: "pfi.provider_write", new_value: batch1, is_local: true });
+  check("set_config is not callable via PostgREST", !!setConfigErr, setConfigErr?.message ?? "no error");
+
+  // Happy path: first sync creates an account, inserts one row, anchors it.
+  const plan1 = {
+    item: { cursor: "cursor-1", update_status: "HISTORICAL_UPDATE_COMPLETE", status: "connected", history_complete: true },
+    accounts: [{ op: "create", external_account_id: "ext-acct-1", type: "checking", display_name: "RLS Plaid Checking", institution: "RLS Bank", mask: "0001" }],
+    inserts: [{ external_account_id: "ext-acct-1", posted_date: "2026-07-03", amount: 42.5, direction: "outflow", description: "Coffee", category: "dining", category_confidence: "high", pfc_primary: "FOOD_AND_DRINK", pfc_detailed: "FOOD_AND_DRINK_COFFEE", category_taxonomy_version: "v2", external_id: "plaid-txn-1" }],
+    anchors: [{ external_account_id: "ext-acct-1", anchor_date: "2026-07-03", balance: 1000, freshness: "cached" }],
+  };
+  const { data: rpcOk, error: rpcOkErr } = await a.client.rpc("commit_connected_sync", { p_batch_id: batch1, p_plan: plan1 });
+  check("commit_connected_sync: owner happy path commits", !rpcOkErr && rpcOk?.inserted === 1 && rpcOk?.anchored === 1 && rpcOk?.accounts_created === 1, rpcOkErr?.message ?? JSON.stringify(rpcOk));
+
+  const { data: itemAfter } = await a.client.from("plaid_items").select("transactions_cursor, status, history_complete_at").eq("id", aItem!.id).single();
+  check("commit_connected_sync: cursor + status + history_complete_at advanced together", itemAfter?.transactions_cursor === "cursor-1" && itemAfter?.status === "connected" && !!itemAfter?.history_complete_at);
+  const { data: batchAfter } = await a.client.from("import_batches").select("status, sync_metadata").eq("id", batch1).single();
+  check("commit_connected_sync: batch confirmed with counts", batchAfter?.status === "confirmed" && batchAfter?.sync_metadata?.counts?.inserted === 1);
+
+  // Idempotent re-run in a new batch: same external id inserts nothing.
+  const batch2 = await newBatch();
+  const { data: rpcAgain, error: rpcAgainErr } = await a.client.rpc("commit_connected_sync", { p_batch_id: batch2, p_plan: { ...plan1, accounts: [{ op: "keep", external_account_id: "ext-acct-1" }] } });
+  check("commit_connected_sync: re-run inserts zero (idempotent)", !rpcAgainErr && rpcAgain?.inserted === 0, rpcAgainErr?.message ?? JSON.stringify(rpcAgain));
+
+  // The provider-write flag never leaks: a direct provider-column update in the same session is still frozen.
+  const { data: plaidTxn } = await a.client.from("transactions").select("id").eq("external_id", "plaid-txn-1").single();
+  const { error: directAfterRpc } = await a.client.from("transactions").update({ amount: 1 }).eq("id", plaidTxn!.id);
+  check("immutability still enforced on a direct update after an RPC in the same session", !!directAfterRpc && /immutable/.test(directAfterRpc.message), directAfterRpc?.message ?? "no error");
+  const { error: directExternalId } = await a.client.from("transactions").update({ external_id: "evil" }).eq("id", plaidTxn!.id);
+  check("external_id is frozen", !!directExternalId);
+
+  // Migration text: only the two audited RPCs SET the flag.
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const migrationText = readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql"))
+    .map((f) => readFileSync(`supabase/migrations/${f}`, "utf8")).join("\n");
+  const setters = migrationText.match(/set_config\('pfi\.provider_write'/g)?.length ?? 0;
+  check("exactly two functions set pfi.provider_write (commit_connected_sync, delete_connected_item_data)", setters === 2, `found ${setters}`);
 } finally {
   if (a) {
     try {
