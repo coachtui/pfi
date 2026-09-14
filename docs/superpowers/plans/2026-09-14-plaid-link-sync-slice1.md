@@ -74,30 +74,30 @@
 - Create: `src/lib/plaid/fixtures/pfc-v1.csv`, `src/lib/plaid/fixtures/pfc-v2.csv` (Plaid's published taxonomy CSVs, committed verbatim)
 - Create: `src/lib/plaid/map-category.ts`, `src/lib/plaid/map-category.test.ts`
 
-- [ ] `mapCategory(version: 'v1'|'v2', primary: string, detailed: string | null): Category` — detailed-level rules first (`FOOD_AND_DRINK_GROCERIES`, `LOAN_PAYMENTS_MORTGAGE_PAYMENT`, `RENT_AND_UTILITIES_RENT`, `GENERAL_SERVICES_INSURANCE`, …), then primary rules (§8). v2-only detailed values are enumerated explicitly.
-- [ ] Tests parse both CSVs: every row maps without falling through to the unknown branch; every `Category` except `savings` is reachable from at least one PFC value (document `savings` as reachable only through pairing/override); a snapshot test of the full v2 mapping so changes are reviewed.
+- [x] `mapCategory(version: 'v1'|'v2', primary: string, detailed: string | null): Category` — detailed-level rules first (`FOOD_AND_DRINK_GROCERIES`, `LOAN_PAYMENTS_MORTGAGE_PAYMENT`, `RENT_AND_UTILITIES_RENT`, `GENERAL_SERVICES_INSURANCE`, …), then primary rules (§8). v2-only detailed values are enumerated explicitly.
+- [x] Tests parse both CSVs: every row maps without falling through to the unknown branch; every `Category` is reachable from at least one PFC value (`savings` via `TRANSFER_OUT_SAVINGS`/`…INVESTMENT_AND_RETIREMENT_FUNDS`); a snapshot test of the full v2 mapping so changes are reviewed.
 
 ### Task 5: `map-transaction.ts`
 
 **Files:**
 - Create: `src/lib/plaid/map-transaction.ts`, `src/lib/plaid/map-transaction.test.ts`
 
-- [ ] `toProviderColumns(txn, version): ProviderColumns` — `posted_date = date`, `authorized_date`, `amount = abs`, `direction` by sign, `description = merchant_name ?? name`, `category` via Task 4, `category_confidence` lower-cased (`unknown` when absent), `pfc_primary/detailed` verbatim, `category_taxonomy_version`, `external_id = transaction_id`. Tests: sign on depository and credit; `pending` rows rejected by a guard; provider column set is exactly §6's left column (a test enumerates keys).
+- [x] `toProviderColumns(txn, version): ProviderColumns` — `posted_date = date`, `authorized_date`, `amount = abs`, `direction` by sign, `description = merchant_name ?? name`, `category` via Task 4, `category_confidence` lower-cased (`unknown` when absent), `pfc_primary/detailed` verbatim, `category_taxonomy_version`, `external_id = transaction_id`. Tests: sign on depository and credit; `pending` rows rejected by a guard; provider column set is exactly §6's left column (a test enumerates keys).
 
 ### Task 6: `pair-transfers.ts`
 
 **Files:**
 - Create: `src/lib/plaid/pair-transfers.ts`, `src/lib/plaid/pair-transfers.test.ts`
 
-- [ ] `pairTransfers(candidates, existing, accounts, windowDays = 3): PairingResult` per §7: opposite directions, equal amounts, distinct non-archived accounts, kind-compatible (`TRANSFER_OUT`↔`TRANSFER_IN`; `LOAN_PAYMENTS_*` outflow ↔ inflow on a `LIABILITY_TYPES` account), within window, **exactly one candidate on each side**. Returns pairs plus `ambiguous[]` for the review list.
-- [ ] Tests: unique match pairs; two equal-amount candidates → none; recurring identical amounts across weeks pair only within-window uniques; loan payment to a linked card pairs, to a checking account does not; already-paired counterpart excluded; `csv`/`demo` counterpart → pair recorded one-sided (existing row untouched) and flagged.
+- [x] `pairTransfers(candidates, existing, accounts, windowDays = 3): PairingResult` per §7: opposite directions, equal amounts, distinct non-archived accounts, kind-compatible (`TRANSFER_OUT`↔`TRANSFER_IN`; `LOAN_PAYMENTS_*` outflow ↔ inflow on a `LIABILITY_TYPES` account), within window, **exactly one candidate on each side**. Returns pairs plus `ambiguous[]` for the review list.
+- [x] Tests: unique match pairs; two equal-amount candidates → none; recurring identical amounts across weeks pair only within-window uniques; loan payment to a linked card pairs, to a checking account does not; already-paired counterpart excluded; `csv`/`demo` counterparts are never paired here (no Plaid classification to judge kind by) — recorded in KNOWN_LIMITATIONS as a follow-up.
 
 ### Task 7: `roster.ts`
 
 **Files:**
 - Create: `src/lib/plaid/roster.ts`, `src/lib/plaid/roster.test.ts`
 
-- [ ] `reconcileRoster(plaidAccounts, pfiAccountsForItem, today): RosterPlan` — create / unshare+archive / closed+archive / reappear+unarchive, each with an audit line. Tests for all four transitions, idempotence on an unchanged roster, and that an investment account with zero transactions is still created (§13.1).
+- [x] `reconcileRoster(plaidAccounts, pfiAccountsForItem, today): RosterPlan` — create / unshare+archive / closed+archive / reappear+unarchive, each with an audit line. Tests for all four transitions, idempotence on an unchanged roster, and that an investment account with zero transactions is still created (§13.1).
 
 ### Task 8: `sync-plan.ts`
 
