@@ -7,6 +7,13 @@ Recorded rather than hidden. Date-stamped; remove entries when resolved.
 - **Demo data is the default dataset, no longer the only source (updated 2026-07-17).** Manual accounts/transactions CRUD and CSV import are live (ROADMAP Phase 3); Koa Holdings' seeded dataset (fixed "today" of 2026-07-15, loaded via `loadDemoData()`) remains the default onboarding data, and cohort/rankings surfaces still run on samples (see Visual parity slice below).
 - **Performance brief is template text by default; AI narration is progressive enhancement (updated 2026-07-18).** With no `AI_GATEWAY_API_KEY` configured, the card shows the deterministic, code-assembled brief ("Calculated" chip) — this is still the only path exercised in e2e, which forces the key to `""` (`playwright.config.ts`) for determinism. With a key configured, an AI-narrated version renders instead ("AI narrative · numbers calculated" chip) — see the "AI interpreter core" section below for what's still unverified.
 
+## Aggregation readiness (2026-09-14, found while designing Plaid Slice 1)
+
+- **`financial_events` are written only by the demo loader.** Manual, CSV, PDF, and (soon) Plaid data never create events, so "What moved your line" drivers, chart stem chips, and the report's investment contributions are empty for real data. A deterministic event-derivation step from transactions (paychecks from recurring inflows, mortgage/debt payments, investment contributions from transfers to brokerage/retirement accounts) is a slice of its own.
+- **No background execution path.** Every query and `rebuildSnapshots` scope by RLS plus `supabase.auth.getUser()`; there is no `src/app/api` directory. Webhooks and cron need a user-scoped rebuild refactor (explicit `userId`, `user_id` filters on every query) before they can run — Plaid Slice 3.
+- **Daily balance anchors restate history.** The snapshot builder replays backward from `current_balance`; a brokerage balance that moves every day with no transaction behind it shifts every past day's net worth on each sync. Acceptable for monthly statement anchors (DECISIONS #24), reopened by daily sync anchors — see CURRENT_PHASE "Decisions needed".
+- **No holdings model.** Brokerage/retirement accounts are a single balance; `report.ts` hard-codes `marketAppreciation = 0`. Plaid Investments (holdings, securities) needs new tables and an engine change under the owner-equity vs market-appreciation rule.
+
 ## Visual parity slice (2026-07-15)
 
 - **Rankings and Data run on sample cohort data**, not a real cohort pipeline — league tabs, leaderboard, percentile compares, and benchmark metrics all read from the deterministic mock module `src/lib/demo-data/cohorts.ts` until Phase 6 builds anonymized cohorts with real minimum-size/suppression rules.

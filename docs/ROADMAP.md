@@ -114,7 +114,7 @@ Goals; deterministic scenario engine (income/expense/debt/savings/purchase/incom
 
 Anonymized cohorts with minimum sizes + suppression; percentile rankings on normalized improvement metrics (never absolute wealth); challenges, badges, quarterly seasons; opt-in public tickers; anti-gaming + data-coverage requirements. Exit: private data never exposed; opt-out works; manipulation constrained.
 
-## Phase 7 — Account aggregation
+## Phase 7 — Account aggregation (opened early 2026-09-14 — Slice 1 spec approved, DECISIONS #43)
 
 Plaid/MX evaluation behind the existing provider abstraction; linking, incremental sync, connection health, reconciliation, webhooks; production security review. Exit: sync failures visible/recoverable; duplicates and transfers tested.
 
