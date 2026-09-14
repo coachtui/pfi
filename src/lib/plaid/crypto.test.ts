@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decryptToken, encryptToken, keyRing } from "./crypto";
+import { decryptToken, encryptToken, keyRing, keyRingFor, keyVersionOf } from "./crypto";
 
 const k1 = new Uint8Array(32).fill(1);
 const k2 = new Uint8Array(32).fill(2);
@@ -43,6 +43,23 @@ describe("token crypto", () => {
   it("rejects an unknown key version", async () => {
     const enc = await encryptToken("secret", k1, 1);
     await expect(decryptToken(enc, keyRing(k2, 3, null))).rejects.toThrow(/key_version 1/);
+  });
+
+  it("derives a stable smallint key version from the key bytes, distinct per key", () => {
+    const v1 = keyVersionOf(k1);
+    expect(v1).toBe(keyVersionOf(new Uint8Array(32).fill(1)));
+    expect(v1).toBeGreaterThanOrEqual(1);
+    expect(v1).toBeLessThanOrEqual(32767);
+    expect(keyVersionOf(k2)).not.toBe(v1);
+    expect(() => keyVersionOf(new Uint8Array(8))).toThrow(/32 bytes/);
+  });
+
+  it("keyRingFor rotates without any counter: rows encrypted under the previous key still decrypt", async () => {
+    const old = await encryptToken("secret", k1, keyVersionOf(k1));
+    const ring = keyRingFor(k2, k1);
+    expect(await decryptToken(old, ring)).toBe("secret");
+    expect(ring.size).toBe(2);
+    expect(await decryptToken(old, keyRingFor(k2, null)).catch((e: Error) => e.message)).toMatch(/no key registered/);
   });
 
   it("enforces the key length and non-empty plaintext", async () => {

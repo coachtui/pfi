@@ -7,7 +7,7 @@
  * Pure: keys are parameters, no env access, no logging. Never log the inputs
  * or outputs of these functions.
  */
-import { webcrypto } from "node:crypto";
+import { createHash, webcrypto } from "node:crypto";
 
 const IV_BYTES = 12;
 const KEY_BYTES = 32;
@@ -63,9 +63,28 @@ export async function decryptToken(token: EncryptedToken, keys: KeyRing): Promis
   return new TextDecoder().decode(decrypted);
 }
 
-/** Build the ring from config: current key is version `current`, previous (if any) is `current - 1`. */
-export function keyRing(current: Uint8Array, currentVersion: number, previous: Uint8Array | null): KeyRing {
+/**
+ * Key version = a stable fingerprint of the key bytes (first 15 bits of
+ * SHA-256, range 1..32767 to fit `smallint`). Rotation therefore needs no
+ * counter in the environment: a row's `key_version` identifies which of the
+ * configured keys (current or previous) encrypted it.
+ */
+export function keyVersionOf(key: Uint8Array): number {
+  assertKey(key);
+  const digest = createHash("sha256").update(key).digest();
+  return (((digest[0] << 8) | digest[1]) & 0x7fff) || 1;
+}
+
+/** Ring from config: the current key plus the previous key during rotation. */
+export function keyRingFor(current: Uint8Array, previous: Uint8Array | null): KeyRing {
+  const ring = new Map<number, Uint8Array>([[keyVersionOf(current), current]]);
+  if (previous) ring.set(keyVersionOf(previous), previous);
+  return ring;
+}
+
+/** Explicit-version ring (tests and the rotation script). */
+export function keyRing(current: Uint8Array, currentVersion: number, previous: Uint8Array | null, previousVersion?: number): KeyRing {
   const ring = new Map<number, Uint8Array>([[currentVersion, current]]);
-  if (previous) ring.set(currentVersion - 1, previous);
+  if (previous) ring.set(previousVersion ?? currentVersion - 1, previous);
   return ring;
 }
