@@ -49,7 +49,7 @@ Full detail (exit criteria, alternatives considered) lives in `docs/ROADMAP.md`;
 | 4 | AI financial interpreter — narrates verified metrics, never calculates | ⬜ Not started |
 | 5 | Scenario simulator & goals | ⬜ Not started |
 | 6 | Cohorts, rankings & gamification | ⬜ Not started |
-| 7 | Account aggregation (Plaid/MX) | ⬜ Not started |
+| 7 | Account aggregation (Plaid) | 🟡 Slice 1 implemented (branch `worktree-plaid-slice1`, 2026-09-14); Slices 2–3 pending |
 | 8 | Aggregate intelligence — anonymized benchmarks | ⬜ Not started |
 | 9 | Production readiness — audits, legal review, closed beta | ⬜ Not started |
 
