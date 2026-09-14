@@ -107,14 +107,19 @@ export interface TransactionListRow {
   direction: string; description: string; category: string | null;
   essential: boolean | null; is_transfer: boolean; transfer_pair_id: string | null;
   notes: string | null; user_override: unknown; import_batch_id: string | null;
+  category_confidence?: string | null; pfc_primary?: string | null;
   financial_accounts: { display_name: string; provider: string };
 }
 
 export interface TransactionListItem extends EffectiveTransaction {
   notes: string | null;
   accountName: string;
-  accountProvider: "demo" | "manual" | "csv";
+  accountProvider: AccountProvider;
   importBatchId: string | null;
+  /** Plaid's confidence in ITS category (display-only; never PFI's confidence). */
+  categoryConfidence: "very_high" | "high" | "medium" | "low" | "unknown" | null;
+  /** Plaid's primary category, verbatim — lets the UI flag unmatched possible transfers. */
+  pfcPrimary: string | null;
 }
 
 export function rowToTransactionListItem(row: TransactionListRow): TransactionListItem {
@@ -135,8 +140,10 @@ export function rowToTransactionListItem(row: TransactionListRow): TransactionLi
     ...effective,
     notes: row.notes,
     accountName: row.financial_accounts.display_name,
-    accountProvider: row.financial_accounts.provider as "demo" | "manual" | "csv",
+    accountProvider: row.financial_accounts.provider as AccountProvider,
     importBatchId: row.import_batch_id,
+    categoryConfidence: (row.category_confidence as TransactionListItem["categoryConfidence"]) ?? null,
+    pfcPrimary: row.pfc_primary ?? null,
   };
 }
 

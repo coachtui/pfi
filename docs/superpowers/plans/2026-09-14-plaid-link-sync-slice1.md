@@ -153,10 +153,10 @@
 - Create: `src/app/accounts/ConnectedInstitutionsCard.tsx`, `src/components/dashboard/HistoryLoadingNotice.tsx`
 - Modify: `src/app/accounts/page.tsx`, `src/app/accounts/AccountsView.tsx` (card above list; "Synced" chip; archived-group reason), `src/app/accounts/RecentImports.tsx` (label), `src/app/page.tsx` + `src/app/score/page.tsx` + `src/app/report/page.tsx` (notice), `src/app/transactions/TransactionSheet.tsx` (category-confidence line), `src/app/transactions/TransactionsView.tsx` ("Possible transfers to review" filter)
 
-- [ ] Card states per §9: not configured; empty + demo notice; rows with glyph+text status (hourglass Preparing history with auto re-sync on mount while `initializing`/`history_loading`; check Connected; triangle Needs reconnect; x-circle Error; clock Disconnect pending), "Last synced with Plaid …", Sync now (pending → summary: added/updated/removed/roster changes/anchor as-of), Reconnect (update-mode Link), Disconnect (two-step) with "Disconnect and delete this institution's data" as a second explicit option, "Still billable" line after 30 days.
-- [ ] `usePlaidLink` wiring; `onSuccess` → `exchangePublicToken`; `onExit` errors surfaced as text.
-- [ ] `HistoryLoadingNotice` with hourglass glyph, shown on dashboard/score/report while `historicalDataComplete === false`.
-- [ ] Verify at 390×844 first, then 1280×900. `pnpm test:e2e` green with Plaid env unset (card shows "not configured").
+- [x] Card states per §9: not configured; empty + demo notice; rows with glyph+text status (hourglass Preparing history with auto re-sync on mount while `initializing`/`history_loading`; check Connected; triangle Needs reconnect; x-circle Error; clock Disconnect pending), "Last synced with Plaid …", Sync now (pending → summary: added/updated/removed/roster changes/anchor as-of), Reconnect (update-mode Link), Disconnect (two-step) with "Disconnect and delete this institution's data" as a second explicit option, "Still billable" line after 30 days.
+- [x] `usePlaidLink` wiring; `onSuccess` → `exchangePublicToken`; `onExit` errors surfaced as text.
+- [x] `HistoryLoadingNotice` with hourglass glyph, shown on dashboard/score/report while `historicalDataComplete === false`.
+- [ ] Verify at 390×844 first, then 1280×900. `pnpm test:e2e` green with Plaid env unset (card shows "not configured") — **blocked: no Supabase credentials on this machine** (no `.env.local`); build passes with placeholder public env.
 
 ### Task 14: Live sandbox + concurrency tests
 

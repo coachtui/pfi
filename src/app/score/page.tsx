@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile, getScoreData, type ScoreRange } from "@/lib/data/queries";
+import { getConnectedItems, getProfile, getScoreData, type ScoreRange } from "@/lib/data/queries";
 import { ScoreView } from "./ScoreView";
 
 const RANGES: ScoreRange[] = ["30d", "90d", "1y", "all"];
@@ -16,7 +16,7 @@ export default async function ScorePage({
 
   const sp = await searchParams;
   const range = RANGES.includes(sp.range as ScoreRange) ? (sp.range as ScoreRange) : "90d";
-  const data = await getScoreData(supabase, range);
+  const [data, connected] = await Promise.all([getScoreData(supabase, range), getConnectedItems(supabase)]);
 
-  return <ScoreView data={data} />;
+  return <ScoreView data={data} historyLoading={!connected.historicalDataComplete} />;
 }

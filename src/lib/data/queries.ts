@@ -76,7 +76,7 @@ export async function getTransactionsData(
     paginateSelect<TransactionListRow>(TRANSACTIONS_PAGE_SIZE, (from, to) => {
       let query = supabase
         .from("transactions")
-        .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, notes, user_override, import_batch_id, financial_accounts!inner(display_name, provider)")
+        .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, notes, user_override, import_batch_id, category_confidence, pfc_primary, financial_accounts!inner(display_name, provider)")
         .order("posted_date", { ascending: false })
         .order("created_at", { ascending: false })
         .order("id", { ascending: true }); // unique tiebreaker: posted_date/created_at ties would make .range() pages unstable

@@ -55,13 +55,20 @@ export function RecentImports({ imports }: { imports: RecentImport[] }) {
           >
             <div className="min-w-0">
               <p className="truncate text-primary">
+                {imp.source && (
+                  <span className="mr-1.5 rounded-full border border-border-subtle px-1.5 py-0.5 text-[10px] text-tertiary">
+                    {imp.source === "connected_account" ? "Synced" : imp.source.toUpperCase()}
+                  </span>
+                )}
                 {imp.accountName} · {imp.rowCount} transaction{imp.rowCount === 1 ? "" : "s"}
               </p>
               <p className="text-xs text-secondary">
                 {imp.firstDate} → {imp.lastDate} · imported {imp.importedAt.slice(0, 10)}
               </p>
             </div>
-            {confirming === imp.batchId ? (
+            {imp.source === "connected_account" ? (
+              <span className="shrink-0 text-xs text-tertiary">Synced — disconnect the institution to remove</span>
+            ) : confirming === imp.batchId ? (
               <span className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"

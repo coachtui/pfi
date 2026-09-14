@@ -9,9 +9,10 @@ import { InlineError } from "@/components/ui/InlineError";
 import { setAccountArchived, setAccountIncluded } from "@/app/actions/accounts";
 import { formatDollars } from "@/lib/financial-engine/format";
 import type { AccountType } from "@/lib/financial-engine";
-import type { AccountSummary, RecentImport } from "@/lib/data/mappers";
+import type { AccountSummary, ConnectedItemSummary, RecentImport } from "@/lib/data/mappers";
 import type { RecurringListItem } from "@/lib/data/queries";
 import { AccountSheet } from "./AccountSheet";
+import { ConnectedInstitutionsCard } from "./ConnectedInstitutionsCard";
 import { DemoDataCard } from "./DemoDataCard";
 import { RecentImports } from "./RecentImports";
 import { RecurringSection } from "./RecurringSection";
@@ -36,11 +37,15 @@ export function AccountsView({
   recentImports,
   recurring,
   asOfByAccount,
+  connectedItems,
+  plaidConfigured,
 }: {
   accounts: AccountSummary[];
   recentImports: RecentImport[];
   recurring: RecurringListItem[];
   asOfByAccount: Record<string, string>;
+  connectedItems: ConnectedItemSummary[];
+  plaidConfigured: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -87,6 +92,12 @@ export function AccountsView({
           {notice}
         </p>
       )}
+
+      <ConnectedInstitutionsCard
+        items={connectedItems}
+        configured={plaidConfigured}
+        hasDemo={accounts.some((a) => a.provider === "demo" && a.archivedAt === null)}
+      />
 
       {accounts.length === 0 ? (
         <Card className="flex flex-col items-center gap-3 p-8 text-center">
@@ -140,7 +151,10 @@ export function AccountsView({
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className={chipCls}>{a.provider}</span>
+                        <span className={chipCls}>{a.provider === "plaid" ? "Synced" : a.provider}</span>
+                        {a.provider === "plaid" && a.connectionStatus && a.connectionStatus !== "ok" && (
+                          <span className={chipCls}>{a.connectionStatus === "login_required" ? "Needs reconnect" : a.connectionStatus}</span>
+                        )}
                         {asOfByAccount[a.id] && (
                           <span className={chipCls}>as of {asOfByAccount[a.id]}</span>
                         )}
@@ -150,7 +164,9 @@ export function AccountsView({
                       {(excluded || archived) && (
                         <p className="text-xs text-tertiary">
                           {archived
-                            ? "Archived accounts and their transactions don’t affect your index. Unarchive to bring them back."
+                            ? a.rosterStatus === "unshared" || a.rosterStatus === "closed"
+                              ? "No longer shared by your bank connection — its history is kept. It comes back automatically if the bank shares it again."
+                              : "Archived accounts and their transactions don’t affect your index. Unarchive to bring them back."
                             : "Excluded accounts don’t affect your index — their history is kept."}
                         </p>
                       )}

@@ -35,7 +35,6 @@ export default async function HomePage() {
   }
   const { snapshots, events, staleIndex, scoreSummary } = data;
   const [freshness, connected] = await Promise.all([getFreshnessData(supabase), getConnectedItems(supabase)]);
-  void connected; // historicalDataComplete is rendered by Task 13's HistoryLoadingNotice
 
   const narrationSource =
     snapshots.length > 0
@@ -85,6 +84,7 @@ export default async function HomePage() {
           events={events}
           scoreSummary={scoreSummary}
           staleIndex={staleIndex}
+          historyLoading={!connected.historicalDataComplete}
           freshness={freshness}
           narration={narration}
           driverNarration={driverNarration}
