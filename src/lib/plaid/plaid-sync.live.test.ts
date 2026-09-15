@@ -34,7 +34,9 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 
 import { Products } from "plaid";
-import { disconnectItem, exchangePublicToken, syncItem } from "@/app/actions/plaid";
+import { clearDemoData } from "@/app/actions/demo";
+import { createLinkToken, disconnectItem, exchangePublicToken, syncItem } from "@/app/actions/plaid";
+import { EVENT_DERIVATION_VERSION } from "@/lib/financial-engine";
 import { getPlaidClient } from "./client";
 import { loadAccessToken } from "./sync";
 
@@ -50,9 +52,12 @@ describe.skipIf(!plaidReady)("Plaid Slice 1 — sandbox link + sync (live)", () 
   let userClient: SupabaseClient;
   let userId: string;
   let itemId: string;
+  let derivedCount = 0;
 
   beforeAll(async () => {
     if (!url || !anonKey || !serviceKey) throw new Error("plaid-sync.live.test.ts needs the Supabase env vars in .env.local");
+    // Slice 2 Item cap: one Item for this user so the refusal path is exercised (read before the client is first built).
+    process.env.PLAID_MAX_ITEMS = "1";
     admin = createSupabaseClient(url, serviceKey);
     const email = `plaid-live-${randomUUID().slice(0, 8)}@example.com`;
     const password = `Test-${randomUUID()}`;
@@ -125,6 +130,27 @@ describe.skipIf(!plaidReady)("Plaid Slice 1 — sandbox link + sync (live)", () 
     expect((snaps ?? []).length).toBe(1);
   }, 480_000);
 
+  it("Slice 2: derived driver events exist for the synced household, survive a demo clear, and the Item cap refuses a second link", async () => {
+    const { data: derived } = await userClient.from("financial_events")
+      .select("type, transaction_id, derivation_version, source").eq("source", "derived");
+    const rows = derived ?? [];
+    console.log(`[live] derived events: ${rows.length} (${[...new Set(rows.map((r) => r.type))].join(", ") || "none"})`);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.transaction_id && r.derivation_version === EVENT_DERIVATION_VERSION)).toBe(true);
+    derivedCount = rows.length;
+
+    // clearDemoData only removes source='demo' rows; the rebuild that follows regenerates the derived set identically.
+    const cleared = await clearDemoData();
+    expect(cleared.error).toBe("");
+    const { count: afterClear } = await userClient.from("financial_events").select("id", { count: "exact", head: true }).eq("source", "derived");
+    expect(afterClear).toBe(derivedCount);
+
+    // Cap (PLAID_MAX_ITEMS=1 for this suite): one active Item → no second link token.
+    const refused = await createLinkToken();
+    expect(refused.linkToken).toBeUndefined();
+    expect(refused.error).toMatch(/limit of 1 connected institution/);
+  }, 120_000);
+
   it("re-sync is idempotent and preserves a user override; a stale token surfaces login_required", async () => {
     const { data: row } = await userClient.from("transactions").select("id").not("external_id", "is", null).limit(1).single();
     const { error: ovErr } = await userClient.from("transactions").update({ user_override: { category: "groceries" } }).eq("id", row!.id);
@@ -136,6 +162,9 @@ describe.skipIf(!plaidReady)("Plaid Slice 1 — sandbox link + sync (live)", () 
     expect(again.counts?.inserted).toBe(0);
     const { data: after } = await userClient.from("transactions").select("user_override").eq("id", row!.id).single();
     expect((after?.user_override as { category?: string })?.category).toBe("groceries");
+    // Derivation is idempotent across a no-op sync (the override above may legitimately move one event; count within ±1).
+    const { count: derivedAfter } = await userClient.from("financial_events").select("id", { count: "exact", head: true }).eq("source", "derived");
+    expect(Math.abs((derivedAfter ?? 0) - derivedCount)).toBeLessThanOrEqual(1);
 
     // Reset the sandbox login: next sync must flag login_required, never wipe data.
     const client = getPlaidClient()!;
@@ -178,5 +207,12 @@ describe.skipIf(!plaidReady)("Plaid Slice 1 — sandbox link + sync (live)", () 
     // /item/remove already happened: a second removal is a no-op at Plaid (ITEM_NOT_FOUND is tolerated).
     const again = await disconnectItem(itemId);
     expect(again.error).toBe("");
+
+    // Slice 2: archived accounts derive nothing, and a disconnected Item no longer counts toward the cap.
+    const { count: derivedAfter } = await userClient.from("financial_events").select("id", { count: "exact", head: true }).eq("source", "derived");
+    expect(derivedAfter).toBe(0);
+    const freed = await createLinkToken();
+    expect(freed.error).toBe("");
+    expect(freed.linkToken).toMatch(/^link-sandbox-/);
   }, 60_000);
 });

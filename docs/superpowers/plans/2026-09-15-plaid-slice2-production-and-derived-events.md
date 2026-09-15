@@ -77,9 +77,9 @@
 
 **Files:** `src/lib/plaid/plaid-sync.live.test.ts`, `e2e/smoke.spec.ts`, `scripts/qa-plaid-link.ts`
 
-- [ ] Live: after the sandbox sync, derived events exist (`source='derived'`, ≥1 `paycheck` or `investment_contribution` — assert on what the sandbox fixture deterministically yields), count unchanged after re-sync, `clearDemoData` leaves them, and the Item cap refuses link-token creation at the limit (set `PLAID_MAX_ITEMS=1` in-test via the config source or by creating rows).
-- [ ] e2e: demo dashboard still shows drivers (source='demo'); consent gate appears once after the version bump (existing password-auth spec covers the gate; adjust fixture version if needed).
-- [ ] QA script: OAuth bank path (`ins_127287`) through `/plaid/oauth`; disclosure sheet; drivers + markers on the dashboard; report investments.
+- [x] Live: after the sandbox sync, derived events exist (`source='derived'`, ≥1 `paycheck` or `investment_contribution` — assert on what the sandbox fixture deterministically yields), count unchanged after re-sync, `clearDemoData` leaves them, and the Item cap refuses link-token creation at the limit (set `PLAID_MAX_ITEMS=1` in-test via the config source or by creating rows).
+- [x] e2e: demo dashboard still shows drivers (source='demo'); consent gate appears once after the version bump (existing password-auth spec covers the gate; adjust fixture version if needed).
+- [x] QA script: OAuth bank path (`ins_127287`) through `/plaid/oauth`; disclosure sheet; drivers + markers on the dashboard; report investments.
 
 ### Task 7: Docs, reviews, verification, PR
 
