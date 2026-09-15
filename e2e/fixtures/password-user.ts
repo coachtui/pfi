@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { PRIVACY_VERSION, TERMS_VERSION } from "../../src/lib/legal/versions";
 import { randomUUID } from "node:crypto";
 
 export interface PasswordUser {
@@ -55,8 +56,8 @@ export async function createPasswordUser(opts: { consent: boolean }): Promise<Pa
 
   if (opts.consent) {
     const { error: consentErr } = await admin.from("user_agreements").insert([
-      { user_id: created.user.id, document: "terms", version: "2026-07-19" },
-      { user_id: created.user.id, document: "privacy", version: "2026-07-19" },
+      { user_id: created.user.id, document: "terms", version: TERMS_VERSION },
+      { user_id: created.user.id, document: "privacy", version: PRIVACY_VERSION },
     ]);
     if (consentErr) throw new Error(`consent insert failed: ${consentErr.message}`);
   }

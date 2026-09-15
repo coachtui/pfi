@@ -3,8 +3,8 @@
  * document materially changes — the consent gate then re-prompts every
  * user. Never edit a document's content without bumping its version.
  */
-export const TERMS_VERSION = "2026-07-19";
-export const PRIVACY_VERSION = "2026-07-19";
+export const TERMS_VERSION = "2026-09-15";
+export const PRIVACY_VERSION = "2026-09-15";
 
 export type AgreementDocument = "terms" | "privacy";
 

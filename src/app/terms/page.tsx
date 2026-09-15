@@ -36,8 +36,10 @@ export default function TermsPage() {
       <section>
         <h2>4. Your data, your ownership</h2>
         <p>
-          Financial data you enter or import remains yours. You grant {name} only the processing
-          rights needed to compute and display your own metrics. We never sell your data.
+          Financial data you enter, import, or connect remains yours. You grant {name} only the
+          processing rights needed to compute and display your own metrics. We never sell your data.
+          Data received through a connected bank account (via Plaid) is handled as described in the
+          Privacy Policy&rsquo;s &ldquo;Connected accounts&rdquo; section.
         </p>
       </section>
       <section>

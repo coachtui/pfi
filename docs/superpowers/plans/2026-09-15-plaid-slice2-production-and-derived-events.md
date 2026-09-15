@@ -71,7 +71,7 @@
 
 **Files:** `src/app/privacy/page.tsx`, `src/app/terms/page.tsx`, `src/lib/legal/versions.ts` (+ tests if any), `src/app/consent/page.tsx` copy check
 
-- [ ] Privacy: new "Connected accounts (Plaid)" section (credentials → Plaid only; what PFI receives; retention; disconnect vs delete; Plaid End User Privacy Policy link); §5 lists Plaid as a processor. Terms: one sentence. Bump `PRIVACY_VERSION` (and `TERMS_VERSION` if terms text changed) → consent gate re-prompts.
+- [x] Privacy: new "Connected accounts (Plaid)" section (credentials → Plaid only; what PFI receives; retention; disconnect vs delete; Plaid End User Privacy Policy link); §5 lists Plaid as a processor. Terms: one sentence. Bump `PRIVACY_VERSION` (and `TERMS_VERSION` if terms text changed) → consent gate re-prompts.
 
 ### Task 6: Tests — live, e2e, QA script
 
