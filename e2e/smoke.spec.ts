@@ -105,9 +105,12 @@ test("tapping a financial term on the score screen opens its definition sheet", 
 
   const sheet = page.getByRole("dialog", { name: "Liquidity" });
   await expect(sheet).toBeVisible();
+  // The definition sheet renders the concept's plainEnglishSummary once one is
+  // authored (Academy content-refinement Slice B migrated liquidity, 2026-07-23);
+  // shortDefinition is only the fallback for unmigrated concepts.
   await expect(
     sheet.getByText(
-      "How quickly your household's money can be used — cash you can spend now versus value that takes time to unlock.",
+      "How many months of essential costs the household could cover using cash it can access right now.",
     ),
   ).toBeVisible();
 
@@ -121,12 +124,13 @@ test("tapping a financial term opens its definition sheet with related navigatio
 
   const sheet = page.getByRole("dialog", { name: "Free cash flow" });
   await expect(sheet).toBeVisible();
+  // plainEnglishSummary (Academy content-refinement Slice B), not the shortDefinition fallback.
   await expect(
     sheet.getByText(
-      "The money remaining after the expenses required to operate your household have been paid.",
+      "Revenue minus operating expenses — what the household keeps and can direct toward saving, investing, or paying down debt.",
     ),
   ).toBeVisible();
-  await expect(sheet.getByText("Revenue − operating expenses")).toBeVisible();
+  await expect(sheet.getByText("Revenue − operating expenses", { exact: true })).toBeVisible();
 
   // Related navigation: tap a related concept chip, content swaps, Back returns.
   await sheet.getByRole("button", { name: "Capital allocation" }).click();
