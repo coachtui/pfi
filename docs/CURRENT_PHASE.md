@@ -700,7 +700,7 @@ ROADMAP Phase 5.
 
 ## Known blockers
 
-- None for Plaid Slice 1: every gate has run on the branch — unit 707/707, RLS 68/68, live 13/13 incl. Plaid Sandbox, e2e 36/37 (the one failure is pre-existing on `main`), and live browser QA at both widths. Ready for PR review.
+- None for Plaid Slice 1: every gate has run on the branch — unit 707/707, RLS 68/68, live 13/13 incl. Plaid Sandbox, e2e green after PR #35 fixed the pre-existing smoke assertions, and live browser QA at both widths. Merged to `main` 2026-09-15 (PR #34).
 - (Resolved 2026-09-15 except for the Plaid keys above.) The implementing machine originally had no `.env.local` (no Supabase URL/anon/service-role keys, no Plaid sandbox keys, no token-encryption key), so `pnpm test:rls` (with its 14 new Plaid/RPC assertions), `pnpm test:live` (`src/lib/plaid/plaid-sync.live.test.ts`, `src/lib/data/rebuild-claim.live.test.ts`), `pnpm test:e2e`, the dev server, and live browser QA at 390×844/1280×900 have not run on this branch. Equivalent RPC/trigger/RLS checks were exercised as impersonated `authenticated` users in a rolled-back transaction via the Supabase MCP (all passing). To unblock: create `.env.local` in the worktree with the Supabase vars plus `PLAID_CLIENT_ID`/`PLAID_SECRET` (sandbox), `PLAID_ENV=sandbox`, and `PLAID_TOKEN_ENCRYPTION_KEY=$(openssl rand -base64 32)`, then run the four suites and the QA checklist in plan Task 15.
 - Not currently a blocker but noted: migrations 0013/0014 exist in the linked project's schema but not in its migration history table (applied outside the recorder before this slice). (Task 12, previously listed here as requiring manual dashboard access, was executed and verified live on 2026-07-19 — see "Recently completed" above.)
 
