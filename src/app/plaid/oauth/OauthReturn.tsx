@@ -25,8 +25,8 @@ export function OauthReturn() {
   }, []);
 
   return (
-    <div className="mx-auto flex min-h-[60dvh] max-w-md flex-col justify-center">
-      <Card className="flex flex-col gap-3 p-5" data-testid="plaid-oauth-return">
+    <div className="mx-auto flex min-h-[60dvh] max-w-md flex-col justify-center" data-testid="plaid-oauth-return">
+      <Card className="flex flex-col gap-3 p-5">
         {phase.kind === "loading" && <Status icon={<Hourglass size={16} aria-hidden />} text="Finishing your bank sign-in…" />}
         {phase.kind === "resume" && (
           <ResumeLink session={phase.session} returnUrl={phase.returnUrl} onError={(message) => setPhase({ kind: "error", message })} />
