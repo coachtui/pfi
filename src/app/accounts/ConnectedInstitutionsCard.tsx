@@ -80,7 +80,8 @@ export function ConnectedInstitutionsCard({
       const res = await fn();
       setBusy(null);
       setConfirming(null);
-      if (res.error) setError(res.error);
+      if (res.error && (res as { throttled?: boolean }).throttled) setNotice(res.error);
+      else if (res.error) setError(res.error);
       else {
         const msg = onOk ? onOk(res) : null;
         if (res.warning) setNotice(`⚠ ${res.warning}`);
@@ -160,7 +161,8 @@ export function ConnectedInstitutionsCard({
   const visible = items.filter((i) => i.status !== "disconnected" || i.accountCount > 0);
 
   return (
-    <Card className="flex flex-col gap-3 p-4" data-testid="connected-institutions">
+    <section aria-label="Connected institutions" data-testid="connected-institutions">
+    <Card className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
         <Landmark size={16} aria-hidden className="text-secondary" />
         <h2 className="text-sm font-semibold text-primary">Connected institutions</h2>
@@ -290,5 +292,6 @@ export function ConnectedInstitutionsCard({
         </>
       )}
     </Card>
+    </section>
   );
 }

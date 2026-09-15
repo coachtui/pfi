@@ -174,6 +174,6 @@
 
 - [x] Rotation script: for every secret row, decrypt with the row's version, re-encrypt with current, bump `key_version`, set `rotated_at`; dry-run flag; documented in SECURITY_MODEL.md.
 - [x] Independent reviews (all HIGH/MEDIUM findings fixed; LOWs fixed or recorded in KNOWN_LIMITATIONS): `code-reviewer`, `security-reviewer` (auth, tenancy, secrets, RPC flag, logging), `database-reviewer` (migration, trigger change, RPC, indexes). Fix findings.
-- [ ] (**blocked: no credentials**) Live browser QA (gstack `browse`, real linked project, sandbox keys) at 390×844 then 1280×900: connect → Preparing history → Connected with populated dashboard and notice cleared → Sync now → Reconnect → Disconnect → Disconnect-and-delete. Record in CURRENT_PHASE "Test status."
-- [ ] (§13.1–§13.4 covered by unit tests + DB-level checks; live confirmations pending credentials) Acceptance criteria §13.1–13.5 each demonstrated and cited (test name or QA step) in CURRENT_PHASE.
-- [ ] `pnpm check` green (build with placeholder public env); `pnpm test:rls`, `pnpm test:live`, `pnpm test:e2e` **pending credentials**; open PR with the dependency-audit verdict and review summaries.
+- [x] Live browser QA (`scripts/qa-plaid-link.ts`; results in CURRENT_PHASE) (gstack `browse`, real linked project, sandbox keys) at 390×844 then 1280×900: connect → Preparing history → Connected with populated dashboard and notice cleared → Sync now → Reconnect → Disconnect → Disconnect-and-delete. Record in CURRENT_PHASE "Test status."
+- [x] Acceptance criteria §13.1–13.5 (unit + DB-level + live suites + browser QA; see CURRENT_PHASE) each demonstrated and cited (test name or QA step) in CURRENT_PHASE.
+- [x] `pnpm check`, `pnpm test:rls` 68/68, `pnpm test:live` 13/13, `pnpm test:e2e` 36/37 (pre-existing failure) green on the branch; PR left to the owner (stop-before-merge boundary) with the dependency-audit verdict and review summaries.

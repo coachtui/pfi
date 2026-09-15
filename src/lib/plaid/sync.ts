@@ -17,7 +17,7 @@ import { paginateSelect } from "@/lib/data/paginate";
 import { LOGIN_REQUIRED_CODES, PlaidCallError, fetchAccounts, fetchSyncPages, getPlaidClient } from "./client";
 import { decryptToken, keyRingFor } from "./crypto";
 import { buildSyncPlan } from "./sync-plan";
-import type { CommitResult, ExistingTxn, ItemStatus, PfiAccount, SyncPlan } from "./types";
+import type { CommitResult, ExistingTxn, ItemStatus, PfiAccount, SyncPages, SyncPlan } from "./types";
 
 const PAGE_SIZE = 1000;
 /** Automatic (dashboard-load) syncs: 10 minutes between attempts, 1 minute while history is loading. */
@@ -188,9 +188,17 @@ export async function syncPlaidItem(
   let committed: { commit: CommitResult; plan: SyncPlan } | null = null;
 
   try {
+    // Right after linking, Plaid answers PRODUCT_NOT_READY on /transactions/sync
+    // for a few seconds. The roster and balances don't depend on transactions,
+    // so commit them with an empty page set and let the next sync pull history.
     const [rosterRes, pages] = await Promise.all([
       fetchAccounts(client.api, accessToken),
-      fetchSyncPages(client.api, accessToken, item.transactions_cursor),
+      fetchSyncPages(client.api, accessToken, item.transactions_cursor).catch((e: unknown) => {
+        if (e instanceof PlaidCallError && e.errorCode === "PRODUCT_NOT_READY") {
+          return { added: [], modified: [], removed: [], nextCursor: "", updateStatus: "NOT_READY", requestIds: e.requestId ? [e.requestId] : [] } satisfies SyncPages;
+        }
+        throw e;
+      }),
     ]);
     requestIds.push(rosterRes.requestId, ...pages.requestIds);
 

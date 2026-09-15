@@ -63,12 +63,15 @@ export function RecentImports({ imports }: { imports: RecentImport[] }) {
                 {imp.accountName} · {imp.rowCount} transaction{imp.rowCount === 1 ? "" : "s"}
               </p>
               <p className="text-xs text-secondary">
-                {imp.firstDate} → {imp.lastDate} · imported {imp.importedAt.slice(0, 10)}
+                {imp.source === "connected_account"
+                  ? `synced ${imp.importedAt.slice(0, 10)}`
+                  : `${imp.firstDate} → ${imp.lastDate} · imported ${imp.importedAt.slice(0, 10)}`}
               </p>
+              {imp.source === "connected_account" && (
+                <p className="mt-0.5 text-[11px] text-tertiary">Synced batches aren&apos;t undone here — disconnect the institution to remove its data.</p>
+              )}
             </div>
-            {imp.source === "connected_account" ? (
-              <span className="shrink-0 text-xs text-tertiary">Synced — disconnect the institution to remove</span>
-            ) : confirming === imp.batchId ? (
+            {imp.source === "connected_account" ? null : confirming === imp.batchId ? (
               <span className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"

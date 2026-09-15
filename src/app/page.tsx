@@ -7,6 +7,7 @@ import { rebuildSnapshots } from "@/lib/data/rebuild-snapshots";
 import { VIEWER_LEVEL } from "@/lib/demo-data/cohorts";
 import { HomeDashboard } from "@/components/dashboard/HomeDashboard";
 import { EmptyDashboard } from "@/components/dashboard/EmptyDashboard";
+import { HistoryLoadingNotice } from "@/components/dashboard/HistoryLoadingNotice";
 import { SignOutButton } from "@/components/nav/SignOutButton";
 import {
   buildIndexSeries,
@@ -78,7 +79,10 @@ export default async function HomePage() {
   return (
     <div className="flex flex-col gap-6">
       {snapshots.length === 0 ? (
-        <EmptyDashboard companyName={company.name} />
+        <>
+          {!connected.historicalDataComplete && <HistoryLoadingNotice />}
+          <EmptyDashboard companyName={company.name} />
+        </>
       ) : (
         <HomeDashboard
           profile={{ companyName: company.name, ticker: company.ticker, username: profile.username, level: VIEWER_LEVEL, logoPath: company.logo_path }}
