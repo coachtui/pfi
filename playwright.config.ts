@@ -27,6 +27,7 @@ export default defineConfig({
       PLAID_SECRET: "",
       PLAID_TOKEN_ENCRYPTION_KEY: "",
       PLAID_TOKEN_ENCRYPTION_KEY_PREVIOUS: "",
+      PLAID_REDIRECT_URI: "",
     },
     url: `http://localhost:${PORT}/login`,
     reuseExistingServer: false,
