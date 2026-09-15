@@ -51,16 +51,28 @@ export function TransactionsView({
     router.replace(`${pathname}?${next.toString()}`);
   };
 
+  const [onlyPossibleTransfers, setOnlyPossibleTransfers] = useState(false);
+  const possibleTransferCount = useMemo(
+    () => transactions.filter((t) => t.accountProvider === "plaid" && !t.isTransfer && (t.pfcPrimary === "TRANSFER_IN" || t.pfcPrimary === "TRANSFER_OUT")).length,
+    [transactions],
+  );
+  const visibleTransactions = useMemo(
+    () => onlyPossibleTransfers
+      ? transactions.filter((t) => t.accountProvider === "plaid" && !t.isTransfer && (t.pfcPrimary === "TRANSFER_IN" || t.pfcPrimary === "TRANSFER_OUT"))
+      : transactions,
+    [transactions, onlyPossibleTransfers],
+  );
+
   const groups = useMemo(() => {
     const map = new Map<string, TransactionListItem[]>();
-    for (const t of transactions) {
+    for (const t of visibleTransactions) {
       const key = t.postedDate.slice(0, 7);
       const list = map.get(key) ?? [];
       list.push(t);
       map.set(key, list);
     }
     return [...map.entries()];
-  }, [transactions]);
+  }, [visibleTransactions]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -116,6 +128,16 @@ export function TransactionsView({
           value={filters.direction ?? "all"}
           onChange={(key) => setFilter({ direction: key === "all" ? undefined : key })}
         />
+        {possibleTransferCount > 0 && (
+          <label className="flex items-center gap-1.5 text-xs text-secondary">
+            <input
+              type="checkbox"
+              checked={onlyPossibleTransfers}
+              onChange={(e) => setOnlyPossibleTransfers(e.target.checked)}
+            />
+            Possible transfers to review ({possibleTransferCount})
+          </label>
+        )}
         {hasFilters && (
           <button
             type="button"
@@ -127,7 +149,7 @@ export function TransactionsView({
         )}
       </div>
 
-      {transactions.length === 0 ? (
+      {visibleTransactions.length === 0 ? (
         hasFilters ? (
           <Card className="flex flex-col items-center gap-3 p-8 text-center">
             <p className="text-sm font-medium text-primary">No transactions match these filters</p>

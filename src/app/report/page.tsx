@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCompany, getProfile, getReportData } from "@/lib/data/queries";
+import { getCompany, getConnectedItems, getProfile, getReportData } from "@/lib/data/queries";
 import { ReportView } from "./ReportView";
 
 export default async function ReportPage() {
@@ -10,7 +10,7 @@ export default async function ReportPage() {
   const company = await getCompany(supabase);
   if (!company) redirect("/onboarding");
 
-  const { snapshots, transactions, events } = await getReportData(supabase);
+  const [{ snapshots, transactions, events }, connected] = await Promise.all([getReportData(supabase), getConnectedItems(supabase)]);
 
   return (
     <ReportView
@@ -19,6 +19,7 @@ export default async function ReportPage() {
       snapshots={snapshots}
       transactions={transactions}
       events={events}
+      historyLoading={!connected.historicalDataComplete}
     />
   );
 }

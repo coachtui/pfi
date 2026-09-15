@@ -19,6 +19,7 @@ import {
   rowToAccountSummary, type SnapshotRow, type EventRow, type TransactionRow,
   type TransactionListRow, type AccountRow, type AccountSummary, type TransactionListItem,
   type RecentImport,
+  type ConnectedItemSummary,
 } from "./mappers";
 import type { TransactionFilters } from "@/lib/validation/transactions";
 import { percentToDecimal } from "./unit-conversions";
@@ -61,7 +62,7 @@ export async function getCompany(supabase: SupabaseClient): Promise<CompanyRow |
 export async function getAccountsData(supabase: SupabaseClient): Promise<AccountSummary[]> {
   const { data, error } = await supabase
     .from("financial_accounts")
-    .select("id, provider, institution, type, display_name, mask, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at")
+    .select("id, provider, institution, type, display_name, mask, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at, plaid_item_id, roster_status, connection_status, last_synced_at")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data as AccountRow[]).map(rowToAccountSummary);
@@ -75,7 +76,7 @@ export async function getTransactionsData(
     paginateSelect<TransactionListRow>(TRANSACTIONS_PAGE_SIZE, (from, to) => {
       let query = supabase
         .from("transactions")
-        .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, notes, user_override, import_batch_id, financial_accounts!inner(display_name, provider)")
+        .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, notes, user_override, import_batch_id, category_confidence, pfc_primary, financial_accounts!inner(display_name, provider)")
         .order("posted_date", { ascending: false })
         .order("created_at", { ascending: false })
         .order("id", { ascending: true }); // unique tiebreaker: posted_date/created_at ties would make .range() pages unstable
@@ -201,7 +202,7 @@ export interface ScoreSourceRows {
 }
 
 export async function fetchScoreSources(supabase: SupabaseClient): Promise<ScoreSourceRows> {
-  const [snapRows, txnRows, acctRes, eventRows] = await Promise.all([
+  const [snapRows, txnRows, acctRes, eventRows, anchorProvRows] = await Promise.all([
     paginateSelect<SnapshotRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
       // date alone is a unique order here only because RLS scopes rows to one
       // user (PK is (user_id, date)) — do not reuse with a service-role client.
@@ -215,16 +216,32 @@ export async function fetchScoreSources(supabase: SupabaseClient): Promise<Score
           .order("id", { ascending: true }) // unique tiebreaker for stable pages
           .range(from, to)),
     // financial_accounts stays unpaginated: bounded by household scale, nowhere near the row cap.
+    // Plaid Slice 1: connection facts + the Item's history flag feed source-reliability confidence.
     supabase
       .from("financial_accounts")
-      .select("id, type, institution, provider, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at"),
+      .select("id, type, institution, provider, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at, connection_status, last_synced_at, plaid_items(status, history_complete_at)"),
     paginateSelect<EventRow & { id: string }>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
       supabase.from("financial_events").select("*")
         .order("date", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to)),
+    // Effective-anchor provenance per account (freshness, observation time, sync discrepancy).
+    paginateSelect<{ account_id: string; anchor_date: string; balance: number; created_at: string; source: string; freshness: string; observed_at: string; discrepancy: number | null }>(
+      TRANSACTIONS_PAGE_SIZE, (from, to) =>
+        supabase.from("balance_anchors")
+          .select("account_id, anchor_date, balance, created_at, source, freshness, observed_at, discrepancy")
+          .order("id", { ascending: true })
+          .range(from, to)),
   ]);
   if (acctRes.error) throw acctRes.error;
+
+  const anchorsByAccount = new Map<string, Array<BalanceAnchor & { source: string; freshness: string; observedAt: string; discrepancy: number | null }>>();
+  for (const r of anchorProvRows) {
+    const list = anchorsByAccount.get(r.account_id) ?? [];
+    list.push({ accountId: r.account_id, anchorDate: r.anchor_date, balance: Number(r.balance), createdAt: r.created_at,
+      source: r.source, freshness: r.freshness, observedAt: r.observed_at, discrepancy: r.discrepancy === null ? null : Number(r.discrepancy) });
+    anchorsByAccount.set(r.account_id, list);
+  }
 
   return {
     snapshots: snapRows.map(rowToSnapshot),
@@ -243,26 +260,42 @@ export async function fetchScoreSources(supabase: SupabaseClient): Promise<Score
         transferPairId: effective.transferPairId, description: effective.description,
       };
     }),
-    accounts: (acctRes.data as Array<{
+    accounts: (acctRes.data as unknown as Array<{
       id: string; type: string; institution: string | null; provider: string;
       current_balance: number | string; credit_limit: number | string | null;
       interest_rate: number | string | null; include_in_calculations: boolean;
-      archived_at: string | null;
+      archived_at: string | null; connection_status: string | null; last_synced_at: string | null;
+      plaid_items: { status: string; history_complete_at: string | null } | null;
     }>)
       .filter((row) => row.archived_at === null)
-      .map((row) => ({
-        id: row.id,
-        type: row.type as ScoreAccountInput["type"],
-        institution: row.institution,
-        currentBalance: Number(row.current_balance),
-        creditLimit: row.credit_limit === null ? null : Number(row.credit_limit),
-        // Stored as a percent (per src/lib/validation/transactions.ts's accountSchema,
-        // e.g. 6.25 meaning 6.25%); the engine's interest-burden metric expects a
-        // decimal APR (0.0625), so convert at this data boundary only.
-        interestRate: percentToDecimal(row.interest_rate === null ? null : Number(row.interest_rate)),
-        includeInCalculations: row.include_in_calculations,
-        provider: row.provider,
-      })),
+      .map((row) => {
+        const eff = effectiveAnchor(anchorsByAccount.get(row.id) ?? []) as
+          | (BalanceAnchor & { source: string; freshness: string; observedAt: string; discrepancy: number | null })
+          | null;
+        const connected = row.provider === "plaid";
+        return {
+          id: row.id,
+          type: row.type as ScoreAccountInput["type"],
+          institution: row.institution,
+          currentBalance: Number(row.current_balance),
+          creditLimit: row.credit_limit === null ? null : Number(row.credit_limit),
+          // Stored as a percent (per src/lib/validation/transactions.ts's accountSchema,
+          // e.g. 6.25 meaning 6.25%); the engine's interest-burden metric expects a
+          // decimal APR (0.0625), so convert at this data boundary only.
+          interestRate: percentToDecimal(row.interest_rate === null ? null : Number(row.interest_rate)),
+          includeInCalculations: row.include_in_calculations,
+          provider: row.provider,
+          connectionStatus: connected ? row.connection_status : null,
+          lastSyncedAt: connected ? row.last_synced_at : null,
+          // A disconnected Item can never finish loading; don't cap confidence on its leftover accounts.
+          historyComplete: connected && row.plaid_items && row.plaid_items.status !== "disconnected"
+            ? row.plaid_items.history_complete_at !== null
+            : null,
+          balanceFreshness: (eff?.freshness as ScoreAccountInput["balanceFreshness"]) ?? null,
+          balanceObservedAt: eff?.observedAt ?? null,
+          latestSyncDiscrepancy: eff && eff.source === "sync" ? eff.discrepancy : null,
+        };
+      }),
     events: eventRows.map(rowToEvent),
   };
 }
@@ -434,14 +467,25 @@ export async function getFreshnessData(supabase: SupabaseClient): Promise<Freshn
 export async function getRecentImports(supabase: SupabaseClient): Promise<RecentImport[]> {
   interface RecentImportRow {
     id: string; import_batch_id: string; posted_date: string; created_at: string;
-    financial_accounts: { display_name: string };
+    financial_accounts: { display_name: string; provider: string };
   }
-  const rows = await paginateSelect<RecentImportRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
-    supabase.from("transactions")
-      .select("id, import_batch_id, posted_date, created_at, financial_accounts!inner(display_name)")
-      .not("import_batch_id", "is", null)
-      .order("id", { ascending: true })
-      .range(from, to) as unknown as PromiseLike<{ data: RecentImportRow[] | null; error: { message: string } | null }>);
+  // Non-synced (csv/pdf/manual) batches are derived from their rows, as before.
+  // Synced rows are excluded here so the scan stays bounded to imports; synced
+  // batches come from import_batches (bounded, newest first) with the counts
+  // the commit recorded in sync_metadata.
+  const [rows, syncedRes] = await Promise.all([
+    paginateSelect<RecentImportRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      supabase.from("transactions")
+        .select("id, import_batch_id, posted_date, created_at, financial_accounts!inner(display_name, provider)")
+        .not("import_batch_id", "is", null)
+        .neq("financial_accounts.provider", "plaid")
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: RecentImportRow[] | null; error: { message: string } | null }>),
+    supabase.from("import_batches")
+      .select("id, source_type, detected_institution, confirmed_at, created_at, sync_metadata")
+      .eq("source_type", "connected_account").eq("status", "confirmed")
+      .order("created_at", { ascending: false }).limit(20),
+  ]);
   const groups = new Map<string, RecentImport>();
   for (const r of rows) {
     const g = groups.get(r.import_batch_id);
@@ -453,6 +497,7 @@ export async function getRecentImports(supabase: SupabaseClient): Promise<Recent
         firstDate: r.posted_date,
         lastDate: r.posted_date,
         importedAt: r.created_at,
+        source: null,
       });
     } else {
       g.rowCount++;
@@ -461,7 +506,64 @@ export async function getRecentImports(supabase: SupabaseClient): Promise<Recent
       if (r.created_at > g.importedAt) g.importedAt = r.created_at;
     }
   }
-  return [...groups.values()].sort((a, b) => (a.importedAt < b.importedAt ? 1 : -1));
+  const batchIds = [...groups.keys()];
+  if (batchIds.length > 0) {
+    const { data: batchRows } = await supabase.from("import_batches").select("id, source_type").in("id", batchIds);
+    for (const b of (batchRows ?? []) as { id: string; source_type: string }[]) {
+      const g = groups.get(b.id);
+      if (g) g.source = b.source_type as RecentImport["source"];
+    }
+  }
+  interface SyncedBatchRow {
+    id: string; source_type: string; detected_institution: string | null; confirmed_at: string | null; created_at: string;
+    sync_metadata: { counts?: { inserted?: number } } | null;
+  }
+  const synced: RecentImport[] = ((syncedRes.data ?? []) as SyncedBatchRow[])
+    .map((b) => ({
+      batchId: b.id,
+      accountName: b.detected_institution ?? "Connected institution",
+      rowCount: b.sync_metadata?.counts?.inserted ?? 0,
+      firstDate: (b.confirmed_at ?? b.created_at).slice(0, 10),
+      lastDate: (b.confirmed_at ?? b.created_at).slice(0, 10),
+      importedAt: b.confirmed_at ?? b.created_at,
+      source: "connected_account" as const,
+    }))
+    .filter((b) => b.rowCount > 0);
+  return [...groups.values(), ...synced].sort((a, b) => (a.importedAt < b.importedAt ? 1 : -1));
+}
+
+const STILL_BILLABLE_AFTER_DAYS = 30;
+
+/** Linked Plaid Items for the Connected-institutions card, plus the household's history-completeness flag. */
+export async function getConnectedItems(supabase: SupabaseClient, now: Date = new Date()): Promise<{ items: ConnectedItemSummary[]; historicalDataComplete: boolean }> {
+  const [itemRes, acctRes] = await Promise.all([
+    supabase.from("plaid_items")
+      .select("id, institution_name, status, error_code, last_synced_at, history_complete_at, last_sync_attempt_at, created_at")
+      .order("created_at", { ascending: true }),
+    supabase.from("financial_accounts").select("plaid_item_id").not("plaid_item_id", "is", null).is("archived_at", null),
+  ]);
+  if (itemRes.error) throw itemRes.error;
+  if (acctRes.error) throw acctRes.error;
+  const counts = new Map<string, number>();
+  for (const a of (acctRes.data ?? []) as { plaid_item_id: string }[]) counts.set(a.plaid_item_id, (counts.get(a.plaid_item_id) ?? 0) + 1);
+  interface ItemRow {
+    id: string; institution_name: string | null; status: ConnectedItemSummary["status"]; error_code: string | null;
+    last_synced_at: string | null; history_complete_at: string | null; last_sync_attempt_at: string | null; created_at: string;
+  }
+  const items = ((itemRes.data ?? []) as ItemRow[]).map((r) => {
+    const broken = r.status === "error" || r.status === "login_required" || r.status === "disconnect_pending";
+    const since = r.last_synced_at ?? r.created_at;
+    const stillBillable = broken && now.getTime() - Date.parse(since) > STILL_BILLABLE_AFTER_DAYS * 86_400_000;
+    return {
+      id: r.id, institutionName: r.institution_name, status: r.status, errorCode: r.error_code,
+      lastSyncedAt: r.last_synced_at, historyCompleteAt: r.history_complete_at,
+      accountCount: counts.get(r.id) ?? 0, stillBillable,
+    };
+  });
+  const historicalDataComplete = items
+    .filter((i) => i.status !== "disconnected")
+    .every((i) => i.historyCompleteAt !== null);
+  return { items, historicalDataComplete };
 }
 
 export interface RecurringListItem extends RecurringSeries {

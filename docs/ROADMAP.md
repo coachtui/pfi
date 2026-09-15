@@ -114,7 +114,11 @@ Goals; deterministic scenario engine (income/expense/debt/savings/purchase/incom
 
 Anonymized cohorts with minimum sizes + suppression; percentile rankings on normalized improvement metrics (never absolute wealth); challenges, badges, quarterly seasons; opt-in public tickers; anti-gaming + data-coverage requirements. Exit: private data never exposed; opt-out works; manipulation constrained.
 
-## Phase 7 — Account aggregation
+## Phase 7 — Account aggregation (opened early 2026-09-14 — Slice 1 implemented on `worktree-plaid-slice1`, pending credentials-gated verification and merge; DECISIONS #43)
+
+- Slice 1 (2026-09-14): Plaid Link + `/transactions/sync` behind the existing provider/anchor/import-batch pipes — user-driven sync, transactional commit RPC, encrypted service-role-only tokens, deterministic PFCv2 categorization, conservative pairing, roster reconciliation, cached-balance anchors, partial-history product state, source-reliability confidence, Connected-institutions UI. Manual accounts unchanged.
+- Slice 2 (next): production cut-over — per-Item pricing check, OAuth redirect URI, privacy/consent language, real institutions; driver-event derivation for real data.
+- Slice 3: user-scoped rebuild refactor, verified webhook route, daily cron; investments holdings spec.
 
 Plaid/MX evaluation behind the existing provider abstraction; linking, incremental sync, connection health, reconciliation, webhooks; production security review. Exit: sync failures visible/recoverable; duplicates and transfers tested.
 

@@ -3,6 +3,7 @@ import type { DailySnapshot } from "./types";
 import {
   buildMetricInputs,
   type ScoreAccountInput, type ScoreTransactionInput,
+  computeSourceReliability,
 } from "./metric-inputs";
 
 const AS_OF = "2026-07-15";
@@ -182,5 +183,47 @@ describe("buildMetricInputs", () => {
       AS_OF,
     );
     expect(inputs.totals.essential).toBe(300);
+  });
+});
+
+describe("computeSourceReliability", () => {
+  const asOf = "2026-09-14";
+  const acct = (over: Partial<ScoreAccountInput>): ScoreAccountInput => ({
+    id: over.id ?? "a", type: "checking", institution: null, currentBalance: 100, creditLimit: null, interestRate: null,
+    includeInCalculations: true, provider: "plaid", connectionStatus: "ok", lastSyncedAt: "2026-09-14T08:00:00Z",
+    historyComplete: true, balanceFreshness: "cached", balanceObservedAt: "2026-09-14T08:00:00Z", latestSyncDiscrepancy: 0, ...over,
+  });
+  const txn = (category: string | null, direction: "inflow" | "outflow" = "outflow", isTransfer = false): ScoreTransactionInput => ({
+    id: Math.random().toString(), accountId: "a", postedDate: asOf, amount: 10, direction, category, essential: null, isTransfer, transferPairId: null, description: "x",
+  });
+
+  it("is clean for a fresh, complete, reconciled connected account", () => {
+    expect(computeSourceReliability([acct({})], [txn("dining")], asOf)).toEqual({
+      historyIncomplete: false, staleConnectedShare: 0, cachedBalanceStale: false, syncDiscrepancy: false, otherCategoryShare: 0,
+    });
+  });
+
+  it("ignores non-connected accounts for connection signals", () => {
+    const manual = acct({ id: "m", provider: "manual", connectionStatus: null, lastSyncedAt: null, historyComplete: null, balanceFreshness: "entered", latestSyncDiscrepancy: null });
+    expect(computeSourceReliability([manual], [], asOf).staleConnectedShare).toBe(0);
+  });
+
+  it("flags incomplete history, stale/non-ok connections, stale cached balances, and discrepancies", () => {
+    const r = computeSourceReliability([
+      acct({ id: "1", historyComplete: false }),
+      acct({ id: "2", connectionStatus: "login_required" }),
+      acct({ id: "3", lastSyncedAt: "2026-07-01T00:00:00Z" }),
+      acct({ id: "4", balanceObservedAt: "2026-09-13T23:00:00Z" }),
+      acct({ id: "5", latestSyncDiscrepancy: -12.5 }),
+    ], [], asOf);
+    expect(r.historyIncomplete).toBe(true);
+    expect(r.staleConnectedShare).toBeCloseTo(2 / 5);
+    expect(r.cachedBalanceStale).toBe(true);
+    expect(r.syncDiscrepancy).toBe(true);
+  });
+
+  it("measures the Other share over non-transfer outflows only", () => {
+    const r = computeSourceReliability([acct({})], [txn("other"), txn("dining"), txn("other", "inflow"), txn("other", "outflow", true)], asOf);
+    expect(r.otherCategoryShare).toBe(0.5);
   });
 });

@@ -193,11 +193,26 @@ export function TransactionDetailSheet({
             {txn.accountName} · {formatShortDate(txn.postedDate)} · {inflow ? "Money in" : "Money out"}
             {txn.isTransfer ? " · Transfer" : ""}
           </p>
-          {(txn.accountProvider !== "manual" || txn.importBatchId !== null) && (
+          {txn.accountProvider === "plaid" ? (
+            <p className="mt-1 text-xs text-tertiary">
+              Synced from your bank — amount and date are locked; corrections below are tracked. Removing it isn&apos;t possible here;
+              disconnect the institution from Accounts to remove its data.
+            </p>
+          ) : (txn.accountProvider !== "manual" || txn.importBatchId !== null) && (
             <p className="mt-1 text-xs text-tertiary">
               {txn.importBatchId !== null
                 ? "CSV-imported data — amount and date are locked; corrections below are tracked. To remove it, undo the whole import from Accounts."
                 : `Imported ${txn.accountProvider} data — amount and date are locked; corrections below are tracked.`}
+            </p>
+          )}
+          {txn.accountProvider === "plaid" && txn.categoryConfidence && (
+            <p className="mt-1 text-xs text-tertiary">
+              Bank&apos;s category confidence: {txn.categoryConfidence.replace("_", " ")} (about its category only — not your score&apos;s confidence)
+            </p>
+          )}
+          {txn.accountProvider === "plaid" && !txn.isTransfer && (txn.pfcPrimary === "TRANSFER_IN" || txn.pfcPrimary === "TRANSFER_OUT") && (
+            <p className="mt-1 text-xs text-warning">
+              Possible transfer — no matching transaction was found in another account, so it counts as money {inflow ? "in" : "out"}. Recategorize if that&apos;s wrong.
             </p>
           )}
           {txn.accountProvider === "manual" && txn.importBatchId === null && (

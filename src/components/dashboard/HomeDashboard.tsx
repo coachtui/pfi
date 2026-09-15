@@ -15,6 +15,7 @@ import { PerformanceBrief } from "@/components/dashboard/PerformanceBrief";
 import { ScoreCard } from "@/components/dashboard/ScoreCard";
 import { Segmented } from "@/components/ui/Segmented";
 import { StaleDataBanner } from "@/components/dashboard/StaleDataBanner";
+import { HistoryLoadingNotice } from "@/components/dashboard/HistoryLoadingNotice";
 import { WhatMovedYourLine } from "@/components/dashboard/WhatMovedYourLine";
 import type { BriefNarrationResult, DivergenceNarrationResult, DriverExplanationsResult } from "@/lib/data/narration";
 import type { ScoreSummary } from "@/lib/data/queries";
@@ -75,6 +76,8 @@ interface HomeDashboardProps {
   scoreSummary: ScoreSummary;
   /** True when a snapshot rebuild is pending/failed and the chart may lag recent edits. */
   staleIndex?: boolean;
+  /** True while any connected institution is still loading its transaction history (Plaid Slice 1). */
+  historyLoading?: boolean;
   freshness: { currentThrough: string | null; showNudge: boolean };
   narration: Promise<BriefNarrationResult | null>;
   driverNarration: Promise<DriverExplanationsResult | null>;
@@ -88,6 +91,7 @@ export function HomeDashboard({
   events,
   scoreSummary,
   staleIndex,
+  historyLoading,
   freshness,
   narration,
   driverNarration,
@@ -125,6 +129,7 @@ export function HomeDashboard({
 
   return (
     <div className="flex flex-col gap-4">
+      {historyLoading && <HistoryLoadingNotice />}
       <CompanyHeader
         companyName={profile.companyName}
         ticker={profile.ticker}

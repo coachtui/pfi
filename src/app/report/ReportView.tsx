@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Share2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { HistoryLoadingNotice } from "@/components/dashboard/HistoryLoadingNotice";
 import { Segmented } from "@/components/ui/Segmented";
 import { FinancialChart } from "@/components/chart/FinancialChart";
 import { FinancialTerm } from "@/components/concepts/FinancialTerm";
@@ -34,7 +35,7 @@ interface ReportViewProps {
   events: FinancialEvent[];
 }
 
-export function ReportView({ companyName, ticker, snapshots, transactions, events }: ReportViewProps) {
+export function ReportView({ companyName, ticker, snapshots, transactions, events, historyLoading = false }: ReportViewProps & { historyLoading?: boolean }) {
   const [granularity, setGranularity] = useState<ReportGranularity>("quarterly");
 
   const indexPoints = useMemo(() => buildIndexSeries(snapshots).points, [snapshots]);
@@ -67,6 +68,7 @@ export function ReportView({ companyName, ticker, snapshots, transactions, event
 
   return (
     <div className="flex flex-col gap-6">
+      {historyLoading && <HistoryLoadingNotice />}
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-primary">Report</h1>

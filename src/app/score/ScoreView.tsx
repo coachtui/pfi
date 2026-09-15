@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { HistoryLoadingNotice } from "@/components/dashboard/HistoryLoadingNotice";
 import { Segmented } from "@/components/ui/Segmented";
 import { momentumLabel, type ConfidenceLevel, type MomentumState } from "@/lib/financial-engine";
 import { FinancialTerm } from "@/components/concepts/FinancialTerm";
@@ -42,12 +43,13 @@ function signedPoints(n: number): string {
   return `${sign}${Math.abs(n)}`;
 }
 
-export function ScoreView({ data }: { data: ScoreData }) {
+export function ScoreView({ data, historyLoading = false }: { data: ScoreData; historyLoading?: boolean }) {
   const router = useRouter();
   const { breakdown, delta, momentum, improvements, range } = data;
 
   return (
     <div className="flex flex-col gap-4">
+      {historyLoading && <HistoryLoadingNotice />}
       <div className="flex items-center gap-3">
         <Link href="/" aria-label="Back to dashboard" className="rounded-lg p-1 text-secondary hover:text-primary">
           <ArrowLeft size={20} />

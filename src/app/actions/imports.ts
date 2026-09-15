@@ -810,6 +810,15 @@ export async function undoImport(batchId: string): Promise<MutationResult> {
   if (!user) return { error: "Not authenticated" };
   if (!z.uuid().safeParse(batchId).success) return { error: "Invalid import" };
 
+  // Synced (Plaid) batches are never undone here: the Item's cursor has moved
+  // past those rows, so Plaid would not resend them. Disconnect-and-delete is
+  // the only removal path for synced data (DECISIONS #43). Server-side check —
+  // the UI hides the button, but the action is the trust boundary.
+  const { data: batchRow } = await supabase.from("import_batches").select("source_type").eq("id", batchId).eq("user_id", user.id).maybeSingle();
+  if (batchRow?.source_type === "connected_account") {
+    return { error: "Synced batches can't be undone. To remove a bank's data, disconnect the institution from Accounts." };
+  }
+
   const { data: deleted, error: delErr } = await supabase
     .from("transactions")
     .delete()
