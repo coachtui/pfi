@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import { createLinkToken, createUpdateLinkToken, exchangePublicToken, syncItem, type SyncResult } from "@/app/actions/plaid";
-import { clearLinkSession, saveLinkSession, type LinkMode, type LinkResult, type LinkSession } from "./link-session";
+import { clearLinkSession, linkStorage, saveLinkSession, type LinkMode, type LinkResult, type LinkSession } from "./link-session";
 
 export type LinkBusy = "link" | "connect" | { itemId: string } | null;
 
@@ -35,6 +35,8 @@ function summarizeExchange(x: Awaited<ReturnType<typeof exchangePublicToken>>): 
  * session; `receivedRedirectUri` must be the full return URL in that case.
  */
 export function usePfiPlaidLink(opts: {
+  /** The signed-in user; bound into the stored session so a resume by anyone else is refused. */
+  userId: string;
   onResult: (result: LinkResult) => void;
   /** Link closed without a result (user backed out). */
   onCancel?: () => void;
@@ -85,15 +87,18 @@ export function usePfiPlaidLink(opts: {
 
   const { open, ready, error: sdkError } = usePlaidLink({
     token: linkToken,
-    receivedRedirectUri: opts.receivedRedirectUri,
+    // Only while a token is live: react-plaid-link re-creates a handler whenever
+    // token OR receivedRedirectUri is set, so leaving the URI in place after
+    // success would spin up a second, tokenless Link on the return page.
+    receivedRedirectUri: linkToken ? opts.receivedRedirectUri : undefined,
     onSuccess: (publicToken, metadata) => {
       setLinkToken(null);
-      clearLinkSession(window.sessionStorage);
+      clearLinkSession(linkStorage());
       finish(publicToken, metadata);
     },
     onExit: (err) => {
       setLinkToken(null);
-      clearLinkSession(window.sessionStorage);
+      clearLinkSession(linkStorage());
       if (err) onResultRef.current({ ok: false, message: `Plaid Link closed with an error (${err.error_code ?? "unknown"}). Try again.` });
       else onCancelRef.current?.();
     },
@@ -118,10 +123,10 @@ export function usePfiPlaidLink(opts: {
         onResultRef.current({ ok: false, message: res.error || "Could not start Plaid Link." });
         return;
       }
-      saveLinkSession(window.sessionStorage, { linkToken: res.linkToken, mode });
+      saveLinkSession(linkStorage(), { linkToken: res.linkToken, mode, userId: opts.userId });
       setLinkToken(res.linkToken);
     });
-  }, []);
+  }, [opts.userId]);
 
   return { startLink, busy, pending, linkOpen: linkToken !== null };
 }

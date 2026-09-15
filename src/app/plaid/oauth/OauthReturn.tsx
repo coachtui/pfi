@@ -5,31 +5,31 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CircleX, Hourglass, TriangleAlert } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { clearLinkSession, readLinkSession, saveLinkResult, type LinkResult, type LinkSession } from "@/app/accounts/link-session";
+import { clearLinkSession, linkStorage, readLinkSession, saveLinkResult, type LinkResult, type LinkSession } from "@/app/accounts/link-session";
 import { usePfiPlaidLink } from "@/app/accounts/usePfiPlaidLink";
 
 type Phase = { kind: "loading" } | { kind: "resume"; session: LinkSession; returnUrl: string } | { kind: "expired" } | { kind: "error"; message: string };
 
-export function OauthReturn() {
+export function OauthReturn({ userId }: { userId: string }) {
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
 
-  // One-time read of client-only APIs (sessionStorage, location) after mount;
+  // One-time read of client-only APIs (localStorage, location) after mount;
   // not the derived-state anti-pattern the set-state-in-effect rule targets.
   useEffect(() => {
-    const session = readLinkSession(window.sessionStorage);
+    const session = readLinkSession(linkStorage(), userId);
     // Plaid always returns with an oauth_state_id; a bare visit is a stale bookmark.
     const returned = /[?#]/.test(window.location.href);
-    if (session && !returned) clearLinkSession(window.sessionStorage);
+    if (session && !returned) clearLinkSession(linkStorage());
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase(session && returned ? { kind: "resume", session, returnUrl: window.location.href } : { kind: "expired" });
-  }, []);
+  }, [userId]);
 
   return (
     <div className="mx-auto flex min-h-[60dvh] max-w-md flex-col justify-center" data-testid="plaid-oauth-return">
       <Card className="flex flex-col gap-3 p-5">
         {phase.kind === "loading" && <Status icon={<Hourglass size={16} aria-hidden />} text="Finishing your bank sign-in…" />}
         {phase.kind === "resume" && (
-          <ResumeLink session={phase.session} returnUrl={phase.returnUrl} onError={(message) => setPhase({ kind: "error", message })} />
+          <ResumeLink userId={userId} session={phase.session} returnUrl={phase.returnUrl} onError={(message) => setPhase({ kind: "error", message })} />
         )}
         {phase.kind === "expired" && (
           <>
@@ -66,15 +66,16 @@ function BackLink() {
 }
 
 /** Mounted only once a session exists: re-initializes Link at the redirect URI and hands the result to the card. */
-function ResumeLink({ session, returnUrl, onError }: { session: LinkSession; returnUrl: string; onError: (message: string) => void }) {
+function ResumeLink({ userId, session, returnUrl, onError }: { userId: string; session: LinkSession; returnUrl: string; onError: (message: string) => void }) {
   const router = useRouter();
   const [finishing, setFinishing] = useState(false);
   const { busy } = usePfiPlaidLink({
+    userId,
     resume: session,
     receivedRedirectUri: returnUrl,
     onResult: (result: LinkResult) => {
       if (!result.ok) { onError(result.message); return; }
-      saveLinkResult(window.sessionStorage, result);
+      saveLinkResult(linkStorage(), result);
       setFinishing(true);
       router.replace("/accounts");
     },

@@ -99,6 +99,10 @@ const SPENDING_ACCOUNT_TYPES: ReadonlySet<AccountType> = new Set([...LIQUID_TYPE
 const LARGE_PURCHASE_CATEGORIES: ReadonlySet<string> = new Set(["shopping", "discretionary", "transport", "other"]);
 const UNEXPECTED_CATEGORIES: ReadonlySet<string> = new Set(["health", "housing"]);
 const UNEXPECTED_DETAILS: ReadonlySet<string> = new Set(["HOME_IMPROVEMENT_REPAIR_AND_MAINTENANCE", "GENERAL_SERVICES_AUTOMOTIVE"]);
+/** Plaid primaries that are money movement, not spending — never a one-off purchase even when unpaired (Zelle, ATM, transfer to an unlinked bank). */
+const MOVEMENT_PRIMARIES: ReadonlySet<string> = new Set(["TRANSFER_OUT", "TRANSFER_IN", "BANK_FEES"]);
+/** Revolving liabilities: a zero balance is routine, so v1 never calls a payment on them a payoff. */
+const REVOLVING_TYPES: ReadonlySet<AccountType> = new Set(["credit_card", "other_liability"]);
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -167,9 +171,10 @@ export function deriveEvents(input: DeriveEventsInput): DerivedEvent[] {
     ? Math.max(BONUS_FLOOR, round2(BONUS_MULTIPLIER * median(paycheckSeries.map((s) => s.typicalAmount))))
     : null;
 
-  // One-off outflows (non-transfer, not a series occurrence, spending accounts) feed the relative threshold.
+  // One-off outflows (non-transfer, not money movement, not a series occurrence, spending accounts) feed the relative threshold.
+  const isMovement = (t: EventTransactionInput) => t.isTransfer || (t.pfcPrimary !== null && MOVEMENT_PRIMARIES.has(t.pfcPrimary));
   const oneOffOutflows = txns.filter(
-    (t) => t.direction === "outflow" && !t.isTransfer && !seriesFor(t) && SPENDING_ACCOUNT_TYPES.has(accountType(t.accountId) as AccountType),
+    (t) => t.direction === "outflow" && !isMovement(t) && !seriesFor(t) && SPENDING_ACCOUNT_TYPES.has(accountType(t.accountId) as AccountType),
   );
   const windowSamplesBefore = (date: ISODate): number[] => {
     const start = addDays(date, -(THRESHOLD_WINDOW_DAYS - 1));
@@ -185,6 +190,8 @@ export function deriveEvents(input: DeriveEventsInput): DerivedEvent[] {
   // Payoff needs history that actually covers the payment date: a balance
   // series that starts later says nothing about what happened in between.
   const paidOffAfter = (accountId: string, date: ISODate): boolean => {
+    const type = accountType(accountId);
+    if (type === null || REVOLVING_TYPES.has(type)) return false;
     const points = balancesByAccount.get(accountId) ?? [];
     if (points.length === 0 || points[0].date > date) return false;
     const after = points.filter((p) => p.date >= date);
@@ -249,7 +256,7 @@ export function deriveEvents(input: DeriveEventsInput): DerivedEvent[] {
       push(t, "insurance_payment", titleCase(series.displayName));
       continue;
     }
-    if (t.isTransfer || series !== null || !SPENDING_ACCOUNT_TYPES.has(acctType)) continue;
+    if (isMovement(t) || series !== null || !SPENDING_ACCOUNT_TYPES.has(acctType)) continue;
 
     const unexpected = (t.category !== null && UNEXPECTED_CATEGORIES.has(t.category))
       || (t.pfcDetailed !== null && UNEXPECTED_DETAILS.has(t.pfcDetailed))
@@ -267,7 +274,7 @@ export function deriveEvents(input: DeriveEventsInput): DerivedEvent[] {
     byBucket.set(key, [...(byBucket.get(key) ?? []), e]);
   }
   for (const list of byBucket.values()) {
-    list.sort((a, b) => b.amount - a.amount || (a.date < b.date ? -1 : 1));
+    list.sort((a, b) => b.amount - a.amount || (a.date < b.date ? -1 : a.date > b.date ? 1 : a.transactionId < b.transactionId ? -1 : 1));
     events.push(...list.slice(0, ONE_OFF_MONTHLY_CAP));
   }
 

@@ -39,6 +39,7 @@ export function AccountsView({
   asOfByAccount,
   connectedItems,
   plaid,
+  userId,
 }: {
   accounts: AccountSummary[];
   recentImports: RecentImport[];
@@ -47,6 +48,7 @@ export function AccountsView({
   connectedItems: ConnectedItemSummary[];
   /** Non-null when bank connections are configured (cap + environment for the card). */
   plaid: PlaidUiConfig | null;
+  userId: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -95,6 +97,7 @@ export function AccountsView({
       )}
 
       <ConnectedInstitutionsCard
+        userId={userId}
         items={connectedItems}
         plaid={plaid}
         hasDemo={accounts.some((a) => a.provider === "demo" && a.archivedAt === null)}

@@ -33,6 +33,7 @@ export default async function AccountsPage() {
       asOfByAccount={freshness.asOfByAccount}
       connectedItems={connected.items}
       plaid={plaid}
+      userId={profile.id}
     />
   );
 }

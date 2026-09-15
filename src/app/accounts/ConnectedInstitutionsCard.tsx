@@ -8,7 +8,7 @@ import { InlineError } from "@/components/ui/InlineError";
 import { deleteItemData, disconnectItem, syncItem, type SyncResult } from "@/app/actions/plaid";
 import type { ConnectedItemSummary } from "@/lib/data/mappers";
 import { ConnectDisclosureSheet } from "./ConnectDisclosureSheet";
-import { hasSeenDisclosure, markDisclosureSeen, takeLinkResult, type LinkMode, type LinkResult } from "./link-session";
+import { hasSeenDisclosure, linkStorage, markDisclosureSeen, takeLinkResult, type LinkMode, type LinkResult } from "./link-session";
 import { summarizeSync, usePfiPlaidLink } from "./usePfiPlaidLink";
 
 /** What the card needs from the server-side Plaid config (never the keys). */
@@ -44,10 +44,12 @@ export function relativeTime(iso: string | null, now: number = Date.now()): stri
 }
 
 export function ConnectedInstitutionsCard({
+  userId,
   items,
   plaid,
   hasDemo,
 }: {
+  userId: string;
   items: ConnectedItemSummary[];
   /** Null when bank connections are not configured in this environment. */
   plaid: PlaidUiConfig | null;
@@ -69,13 +71,13 @@ export function ConnectedInstitutionsCard({
     router.refresh();
   };
 
-  const link = usePfiPlaidLink({ onResult: showResult });
+  const link = usePfiPlaidLink({ userId, onResult: showResult });
 
   // A result handed back from the OAuth return page (spec §1a): a one-time
-  // read of a client-only API (sessionStorage) that cannot be computed during
+  // read of a client-only API (localStorage) that cannot be computed during
   // render — not the derived-state anti-pattern the lint rule targets.
   useEffect(() => {
-    const r = takeLinkResult(window.sessionStorage);
+    const r = takeLinkResult(linkStorage());
     if (!r) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!r.ok) setError(r.message);
@@ -124,7 +126,7 @@ export function ConnectedInstitutionsCard({
   const startLink = (mode: LinkMode) => {
     setError(null);
     setNotice(null);
-    if (mode.kind === "connect" && !hasSeenDisclosure(window.localStorage)) {
+    if (mode.kind === "connect" && !hasSeenDisclosure(linkStorage())) {
       setDisclosure({ open: true, next: mode });
       return;
     }
@@ -132,7 +134,7 @@ export function ConnectedInstitutionsCard({
   };
 
   const continueFromDisclosure = () => {
-    markDisclosureSeen(window.localStorage);
+    markDisclosureSeen(linkStorage());
     const next = disclosure.next;
     setDisclosure({ open: false, next: null });
     if (next) link.startLink(next);
@@ -279,7 +281,7 @@ export function ConnectedInstitutionsCard({
           <div className="flex flex-col gap-1">
             <button
               type="button"
-              disabled={anyPending || linkBusy !== null || atCap}
+              disabled={anyPending || linkBusy !== null || link.linkOpen || atCap}
               onClick={() => startLink({ kind: "connect" })}
               className="self-start rounded-xl bg-positive-strong px-4 py-2 text-sm font-semibold text-base disabled:opacity-60"
             >

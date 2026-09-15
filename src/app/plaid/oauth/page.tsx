@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { branding } from "@/lib/config/branding";
+import { createClient } from "@/lib/supabase/server";
 import { OauthReturn } from "./OauthReturn";
 
 export const metadata: Metadata = { title: `Finishing your bank sign-in — ${branding.productName}` };
@@ -9,6 +11,9 @@ export const metadata: Metadata = { title: `Finishing your bank sign-in — ${br
  * other page; all the work happens client-side in OauthReturn, which resumes
  * the Link session stored before the redirect.
  */
-export default function PlaidOauthPage() {
-  return <OauthReturn />;
+export default async function PlaidOauthPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  return <OauthReturn userId={user.id} />;
 }

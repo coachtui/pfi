@@ -37,8 +37,8 @@ receives:
 - **Recurring series** — the same series the Recurring page shows, plus your
   confirm/dismiss status. A transaction "belongs" to a series when its account,
   direction, and normalised description match. A series counts only when you
-  confirmed it, or when it has at least three occurrences at medium or high
-  confidence and you have not dismissed it.
+  confirmed it, or when the Recurring page rates it medium or high confidence
+  (which takes several occurrences) and you have not dismissed it.
 - **Liability balance history** (optional) — used only to tell a payoff from a
   payment. When absent, a payment is never called a payoff.
 
@@ -61,7 +61,7 @@ listed; the first match wins.
 | `mortgage_payment`        | Plaid labels it `LOAN_PAYMENTS_MORTGAGE_PAYMENT`; **or** it is the outflow side of a transfer pair whose other side lands in a mortgage account; **or** it belongs to a housing series whose name contains "mortgage". |
 | `investment_contribution` | The outflow side of a transfer pair into a brokerage or retirement account; **or** (unpaired) Plaid labels it `TRANSFER_OUT_INVESTMENT_AND_RETIREMENT_FUNDS`. Counted once, on the outflow side. |
 | `debt_payment`            | The outflow side of a transfer pair into any other liability (credit card, loan, line of credit); **or** (unpaired) Plaid's primary category is `LOAN_PAYMENTS`.                       |
-| `debt_payoff`             | A `debt_payment` where the liability's balance history is at or below zero at every point on or after the payment date. Needs balance history; otherwise stays a payment.             |
+| `debt_payoff`             | A `debt_payment` into an installment liability (mortgage, auto, student, or personal loan) whose balance history is at or below zero at every point on or after the payment date. Needs balance history; otherwise stays a payment. Never for a credit card or line of credit — a zero balance there is routine, not a payoff. |
 | `tax_payment`             | Plaid labels it `GOVERNMENT_AND_NON_PROFIT_TAX_PAYMENT`.                                                                                                                              |
 | `insurance_payment`       | Categorised as insurance **and** belongs to a recurring series. A single insurance charge is not an event.                                                                             |
 
@@ -70,8 +70,10 @@ an event.
 
 ### One-off spending
 
-Only non-transfer outflows on spending accounts (checking, savings, money
-market, credit card) that do **not** belong to a recurring series are considered.
+Only outflows on spending accounts (checking, savings, money market, credit
+card) that are not transfers, not money movement Plaid labels `TRANSFER_OUT`
+or `BANK_FEES` (Zelle, ATM withdrawals, transfers to an unlinked bank), and
+that do **not** belong to a recurring series are considered.
 
 | Event                | Rule                                                                                                                                   |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -84,8 +86,8 @@ If there are at least five, the bar is
 **max($250, 2.5 × their median)**; with fewer samples the bar is $250. So a
 household whose typical one-off purchase is $80 flags anything from $250 up,
 while one whose typical purchase is $200 needs $500 before a purchase is
-called large. Recurring bills never enter the median, so a big mortgage
-does not raise the bar.
+called large. Bills that belong to an eligible recurring series never enter
+the median, so a big mortgage does not raise the bar.
 
 **Monthly cap.** Per calendar month and per type, only the three largest
 events survive. A month with eight big purchases shows the three biggest;
@@ -93,7 +95,7 @@ the rest remain ordinary transactions.
 
 ### What v1 deliberately does not do
 
-- No `debt_payoff` without liability balance history.
+- No `debt_payoff` without liability balance history, and none on revolving debt.
 - No events from accounts you excluded or archived.
 - No events for demo accounts (the demo dataset authors its own).
 - No use of merchant names beyond the series match; labels are the series

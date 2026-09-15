@@ -79,6 +79,7 @@ describe("plaidConfig", () => {
 
   it("accepts an https redirect URI and normalizes it; rejects query strings, fragments, and relative values", () => {
     expect(plaidConfig({ ...full, PLAID_REDIRECT_URI: "https://pfi-one.vercel.app/plaid/oauth" })?.redirectUri).toBe("https://pfi-one.vercel.app/plaid/oauth");
+    expect(() => plaidConfig({ ...full, PLAID_REDIRECT_URI: "https://pfi-one.vercel.app/accounts" })).toThrow(/plaid\/oauth/);
     expect(() => plaidConfig({ ...full, PLAID_REDIRECT_URI: "/plaid/oauth" })).toThrow(/absolute URL/);
     expect(() => plaidConfig({ ...full, PLAID_REDIRECT_URI: "https://pfi-one.vercel.app/plaid/oauth?x=1" })).toThrow(/query string/);
     expect(() => plaidConfig({ ...full, PLAID_REDIRECT_URI: "https://pfi-one.vercel.app/plaid/oauth#frag" })).toThrow(/fragment/);

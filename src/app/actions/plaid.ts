@@ -134,8 +134,11 @@ export async function exchangePublicToken(input: unknown): Promise<ExchangeResul
     .select("id").single();
   if (itemErr || !itemRow) {
     console.error(`[plaid] plaid_items insert failed: ${itemErr?.message ?? "no row"}`);
-    // A unique item_id collision means this Plaid Item is already recorded (a retried exchange); otherwise quarantine it.
-    if (itemErr?.code !== "23505") {
+    // Only a collision on Plaid's item_id means this Item is already recorded (a retried exchange).
+    // Any other failure — including the one-active-Item-per-institution index — leaves a live,
+    // billable Item that must be removed or recorded as retryable, never dropped.
+    const knownItem = itemErr?.code === "23505" && /plaid_items_item_id_key/.test(itemErr.message ?? "");
+    if (!knownItem) {
       await quarantineNewItem(supabase, user.id, client.cfg, accessToken, { plaidItemId, institutionId, institutionName: parsed.data.institutionName, reason: "ITEM_INSERT_FAILED" });
     }
     return { error: "Could not save the connection — try again." };
@@ -183,12 +186,15 @@ async function quarantineNewItem(
   const removed = client ? await removeItem(client.api, accessToken).then(() => true).catch(() => false) : false;
   if (removed) return;
   console.error(`[plaid] /item/remove failed during exchange rollback (${meta.reason}); keeping Item retryable`);
-  const { data: row, error } = await supabase.from("plaid_items")
+  const record = (institutionId: string | null) => supabase.from("plaid_items")
     .upsert(
-      { user_id: userId, item_id: meta.plaidItemId, institution_id: meta.institutionId, institution_name: meta.institutionName, status: "disconnect_pending", error_code: meta.reason },
+      { user_id: userId, item_id: meta.plaidItemId, institution_id: institutionId, institution_name: meta.institutionName, status: "disconnect_pending", error_code: meta.reason },
       { onConflict: "item_id" },
     )
     .select("id").single();
+  let { data: row, error } = await record(meta.institutionId);
+  // The per-institution active-Item index can refuse the row; record it without the institution rather than lose a billable Item.
+  if ((error || !row) && meta.institutionId) ({ data: row, error } = await record(null));
   if (error || !row) {
     console.error(`[plaid] could not record quarantined Item: ${error?.message ?? "no row"}`);
     return;

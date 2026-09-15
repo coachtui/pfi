@@ -44,6 +44,7 @@ function parseRedirectUri(value: string | undefined, environment: PlaidEnvironme
     throw new Error("PLAID_REDIRECT_URI must use https (http is allowed only for localhost in sandbox).");
   }
   if (url.search || url.hash) throw new Error("PLAID_REDIRECT_URI must not contain a query string or fragment (Plaid requires an exact match).");
+  if (url.pathname !== "/plaid/oauth") throw new Error("PLAID_REDIRECT_URI must point at this app's /plaid/oauth page.");
   return url.toString();
 }
 

@@ -112,11 +112,20 @@ describe("deriveEvents — transfers into other accounts", () => {
     expect(fromSeries.map((e) => e.type)).toEqual(["mortgage_payment"]);
   });
 
-  it("debt payoff when the liability's balance history stays at or below zero after the payment", () => {
+  it("a credit card paid in full is never a payoff (a zero balance is routine on revolving debt)", () => {
+    const [out, inn] = pair("chk", "card", "2026-08-13", 1200, "Statement payment");
+    const balances = [{ accountId: "card", date: "2026-08-12", balance: 1200 }, { accountId: "card", date: "2026-08-13", balance: 0 }, { accountId: "card", date: "2026-08-20", balance: 0 }];
+    expect(run({ transactions: [out, inn], liabilityBalances: balances }).map((e) => e.type)).toEqual(["debt_payment"]);
+  });
+
+  it("debt payoff when an installment loan's balance history stays at or below zero after the payment", () => {
+    const LOAN: EventAccountInput = { id: "card", type: "auto_loan", provider: "plaid", includeInCalculations: true, archived: false };
+    const runLoan = (over: Partial<DeriveEventsInput>) => deriveEvents({ accounts: [CHK, LOAN], transactions: [], series: [], ...over });
     const [out, inn] = pair("chk", "card", "2026-08-13", 1200, "Final payment");
     const balances = [
       { accountId: "card", date: "2026-08-12", balance: 1200 }, { accountId: "card", date: "2026-08-13", balance: 0 }, { accountId: "card", date: "2026-08-14", balance: 0 },
     ];
+    const run = runLoan;
     expect(run({ transactions: [out, inn], liabilityBalances: balances }).map((e) => e.type)).toEqual(["debt_payoff"]);
     expect(run({ transactions: [out, inn], liabilityBalances: [...balances, { accountId: "card", date: "2026-08-20", balance: 40 }] }).map((e) => e.type)).toEqual(["debt_payment"]);
     expect(run({ transactions: [out, inn] }).map((e) => e.type)).toEqual(["debt_payment"]); // no history → never payoff
@@ -181,6 +190,17 @@ describe("deriveEvents — one-off purchases (relative threshold + monthly cap)"
       txn({ postedDate: "2026-08-11", amount: 500, category: "shopping", description: "At bar" }),
     ] });
     expect(events.map((e) => e.label)).toEqual(["At bar"]);
+  });
+
+  it("unpaired money movement (Zelle, ATM, transfer to an unlinked bank, fees) is never a purchase and never feeds the median", () => {
+    const zelle = txn({ postedDate: "2026-08-10", amount: 1200, category: "other", pfcPrimary: "TRANSFER_OUT", pfcDetailed: "TRANSFER_OUT_ACCOUNT_TRANSFER", description: "ZELLE TO LANDLORD" });
+    const atm = txn({ postedDate: "2026-08-11", amount: 600, category: "other", pfcPrimary: "TRANSFER_OUT", pfcDetailed: "TRANSFER_OUT_WITHDRAWAL", description: "ATM" });
+    const fee = txn({ postedDate: "2026-08-12", amount: 300, category: "other", pfcPrimary: "BANK_FEES", pfcDetailed: "BANK_FEES_OVERDRAFT_FEES", description: "Overdraft" });
+    expect(run({ transactions: [zelle, atm, fee] })).toEqual([]);
+    // Movement rows do not raise the bar for real purchases either.
+    const movers = Array.from({ length: 6 }, (_, i) => txn({ postedDate: `2026-07-${String(i + 1).padStart(2, "0")}`, amount: 2000, category: "other", pfcPrimary: "TRANSFER_OUT", description: `Move ${i}` }));
+    const buy = txn({ postedDate: "2026-08-10", amount: 300, category: "shopping", description: "TV" });
+    expect(run({ transactions: [...movers, buy] }).map((e) => e.label)).toEqual(["TV"]);
   });
 
   it("unexpected expense for health/housing categories or repair details; never for recurring, transfers, or non-spending accounts", () => {

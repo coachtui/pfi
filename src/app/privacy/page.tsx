@@ -37,7 +37,8 @@ export default function PrivacyPage() {
           institution ends collection and revokes {name}&rsquo;s access at Plaid; your history stays
           in your account unless you choose &ldquo;Disconnect and delete data&rdquo;, which removes
           every account, balance, and transaction that came through that connection. Deleting your
-          {name} account deletes all of it.
+          {name} account deletes everything {name} holds; disconnect your institutions first so
+          that access at Plaid is revoked as well, or ask us to and we will do it for you.
         </p>
         <p>
           Plaid&rsquo;s handling of your data is governed by its own{" "}
