@@ -479,8 +479,10 @@ begin
   -- of rows; a per-row loop would risk statement_timeout and wedge the
   -- cursor). Idempotent via the partial unique index; pair keys captured so
   -- pairing can run once ids exist.
+  -- (Supabase's pg-safeupdate guard on API sessions rejects UPDATE/DELETE
+  -- without WHERE, so the temp table is truncated, never deleted from.)
   create temp table if not exists sync_pairs (pair_key text, txn_id uuid) on commit drop;
-  delete from sync_pairs;
+  truncate sync_pairs;
 
   with src as (
     select * from jsonb_to_recordset(coalesce(p_plan->'inserts', '[]')) as x(

@@ -402,11 +402,15 @@ try {
   check("commit_connected_sync: re-run inserts zero (idempotent)", !rpcAgainErr && rpcAgain?.inserted === 0, rpcAgainErr?.message ?? JSON.stringify(rpcAgain));
 
   // The provider-write flag never leaks: a direct provider-column update in the same session is still frozen.
-  const { data: plaidTxn } = await a.client.from("transactions").select("id").eq("external_id", "plaid-txn-1").single();
-  const { error: directAfterRpc } = await a.client.from("transactions").update({ amount: 1 }).eq("id", plaidTxn!.id);
-  check("immutability still enforced on a direct update after an RPC in the same session", !!directAfterRpc && /immutable/.test(directAfterRpc.message), directAfterRpc?.message ?? "no error");
-  const { error: directExternalId } = await a.client.from("transactions").update({ external_id: "evil" }).eq("id", plaidTxn!.id);
-  check("external_id is frozen", !!directExternalId);
+  const { data: plaidTxn } = await a.client.from("transactions").select("id").eq("external_id", "plaid-txn-1").maybeSingle();
+  if (plaidTxn) {
+    const { error: directAfterRpc } = await a.client.from("transactions").update({ amount: 1 }).eq("id", plaidTxn.id);
+    check("immutability still enforced on a direct update after an RPC in the same session", !!directAfterRpc && /immutable/.test(directAfterRpc.message), directAfterRpc?.message ?? "no error");
+    const { error: directExternalId } = await a.client.from("transactions").update({ external_id: "evil" }).eq("id", plaidTxn.id);
+    check("external_id is frozen", !!directExternalId);
+  } else {
+    check("synced row exists for the post-RPC immutability checks", false, "happy path did not insert plaid-txn-1");
+  }
 
   // Migration text: only the two audited RPCs SET the flag.
   const { readdirSync, readFileSync } = await import("node:fs");
