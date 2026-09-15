@@ -1,5 +1,7 @@
 # Security Model
 
+> The governing policy is `docs/INFORMATION_SECURITY_POLICY.md`; this document is its implementation record.
+
 Status: core auth + persistence security landed this phase (magic-link auth, schema, RLS, tenant-isolation tests). Real user accounts can exist now, though the only data flowing through the pipeline so far is the demo dataset (seeded through the real path — DECISIONS.md #10). This document states the rules the rest of persistence work (manual entry, CSV import, aggregation) must keep landing with.
 
 ## Current state (Phase 0–1)
