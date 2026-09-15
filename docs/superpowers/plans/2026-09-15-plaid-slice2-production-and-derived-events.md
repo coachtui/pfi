@@ -83,6 +83,6 @@
 
 ### Task 7: Docs, reviews, verification, PR
 
-- [ ] DATA_MODEL (events provenance + rebuild), SECURITY_MODEL (production runbook: env matrix, redirect URI, rollback; owner checklist), KNOWN_LIMITATIONS, ROADMAP, CURRENT_PHASE, DECISIONS #44 final notes; memory note `pfi-plaid-production-readiness`.
-- [ ] Reviews: `code-reviewer`, `security-reviewer` (OAuth return, sessionStorage token, cap, consent), `database-reviewer` (0016, trigger, RPC change). Fix findings.
-- [ ] `pnpm check`, `pnpm test:rls`, `pnpm test:live`, `pnpm test:e2e`, browser QA at 390 then 1280. Open PR; owner completes the Plaid dashboard checklist and links a real institution (acceptance criterion 5).
+- [x] DATA_MODEL (events provenance + rebuild + 0017/0018), SECURITY_MODEL (production runbook: env matrix, redirect URI, cap, rollback, account-deletion note; owner checklist), KNOWN_LIMITATIONS (resolved items + deferred review findings), ROADMAP, README, CURRENT_PHASE, DECISIONS #44 implementation notes, DRIVER_EVENTS; memory note `pfi-plaid-production-readiness`.
+- [x] Reviews: `code-reviewer`, `security-reviewer`, `database-reviewer` — findings fixed in two commits ("review fixes (database)", "review fixes (code + security)"); migrations 0017–0019 added and applied; deferred items recorded.
+- [x] `pnpm check` (lint/typecheck/unit; build with env), `pnpm test:rls` (83/83), `pnpm test:live` (Sandbox), `pnpm test:e2e`; browser QA at 390 then 1280 via `scripts/qa-plaid-link.ts` (non-OAuth path). Open PR; owner completes the Plaid dashboard checklist and links a real institution (acceptance criterion 5) — the OAuth path (`QA_OAUTH=1`) needs the localhost redirect URI registered first.
