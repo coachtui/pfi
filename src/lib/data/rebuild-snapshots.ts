@@ -4,9 +4,10 @@ import {
   buildDailySnapshots, deriveRebuildConfig, effectiveAnchor, rollForwardBalance,
   type AccountInput, type AccountType, type BalanceAnchor, type RecurringOverride,
 } from "@/lib/financial-engine";
-import { rowToTransactionInput, snapshotToRow, type TransactionRow } from "./mappers";
+import { rowToTransactionInput, snapshotToRow } from "./mappers";
 import { insertChunked } from "./insert-chunked";
 import { paginateSelect } from "./paginate";
+import { rebuildDerivedEvents, type DerivationAccountRow, type DerivationTransactionRow } from "./rebuild-derived-events";
 
 // PostgREST caps unbounded selects at 1000 rows; a demo profile or long-lived
 // real account can exceed that, which used to silently truncate the
@@ -15,9 +16,8 @@ import { paginateSelect } from "./paginate";
 // every day after the 1000th row's date).
 const PAGE_SIZE = 1000;
 
-interface RebuildAccountRow {
-  id: string; type: string; current_balance: number | null;
-  include_in_calculations: boolean; archived_at: string | null;
+interface RebuildAccountRow extends DerivationAccountRow {
+  current_balance: number | null;
 }
 
 /**
@@ -32,7 +32,9 @@ interface RebuildAccountRow {
  * retry-on-next-mutation covers the failure window. For accounts with
  * balance anchors, `current_balance` is corrected from the effective anchor
  * before building (DECISIONS #24); anchorless accounts keep their
- * hand-typed balance.
+ * hand-typed balance. Derived driver events (DECISIONS #44) are regenerated
+ * at the tail from the same loaded data, so every rebuild path — mutation,
+ * sync commit, dashboard repair — refreshes them together.
  */
 export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ error: string }> {
   try {
@@ -41,10 +43,10 @@ export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ erro
 
     const [acctRes, transactionRows, priorRows, overrideRows, anchorRows] = await Promise.all([
       supabase.from("financial_accounts")
-        .select("id, type, current_balance, include_in_calculations, archived_at"),
-      paginateSelect<TransactionRow>(PAGE_SIZE, (from, to) =>
+        .select("id, type, provider, current_balance, include_in_calculations, archived_at"),
+      paginateSelect<DerivationTransactionRow>(PAGE_SIZE, (from, to) =>
         supabase.from("transactions")
-          .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id")
+          .select("id, account_id, posted_date, amount, direction, description, category, essential, is_transfer, transfer_pair_id, user_override, pfc_primary, pfc_detailed")
           .order("id", { ascending: true })
           .range(from, to)),
       paginateSelect<{ date: string; safety_buffer: number }>(PAGE_SIZE, (from, to) =>
@@ -123,6 +125,22 @@ export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ erro
     if (config) {
       const snapshots = buildDailySnapshots(accounts, transactions, config, recurringOverrides);
       await insertChunked(supabase, "daily_snapshots", snapshots.map((s) => snapshotToRow(user.id, s)));
+    }
+
+    try {
+      await rebuildDerivedEvents(supabase, user.id, {
+        accounts: acctRes.data as RebuildAccountRow[],
+        transactions: transactionRows,
+        recurringOverrides: overrideRows,
+        anchorsByAccount,
+        referenceDate: config?.endDate ?? null,
+      });
+    } catch (e) {
+      // Snapshots are already correct, so the stale-index check would not fire
+      // again; remember the failure on the profile so the dashboard repairs it
+      // under the lease on the next load (same flag the sync path uses).
+      await supabase.from("user_profiles").update({ rebuild_pending_at: new Date().toISOString() }).eq("id", user.id);
+      throw e;
     }
     return { error: "" };
   } catch (e) {

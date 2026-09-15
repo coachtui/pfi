@@ -9,6 +9,7 @@ import {
   fetchAccounts, getPlaidClient, removeItem,
 } from "@/lib/plaid/client";
 import { encryptToken, keyVersionOf } from "@/lib/plaid/crypto";
+import { capMessage, countActiveItems } from "@/lib/plaid/items";
 import { mapAccount } from "@/lib/plaid/map-account";
 import { loadAccessToken, loadOwnedItem, syncAllItems, syncPlaidItem, type SyncOutcome } from "@/lib/plaid/sync";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -31,12 +32,14 @@ async function authed() {
 export interface LinkTokenResult { error: string; linkToken?: string }
 
 export async function createLinkToken(): Promise<LinkTokenResult> {
-  const { user } = await authed();
+  const { supabase, user } = await authed();
   if (!user) return { error: "Not authenticated" };
   const client = getPlaidClient();
   if (!client) return { error: "Bank connections are not configured." };
   try {
-    const { linkToken } = await plaidCreateLinkToken(client.api, user.id, { clientName: branding.productName });
+    // Item cap (spec §1c): enforced here, not only in the UI — each Item is billable.
+    if ((await countActiveItems(supabase, user.id)) >= client.cfg.maxItems) return { error: capMessage(client.cfg.maxItems) };
+    const { linkToken } = await plaidCreateLinkToken(client.api, user.id, { clientName: branding.productName, redirectUri: client.cfg.redirectUri });
     return { error: "", linkToken };
   } catch (e) {
     return { error: e instanceof PlaidCallError ? "Could not start the bank connection. Try again shortly." : "Could not start the bank connection." };
@@ -56,7 +59,7 @@ export async function createUpdateLinkToken(itemId: unknown): Promise<LinkTokenR
   try {
     const accessToken = await loadAccessToken(user.id, item.id);
     if (!accessToken) return { error: "This connection has no stored credentials. Disconnect it and connect again." };
-    const { linkToken } = await plaidCreateLinkToken(client.api, user.id, { clientName: branding.productName, accessToken });
+    const { linkToken } = await plaidCreateLinkToken(client.api, user.id, { clientName: branding.productName, accessToken, redirectUri: client.cfg.redirectUri });
     return { error: "", linkToken };
   } catch {
     return { error: "Could not start reconnection. Try again shortly." };
@@ -92,6 +95,16 @@ export async function exchangePublicToken(input: unknown): Promise<ExchangeResul
     return { error: "The bank connection could not be completed. Try again." };
   }
 
+  // Cap re-check at exchange time: two tabs can each hold a link token minted under the cap.
+  try {
+    if ((await countActiveItems(supabase, user.id)) >= client.cfg.maxItems) {
+      await quarantineNewItem(supabase, user.id, client.cfg, accessToken, { plaidItemId, institutionId: parsed.data.institutionId, institutionName: parsed.data.institutionName, reason: "ITEM_CAP" });
+      return { error: capMessage(client.cfg.maxItems) };
+    }
+  } catch {
+    // Count failed: fall through to the insert, which is still RLS-scoped; the cap is a billing bound, not a security boundary.
+  }
+
   // Duplicate-institution guard. Plaid's own institution id wins over Link metadata.
   let institutionId = parsed.data.institutionId;
   try {
@@ -121,8 +134,11 @@ export async function exchangePublicToken(input: unknown): Promise<ExchangeResul
     .select("id").single();
   if (itemErr || !itemRow) {
     console.error(`[plaid] plaid_items insert failed: ${itemErr?.message ?? "no row"}`);
-    // A unique item_id collision means this Plaid Item is already recorded (a retried exchange); otherwise quarantine it.
-    if (itemErr?.code !== "23505") {
+    // Only a collision on Plaid's item_id means this Item is already recorded (a retried exchange).
+    // Any other failure — including the one-active-Item-per-institution index — leaves a live,
+    // billable Item that must be removed or recorded as retryable, never dropped.
+    const knownItem = itemErr?.code === "23505" && /plaid_items_item_id_key/.test(itemErr.message ?? "");
+    if (!knownItem) {
       await quarantineNewItem(supabase, user.id, client.cfg, accessToken, { plaidItemId, institutionId, institutionName: parsed.data.institutionName, reason: "ITEM_INSERT_FAILED" });
     }
     return { error: "Could not save the connection — try again." };
@@ -170,12 +186,15 @@ async function quarantineNewItem(
   const removed = client ? await removeItem(client.api, accessToken).then(() => true).catch(() => false) : false;
   if (removed) return;
   console.error(`[plaid] /item/remove failed during exchange rollback (${meta.reason}); keeping Item retryable`);
-  const { data: row, error } = await supabase.from("plaid_items")
+  const record = (institutionId: string | null) => supabase.from("plaid_items")
     .upsert(
-      { user_id: userId, item_id: meta.plaidItemId, institution_id: meta.institutionId, institution_name: meta.institutionName, status: "disconnect_pending", error_code: meta.reason },
+      { user_id: userId, item_id: meta.plaidItemId, institution_id: institutionId, institution_name: meta.institutionName, status: "disconnect_pending", error_code: meta.reason },
       { onConflict: "item_id" },
     )
     .select("id").single();
+  let { data: row, error } = await record(meta.institutionId);
+  // The per-institution active-Item index can refuse the row; record it without the institution rather than lose a billable Item.
+  if ((error || !row) && meta.institutionId) ({ data: row, error } = await record(null));
   if (error || !row) {
     console.error(`[plaid] could not record quarantined Item: ${error?.message ?? "no row"}`);
     return;

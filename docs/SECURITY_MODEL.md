@@ -51,6 +51,38 @@ Spec: `docs/superpowers/specs/2026-09-14-plaid-link-sync-slice1-design.md` §11.
 - **User control.** Disconnect calls `/item/remove` first (ends Plaid billing), then marks the Item disconnected, deletes the secret, and archives the accounts with history kept; if Plaid refuses, the Item stays visible as `disconnect_pending` and retryable. "Disconnect and delete this institution's data" additionally removes its accounts, transactions, anchors, and batches through the transactional RPC. Items broken for over 30 days are flagged "still billable".
 - **Rate limiting.** Sync is throttled per Item (10 minutes; 1 minute while history is loading); Plaid's own `RATE_LIMIT_EXCEEDED` is surfaced as a retry message.
 
+## Plaid production runbook (Phase 7, Slice 2, DECISIONS #44)
+
+Spec: `docs/superpowers/specs/2026-09-15-plaid-slice2-production-and-derived-events-design.md` §1, §4.
+
+**Environment matrix.** Items are per Plaid environment, so Sandbox and Production never mix.
+
+| Where | `PLAID_ENV` | `PLAID_SECRET` | `PLAID_REDIRECT_URI` | `PLAID_MAX_ITEMS` |
+| --- | --- | --- | --- | --- |
+| Vercel **Production** | `production` | Production secret | `https://pfi-one.vercel.app/plaid/oauth` | `5` (default) |
+| Vercel Preview / Development | `sandbox` | Sandbox secret | unset, or a registered preview URL | `5` |
+| Developer `.env.local` | `sandbox` | Sandbox secret | `http://localhost:3000/plaid/oauth` (http is accepted only for localhost/127.0.0.1 in sandbox) | `5` |
+| Playwright e2e | all `PLAID_*` forced empty | — | — | — |
+
+Production keys never enter `.env.local`; `plaidConfig()` validates the redirect URI (absolute, no query/fragment, https except sandbox-localhost) and the cap (integer 1–20) at first use.
+
+- **OAuth return.** `redirect_uri` is passed on every link token (fresh and update mode). Before opening Link, the card stores `{ linkToken, mode, itemId?, createdAt }` in `localStorage['pfi.plaid.link']` (same-origin, expires after 30 minutes, cleared on success/exit; localStorage rather than sessionStorage because the installed PWA may return from the bank in a different browsing context, per Plaid's guidance). `/plaid/oauth` sits behind the proxy's auth gate; it reads that session, hands `window.location.href` to Link as `receivedRedirectUri`, and never parses Plaid's `oauth_state_id` itself. A visit without a stored session, or without a query string, is treated as expired. The result the page hands back to the card (`localStorage['pfi.plaid.result']`) is a validated `{ ok, message, warning }` rendered as text. A link token is useless without the same origin and the signed-in user's session, and Plaid rejects a redirect URI that is not registered for the client id.
+- **Item cap.** `createLinkToken` refuses when the user's non-disconnected Items ≥ `PLAID_MAX_ITEMS`; `exchangePublicToken` re-checks and, if a token minted under the cap from another tab arrives late, removes the new Item at Plaid (`/item/remove`) before answering — a billing bound (best-effort at the app layer, hard-capped at 20 by the 0019 trigger), not a tenancy boundary (RLS remains the boundary).
+- **Consent.** `/privacy` has a "Connected accounts (Plaid)" section and lists Plaid as a processor; `PRIVACY_VERSION`/`TERMS_VERSION` were bumped to `2026-09-15`, so the existing consent gate re-prompts every user. A per-device "How connecting works" sheet precedes the first Link open (`localStorage['pfi.plaid.disclosure.v1']`) — a notice, not a recorded consent.
+- **Sandbox chip.** While `PLAID_ENV=sandbox`, the Connected-institutions card shows a "Sandbox" chip so a test bank on the live site is never mistaken for a real one.
+- **Derived events.** `financial_events` rows with `source = 'derived'` reference the user's own transactions (ownership trigger + FK cascade) under the unchanged owner-only RLS; the derivation runs as the signed-in user, never touches provider-owned columns, and never runs for demo accounts.
+- **Account deletion.** There is no in-product "delete my account" yet; deleting a user through the Supabase admin API cascades `plaid_items` and `plaid_item_secrets` **without** calling `/item/remove`, which would leave the Items live and billable at Plaid with no token left to revoke them. Before deleting a user: run "Disconnect" on every institution from the app (or call `disconnectItem` for each non-disconnected Item), or remove the Items in the Plaid dashboard. The privacy policy says exactly this.
+- **Cap backstop.** The mint/exchange checks are read-then-insert; migration 0019 adds a `before insert` trigger that refuses a 21st active Item per user regardless (the ceiling `PLAID_MAX_ITEMS` accepts), so a parallel-flow race is bounded.
+- **Rollback.** Flip Vercel Production's `PLAID_ENV` back to `sandbox` (or remove the `PLAID_*` group to disable the card) and redeploy; Production Items stay at Plaid until disconnected from a Production deploy or removed in the Plaid dashboard, so disconnect real Items first if the rollback is permanent.
+
+**Owner checklist before the first real bank (outside the codebase):**
+1. Plaid dashboard → Company/application profile: legal name, product name, website `https://pfi-one.vercel.app`, support email, privacy policy URL `https://pfi-one.vercel.app/privacy`, use case "personal financial dashboard for the account holder".
+2. Request Production access for Transactions; wait for approval.
+3. Dashboard → API → "Allowed redirect URIs": add `https://pfi-one.vercel.app/plaid/oauth` (and `http://localhost:3000/plaid/oauth` for local sandbox OAuth testing).
+4. Confirm pay-as-you-go billing and the per-Item Transactions price.
+5. Vercel Production env: `PLAID_CLIENT_ID`, `PLAID_SECRET` (Production), `PLAID_ENV=production`, `PLAID_TOKEN_ENCRYPTION_KEY` (32 random bytes, base64), `PLAID_REDIRECT_URI`, optionally `PLAID_MAX_ITEMS`; redeploy.
+6. Verify the OAuth path in Sandbox first (`QA_OAUTH=1 npx tsx --env-file=.env.local scripts/qa-plaid-link.ts` against a local dev server with the localhost redirect URI registered), then link one real institution on the live site and confirm drivers appear on the dashboard.
+
 ## Threat-model notes to expand in Phase 3
 
 Cross-tenant leakage (RLS bypass), re-identification through cohort aggregates (minimum cohort sizes, suppression, consider differential privacy in Phase 8), CSV import abuse (size limits, parser hardening), and scraping of public profiles.

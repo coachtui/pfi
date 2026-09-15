@@ -19,3 +19,4 @@ export * from "./recurring";
 export * from "./anchors";
 export * from "./staleness";
 export * from "./divergence";
+export * from "./derived-events";

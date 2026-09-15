@@ -157,13 +157,17 @@ async function pageOnce(api: PlaidApi, accessToken: string, startCursor: string 
   return pages;
 }
 
-export async function createLinkToken(api: PlaidApi, userId: string, opts: { accessToken?: string; clientName: string }): Promise<{ linkToken: string; requestId: string }> {
+export async function createLinkToken(
+  api: PlaidApi, userId: string, opts: { accessToken?: string; clientName: string; redirectUri?: string | null },
+): Promise<{ linkToken: string; requestId: string }> {
   const { data, requestId } = await plaidCall("link/token/create", () =>
     api.linkTokenCreate({
       client_name: opts.clientName,
       language: "en",
       country_codes: [CountryCode.Us],
       user: { client_user_id: userId },
+      // OAuth institutions need a registered return URL on every token (fresh and update mode).
+      ...(opts.redirectUri ? { redirect_uri: opts.redirectUri } : {}),
       ...(opts.accessToken
         ? { access_token: opts.accessToken }
         : { products: [Products.Transactions], transactions: { days_requested: 730 } }),

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAccountsData, getConnectedItems, getFreshnessData, getProfile, getRecentImports, getRecurringData } from "@/lib/data/queries";
 import { plaidConfig } from "@/lib/config/env.server";
 import { AccountsView } from "./AccountsView";
+import type { PlaidUiConfig } from "./ConnectedInstitutionsCard";
 
 export default async function AccountsPage() {
   const supabase = await createClient();
@@ -17,9 +18,10 @@ export default async function AccountsPage() {
   ]);
   // A partial Plaid configuration throws (deployment mistake); the accounts
   // page degrades to "not configured" and logs rather than failing to render.
-  let plaidConfigured = false;
+  let plaid: PlaidUiConfig | null = null;
   try {
-    plaidConfigured = plaidConfig() !== null;
+    const cfg = plaidConfig();
+    if (cfg) plaid = { maxItems: cfg.maxItems, environment: cfg.environment };
   } catch (e) {
     console.error(`[plaid] ${e instanceof Error ? e.message : "invalid configuration"}`);
   }
@@ -30,7 +32,8 @@ export default async function AccountsPage() {
       recurring={recurring}
       asOfByAccount={freshness.asOfByAccount}
       connectedItems={connected.items}
-      plaidConfigured={plaidConfigured}
+      plaid={plaid}
+      userId={profile.id}
     />
   );
 }

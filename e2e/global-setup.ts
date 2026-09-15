@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { PRIVACY_VERSION, TERMS_VERSION } from "../src/lib/legal/versions";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -48,8 +49,8 @@ export default async function globalSetup(): Promise<void> {
   if (createErr) throw new Error(`e2e setup: createUser failed: ${createErr.message}`);
 
   const { error: consentErr } = await admin.from("user_agreements").insert([
-    { user_id: created.user.id, document: "terms", version: "2026-07-19" },
-    { user_id: created.user.id, document: "privacy", version: "2026-07-19" },
+    { user_id: created.user.id, document: "terms", version: TERMS_VERSION },
+    { user_id: created.user.id, document: "privacy", version: PRIVACY_VERSION },
   ]);
   if (consentErr) throw new Error(`e2e setup: consent insert failed: ${consentErr.message}`);
 

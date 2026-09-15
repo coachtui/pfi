@@ -71,6 +71,33 @@ describe("plaidConfig", () => {
     );
   });
 
+  it("defaults redirectUri to null and maxItems to 5", () => {
+    const cfg = plaidConfig(full)!;
+    expect(cfg.redirectUri).toBeNull();
+    expect(cfg.maxItems).toBe(5);
+  });
+
+  it("accepts an https redirect URI and normalizes it; rejects query strings, fragments, and relative values", () => {
+    expect(plaidConfig({ ...full, PLAID_REDIRECT_URI: "https://pfi-one.vercel.app/plaid/oauth" })?.redirectUri).toBe("https://pfi-one.vercel.app/plaid/oauth");
+    expect(() => plaidConfig({ ...full, PLAID_REDIRECT_URI: "https://pfi-one.vercel.app/accounts" })).toThrow(/plaid\/oauth/);
+    expect(() => plaidConfig({ ...full, PLAID_REDIRECT_URI: "/plaid/oauth" })).toThrow(/absolute URL/);
+    expect(() => plaidConfig({ ...full, PLAID_REDIRECT_URI: "https://pfi-one.vercel.app/plaid/oauth?x=1" })).toThrow(/query string/);
+    expect(() => plaidConfig({ ...full, PLAID_REDIRECT_URI: "https://pfi-one.vercel.app/plaid/oauth#frag" })).toThrow(/fragment/);
+  });
+
+  it("allows http only for localhost in sandbox", () => {
+    expect(plaidConfig({ ...full, PLAID_REDIRECT_URI: "http://localhost:3000/plaid/oauth" })?.redirectUri).toBe("http://localhost:3000/plaid/oauth");
+    expect(() => plaidConfig({ ...full, PLAID_ENV: "production", PLAID_REDIRECT_URI: "http://localhost:3000/plaid/oauth" })).toThrow(/https/);
+    expect(() => plaidConfig({ ...full, PLAID_REDIRECT_URI: "http://example.com/plaid/oauth" })).toThrow(/https/);
+  });
+
+  it("parses PLAID_MAX_ITEMS as an integer in 1..20", () => {
+    expect(plaidConfig({ ...full, PLAID_MAX_ITEMS: "3" })?.maxItems).toBe(3);
+    expect(() => plaidConfig({ ...full, PLAID_MAX_ITEMS: "0" })).toThrow(/between 1 and 20/);
+    expect(() => plaidConfig({ ...full, PLAID_MAX_ITEMS: "2.5" })).toThrow(/between 1 and 20/);
+    expect(() => plaidConfig({ ...full, PLAID_MAX_ITEMS: "lots" })).toThrow(/between 1 and 20/);
+  });
+
   it("returns client id and secret verbatim", () => {
     const cfg = plaidConfig(full)!;
     expect(cfg.clientId).toBe("client-id");

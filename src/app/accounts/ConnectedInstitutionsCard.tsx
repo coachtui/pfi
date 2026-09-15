@@ -2,15 +2,20 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from "react-plaid-link";
-import { Check, CircleX, Clock, Hourglass, Landmark, TriangleAlert } from "lucide-react";
+import { Check, CircleX, Clock, FlaskConical, Hourglass, Landmark, TriangleAlert } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { InlineError } from "@/components/ui/InlineError";
-import {
-  createLinkToken, createUpdateLinkToken, deleteItemData, disconnectItem, exchangePublicToken, syncItem,
-  type SyncResult,
-} from "@/app/actions/plaid";
+import { deleteItemData, disconnectItem, syncItem, type SyncResult } from "@/app/actions/plaid";
 import type { ConnectedItemSummary } from "@/lib/data/mappers";
+import { ConnectDisclosureSheet } from "./ConnectDisclosureSheet";
+import { hasSeenDisclosure, linkStorage, markDisclosureSeen, takeLinkResult, type LinkMode, type LinkResult } from "./link-session";
+import { summarizeSync, usePfiPlaidLink } from "./usePfiPlaidLink";
+
+/** What the card needs from the server-side Plaid config (never the keys). */
+export interface PlaidUiConfig {
+  maxItems: number;
+  environment: "sandbox" | "production";
+}
 
 const actionCls =
   "rounded-lg border border-border-subtle px-2.5 py-1 text-xs text-secondary transition-colors hover:text-primary disabled:opacity-60";
@@ -38,27 +43,16 @@ export function relativeTime(iso: string | null, now: number = Date.now()): stri
   return `${Math.round(hours / 24)}d ago`;
 }
 
-function summarize(r: SyncResult): string {
-  const c = r.counts;
-  if (!c) return "Synced.";
-  const parts = [`${c.inserted} added`];
-  if (c.updated) parts.push(`${c.updated} updated`);
-  if (c.deleted) parts.push(`${c.deleted} removed`);
-  if (c.accounts_created) parts.push(`${c.accounts_created} new account${c.accounts_created === 1 ? "" : "s"}`);
-  if (r.rosterChanges) parts.push("account selection changed");
-  if (r.ambiguousTransfers) parts.push(`${r.ambiguousTransfers} possible transfer${r.ambiguousTransfers === 1 ? "" : "s"} to review`);
-  return `Synced — ${parts.join(", ")}.${r.historyComplete === false ? " Plaid is still preparing history." : ""}`;
-}
-
-type LinkMode = { kind: "connect" } | { kind: "update"; itemId: string };
-
 export function ConnectedInstitutionsCard({
+  userId,
   items,
-  configured,
+  plaid,
   hasDemo,
 }: {
+  userId: string;
   items: ConnectedItemSummary[];
-  configured: boolean;
+  /** Null when bank connections are not configured in this environment. */
+  plaid: PlaidUiConfig | null;
   hasDemo: boolean;
 }) {
   const router = useRouter();
@@ -67,10 +61,28 @@ export function ConnectedInstitutionsCard({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<{ itemId: string; deleteData: boolean } | null>(null);
-  const [linkToken, setLinkToken] = useState<string | null>(null);
-  const modeRef = useRef<LinkMode>({ kind: "connect" });
+  const [disclosure, setDisclosure] = useState<{ open: boolean; next: LinkMode | null }>({ open: false, next: null });
   const autoSynced = useRef(false);
   const [autoSyncing, setAutoSyncing] = useState(false);
+
+  const showResult = (r: LinkResult) => {
+    if (!r.ok) { setError(r.message); return; }
+    setNotice(r.warning ? `⚠ ${r.message}` : r.message);
+    router.refresh();
+  };
+
+  const link = usePfiPlaidLink({ userId, onResult: showResult });
+
+  // A result handed back from the OAuth return page (spec §1a): a one-time
+  // read of a client-only API (localStorage) that cannot be computed during
+  // render — not the derived-state anti-pattern the lint rule targets.
+  useEffect(() => {
+    const r = takeLinkResult(linkStorage());
+    if (!r) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!r.ok) setError(r.message);
+    else { setNotice(r.warning ? `⚠ ${r.message}` : r.message); router.refresh(); }
+  }, [router]);
 
   const run = (label: string, fn: () => Promise<{ error: string; warning?: string }>, onOk?: (r: { error: string; warning?: string }) => string | null) => {
     setError(null);
@@ -90,40 +102,6 @@ export function ConnectedInstitutionsCard({
       }
     });
   };
-
-  const { open, ready } = usePlaidLink({
-    token: linkToken,
-    onSuccess: (publicToken: string | null, metadata: PlaidLinkOnSuccessMetadata) => {
-      setLinkToken(null);
-      const mode = modeRef.current;
-      if (!publicToken) {
-        // Update mode returns no public token; a fresh connect always does.
-        if (mode.kind === "connect") { setError("Plaid Link returned no token. Try again."); return; }
-      }
-      if (mode.kind === "connect") {
-        run("connect", () => exchangePublicToken({
-          publicToken: publicToken as string,
-          institutionId: metadata.institution?.institution_id ?? null,
-          institutionName: metadata.institution?.name ?? null,
-        }), (r) => {
-          const x = r as Awaited<ReturnType<typeof exchangePublicToken>>;
-          return x.counts
-            ? `Connected — ${x.counts.accounts_created} account${x.counts.accounts_created === 1 ? "" : "s"}, ${x.counts.inserted} transactions.${x.historyComplete ? "" : " Plaid is preparing your transaction history. Check again shortly."}`
-            : "Connected.";
-        });
-      } else {
-        run(mode.itemId, () => syncItem(mode.itemId), (r) => summarize(r as SyncResult));
-      }
-    },
-    onExit: (err) => {
-      setLinkToken(null);
-      if (err) setError(`Plaid Link closed with an error (${err.error_code ?? "unknown"}). Try again.`);
-    },
-  });
-
-  useEffect(() => {
-    if (linkToken && ready) open();
-  }, [linkToken, ready, open]);
 
   // Preparing-history Items re-sync once per visit (server throttle: 1 minute in that state).
   useEffect(() => {
@@ -148,27 +126,45 @@ export function ConnectedInstitutionsCard({
   const startLink = (mode: LinkMode) => {
     setError(null);
     setNotice(null);
-    modeRef.current = mode;
-    setBusy(mode.kind === "connect" ? "link" : mode.itemId);
-    startTransition(async () => {
-      const res = mode.kind === "connect" ? await createLinkToken() : await createUpdateLinkToken(mode.itemId);
-      setBusy(null);
-      if (res.error || !res.linkToken) setError(res.error || "Could not start Plaid Link.");
-      else setLinkToken(res.linkToken);
-    });
+    if (mode.kind === "connect" && !hasSeenDisclosure(linkStorage())) {
+      setDisclosure({ open: true, next: mode });
+      return;
+    }
+    link.startLink(mode);
+  };
+
+  const continueFromDisclosure = () => {
+    markDisclosureSeen(linkStorage());
+    const next = disclosure.next;
+    setDisclosure({ open: false, next: null });
+    if (next) link.startLink(next);
   };
 
   const visible = items.filter((i) => i.status !== "disconnected" || i.accountCount > 0);
+  const activeCount = items.filter((i) => i.status !== "disconnected").length;
+  const atCap = plaid !== null && activeCount >= plaid.maxItems;
+  const linkBusy = link.busy;
+  const anyPending = pending || link.pending;
+  const itemBusy = (id: string) => busy === id || (typeof linkBusy === "object" && linkBusy !== null && linkBusy.itemId === id);
+  const connectLabel = linkBusy === "link" ? "Opening Plaid…" : linkBusy === "connect" ? "Connecting…" : "Connect a bank";
 
   return (
     <section aria-label="Connected institutions" data-testid="connected-institutions">
     <Card className="flex flex-col gap-3 p-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Landmark size={16} aria-hidden className="text-secondary" />
         <h2 className="text-sm font-semibold text-primary">Connected institutions</h2>
+        {plaid?.environment === "sandbox" && (
+          <span
+            className="ml-auto inline-flex items-center gap-1 rounded-full border border-warning px-2 py-0.5 text-[11px] font-medium text-warning"
+            title="Plaid Sandbox: test banks only, no real accounts"
+          >
+            <FlaskConical size={11} aria-hidden /> Sandbox
+          </span>
+        )}
       </div>
 
-      {!configured ? (
+      {plaid === null ? (
         <p className="text-xs text-secondary">
           Bank connections are not configured in this environment. Add accounts manually or import statements instead.
         </p>
@@ -177,6 +173,9 @@ export function ConnectedInstitutionsCard({
           <p className="text-xs text-secondary">
             Connect a bank through Plaid to keep transactions and balances synced. Balances show as of the last sync with Plaid.
             Manual accounts — cash on hand, property, anything a bank doesn&apos;t see — stay exactly as they are.
+          </p>
+          <p className="text-[11px] text-tertiary" data-testid="connection-count">
+            {activeCount} of {plaid.maxItems} connection{plaid.maxItems === 1 ? "" : "s"} used
           </p>
           {autoSyncing && (
             <p role="status" className="flex items-center gap-1 text-xs text-secondary">
@@ -195,7 +194,7 @@ export function ConnectedInstitutionsCard({
             <ul className="flex flex-col gap-2">
               {visible.map((item) => {
                 const { label, Icon } = STATUS[item.status];
-                const isBusy = busy === item.id;
+                const isBusy = itemBusy(item.id);
                 const loading = item.status === "initializing" || item.status === "history_loading";
                 return (
                   <li key={item.id} className="flex flex-col gap-2 rounded-lg border border-border-subtle p-2.5">
@@ -235,14 +234,14 @@ export function ConnectedInstitutionsCard({
                       <div className="flex flex-wrap items-center gap-2">
                         <button
                           type="button"
-                          disabled={pending}
+                          disabled={anyPending}
                           onClick={() => run(item.id, () => (confirming.deleteData ? deleteItemData(item.id) : disconnectItem(item.id)), () =>
                             confirming.deleteData ? "Disconnected and deleted this institution's data." : "Disconnected — history kept.")}
                           className={dangerCls}
                         >
                           {isBusy ? "Working…" : confirming.deleteData ? "Confirm — delete its data" : "Confirm disconnect"}
                         </button>
-                        <button type="button" disabled={pending} onClick={() => setConfirming(null)} className={actionCls}>
+                        <button type="button" disabled={anyPending} onClick={() => setConfirming(null)} className={actionCls}>
                           Keep
                         </button>
                       </div>
@@ -251,24 +250,24 @@ export function ConnectedInstitutionsCard({
                         {item.status !== "disconnected" && item.status !== "disconnect_pending" && (
                           <button
                             type="button"
-                            disabled={pending}
-                            onClick={() => run(item.id, () => syncItem(item.id), (r) => summarize(r as SyncResult))}
+                            disabled={anyPending}
+                            onClick={() => run(item.id, () => syncItem(item.id), (r) => summarizeSync(r as SyncResult))}
                             className={actionCls}
                           >
                             {isBusy ? "Syncing…" : "Sync now"}
                           </button>
                         )}
                         {(item.status === "login_required" || item.status === "error") && (
-                          <button type="button" disabled={pending} onClick={() => startLink({ kind: "update", itemId: item.id })} className={actionCls}>
+                          <button type="button" disabled={anyPending} onClick={() => startLink({ kind: "update", itemId: item.id })} className={actionCls}>
                             Reconnect
                           </button>
                         )}
                         {item.status !== "disconnected" && (
-                          <button type="button" disabled={pending} onClick={() => setConfirming({ itemId: item.id, deleteData: false })} className={actionCls}>
+                          <button type="button" disabled={anyPending} onClick={() => setConfirming({ itemId: item.id, deleteData: false })} className={actionCls}>
                             {item.status === "disconnect_pending" ? "Retry disconnect" : "Disconnect"}
                           </button>
                         )}
-                        <button type="button" disabled={pending} onClick={() => setConfirming({ itemId: item.id, deleteData: true })} className={actionCls}>
+                        <button type="button" disabled={anyPending} onClick={() => setConfirming({ itemId: item.id, deleteData: true })} className={actionCls}>
                           {item.status === "disconnected" ? "Delete its data" : "Disconnect and delete data"}
                         </button>
                       </div>
@@ -279,19 +278,29 @@ export function ConnectedInstitutionsCard({
             </ul>
           )}
 
-          <div>
+          <div className="flex flex-col gap-1">
             <button
               type="button"
-              disabled={pending || busy === "link"}
+              disabled={anyPending || linkBusy !== null || link.linkOpen || atCap}
               onClick={() => startLink({ kind: "connect" })}
-              className="rounded-xl bg-positive-strong px-4 py-2 text-sm font-semibold text-base disabled:opacity-60"
+              className="self-start rounded-xl bg-positive-strong px-4 py-2 text-sm font-semibold text-base disabled:opacity-60"
             >
-              {busy === "link" ? "Opening Plaid…" : busy === "connect" ? "Connecting…" : "Connect a bank"}
+              {connectLabel}
             </button>
+            {atCap && (
+              <p className="text-[11px] text-secondary">
+                Limit of {plaid.maxItems} connected institution{plaid.maxItems === 1 ? "" : "s"} reached — disconnect one to connect another.
+              </p>
+            )}
           </div>
         </>
       )}
     </Card>
+    <ConnectDisclosureSheet
+      open={disclosure.open}
+      onClose={() => setDisclosure({ open: false, next: null })}
+      onContinue={continueFromDisclosure}
+    />
     </section>
   );
 }

@@ -12,7 +12,7 @@ import type { AccountType } from "@/lib/financial-engine";
 import type { AccountSummary, ConnectedItemSummary, RecentImport } from "@/lib/data/mappers";
 import type { RecurringListItem } from "@/lib/data/queries";
 import { AccountSheet } from "./AccountSheet";
-import { ConnectedInstitutionsCard } from "./ConnectedInstitutionsCard";
+import { ConnectedInstitutionsCard, type PlaidUiConfig } from "./ConnectedInstitutionsCard";
 import { DemoDataCard } from "./DemoDataCard";
 import { RecentImports } from "./RecentImports";
 import { RecurringSection } from "./RecurringSection";
@@ -38,14 +38,17 @@ export function AccountsView({
   recurring,
   asOfByAccount,
   connectedItems,
-  plaidConfigured,
+  plaid,
+  userId,
 }: {
   accounts: AccountSummary[];
   recentImports: RecentImport[];
   recurring: RecurringListItem[];
   asOfByAccount: Record<string, string>;
   connectedItems: ConnectedItemSummary[];
-  plaidConfigured: boolean;
+  /** Non-null when bank connections are configured (cap + environment for the card). */
+  plaid: PlaidUiConfig | null;
+  userId: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -94,8 +97,9 @@ export function AccountsView({
       )}
 
       <ConnectedInstitutionsCard
+        userId={userId}
         items={connectedItems}
-        configured={plaidConfigured}
+        plaid={plaid}
         hasDemo={accounts.some((a) => a.provider === "demo" && a.archivedAt === null)}
       />
 

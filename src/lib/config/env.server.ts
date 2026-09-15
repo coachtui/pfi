@@ -23,6 +23,36 @@ export interface PlaidServerConfig {
   tokenKey: Uint8Array;
   /** Prior key during rotation (see SECURITY_MODEL.md), or null. */
   previousTokenKey: Uint8Array | null;
+  /** OAuth return URL registered with Plaid (Slice 2); null = OAuth institutions unavailable. */
+  redirectUri: string | null;
+  /** Per-user cap on active Items (Slice 2; bounds per-Item billing). */
+  maxItems: number;
+}
+
+const DEFAULT_MAX_ITEMS = 5;
+
+function parseRedirectUri(value: string | undefined, environment: PlaidEnvironment): string | null {
+  if (!value) return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("PLAID_REDIRECT_URI must be an absolute URL (e.g. https://pfi-one.vercel.app/plaid/oauth).");
+  }
+  const localhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && localhost && environment === "sandbox")) {
+    throw new Error("PLAID_REDIRECT_URI must use https (http is allowed only for localhost in sandbox).");
+  }
+  if (url.search || url.hash) throw new Error("PLAID_REDIRECT_URI must not contain a query string or fragment (Plaid requires an exact match).");
+  if (url.pathname !== "/plaid/oauth") throw new Error("PLAID_REDIRECT_URI must point at this app's /plaid/oauth page.");
+  return url.toString();
+}
+
+function parseMaxItems(value: string | undefined): number {
+  if (!value) return DEFAULT_MAX_ITEMS;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 20) throw new Error("PLAID_MAX_ITEMS must be an integer between 1 and 20.");
+  return n;
 }
 
 const PLAID_ENVIRONMENTS: ReadonlySet<string> = new Set(["sandbox", "production"]);
@@ -70,13 +100,16 @@ export function plaidConfig(source: Partial<NodeJS.ProcessEnv> = process.env): P
     throw new Error(`PLAID_ENV must be "sandbox" or "production" (got "${environment}").`);
   }
 
+  const env = environment as PlaidEnvironment;
   return {
     clientId: clientId!,
     secret: secret!,
-    environment: environment as PlaidEnvironment,
+    environment: env,
     tokenKey: decodeKey("PLAID_TOKEN_ENCRYPTION_KEY", source.PLAID_TOKEN_ENCRYPTION_KEY!),
     previousTokenKey: source.PLAID_TOKEN_ENCRYPTION_KEY_PREVIOUS
       ? decodeKey("PLAID_TOKEN_ENCRYPTION_KEY_PREVIOUS", source.PLAID_TOKEN_ENCRYPTION_KEY_PREVIOUS)
       : null,
+    redirectUri: parseRedirectUri(source.PLAID_REDIRECT_URI || undefined, env),
+    maxItems: parseMaxItems(source.PLAID_MAX_ITEMS || undefined),
   };
 }

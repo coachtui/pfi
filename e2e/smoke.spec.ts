@@ -147,6 +147,14 @@ test("tapping a financial term opens its definition sheet with related navigatio
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
+test("the Plaid OAuth return page treats a bare visit as an expired sign-in", async () => {
+  await page.goto("/plaid/oauth");
+  const card = page.getByTestId("plaid-oauth-return");
+  await expect(card.getByRole("status")).toHaveText(/This bank sign-in has expired/);
+  await card.getByRole("link", { name: "Back to Accounts" }).click();
+  await expect(page).toHaveURL(/\/accounts$/);
+});
+
 test("accounts screen shows the demo data card with Koa active", async () => {
   await page.goto("/accounts");
   await expect(page.getByText("Demo data", { exact: true })).toBeVisible();

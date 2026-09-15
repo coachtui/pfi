@@ -251,14 +251,19 @@ export async function syncPlaidItem(
   let warning: string | undefined;
   try {
     const finish = opts.revalidate === false
-      ? await rebuildSnapshots(supabase).then((r) => (r.error ? { error: "", warning: `Saved — but the index recalculation failed: ${r.error}` } : { error: "" }))
+      ? await rebuildSnapshots(supabase).then((r) => {
+          if (!r.error) return { error: "" };
+          console.error(`[plaid] post-sync rebuild failed for batch ${batchId}: ${r.error}`);
+          return { error: "", warning: "Saved — but the index recalculation failed. It will retry on your next dashboard load." };
+        })
       : await finishWithRebuild(supabase);
     warning = finish.warning;
     if (!finish.warning) {
       await supabase.from("import_batches").update({ rebuild_completed_at: new Date().toISOString() }).eq("id", batchId);
     }
   } catch (e) {
-    warning = `Saved — but the index recalculation failed: ${e instanceof Error ? e.message : "unknown"}. It will retry on your next dashboard load.`;
+    console.error(`[plaid] post-sync rebuild threw for batch ${batchId}: ${e instanceof Error ? e.message : "unknown"}`);
+    warning = "Saved — but the index recalculation failed. It will retry on your next dashboard load.";
   }
   return {
     ok: true, batchId, counts: commit, status: plan.item.status, historyComplete: plan.item.history_complete,
