@@ -59,13 +59,13 @@
 
 ### Task 4: OAuth + Link lifecycle + card
 
-**Files:** `src/lib/plaid/client.ts` (`redirect_uri`), `src/app/actions/plaid.ts` (cap check in `createLinkToken`/`createUpdateLinkToken`; `getConnectionLimits`), `src/app/accounts/usePfiPlaidLink.ts` (new hook + pure `linkSession` helpers with tests), `src/app/plaid/oauth/page.tsx` + `OauthReturn.tsx` (new), `src/app/accounts/ConnectedInstitutionsCard.tsx` (use the hook; "N of M connections"; Sandbox chip; result from `sessionStorage['pfi.plaid.result']`), `src/app/accounts/ConnectDisclosureSheet.tsx` (new), `src/lib/data/queries.ts` (`getConnectedItems` returns `maxItems`, `environment`)
+**Files:** `src/lib/plaid/client.ts` (`redirect_uri`), `src/lib/plaid/items.ts` (new: `countActiveItems`, `capMessage`), `src/app/actions/plaid.ts` (cap check in `createLinkToken` and re-check in `exchangePublicToken`; `redirect_uri` on both token kinds), `src/app/accounts/link-session.ts` (+ test; pure session/result/disclosure helpers), `src/app/accounts/usePfiPlaidLink.ts` (new hook), `src/app/plaid/oauth/page.tsx` + `OauthReturn.tsx` (new), `src/app/accounts/ConnectedInstitutionsCard.tsx` (uses the hook; "N of M connections used"; Sandbox chip; OAuth result banner; cap message), `src/app/accounts/ConnectDisclosureSheet.tsx` (new), `src/app/accounts/page.tsx` + `AccountsView.tsx` (pass `PlaidUiConfig { maxItems, environment }` from `plaidConfig()`; *plan deviation:* the page passes config instead of `getConnectedItems` returning it, so the data layer never imports server env config)
 
-- [ ] Link token: `redirect_uri` when configured; refuse with "You've reached the limit of N connected institutions" when active Items ≥ cap.
-- [ ] Session helpers (pure): `saveLinkSession`, `readLinkSession` (30-minute expiry), `clearLinkSession`, `saveLinkResult`/`takeLinkResult`.
-- [ ] `/plaid/oauth`: loading / expired / error states; `receivedRedirectUri: window.location.href`; on success runs exchange or update-sync, stores the result, `router.replace("/accounts")`.
-- [ ] Disclosure sheet before the first Link open per device (`localStorage['pfi.plaid.disclosure.v1']`), "Continue to Plaid" → proceeds.
-- [ ] Card: connections counter, Sandbox chip (from `environment`), result banner on return.
+- [x] Link token: `redirect_uri` when configured; refuse with "You've reached the limit of N connected institutions" when active Items ≥ cap; the exchange re-checks the cap and quarantines (`/item/remove`) a token minted under the cap from another tab.
+- [x] Session helpers (pure): `saveLinkSession`, `readLinkSession` (30-minute expiry), `clearLinkSession`, `saveLinkResult`/`takeLinkResult`, `hasSeenDisclosure`/`markDisclosureSeen`; every storage access is try/catch (private mode).
+- [x] `/plaid/oauth`: loading / expired / error states; `receivedRedirectUri: window.location.href`; on success runs exchange or update-sync, stores the result, `router.replace("/accounts")`; a bare visit (no `oauth_state_id`) is treated as expired.
+- [x] Disclosure sheet before the first Link open per device (`localStorage['pfi.plaid.disclosure.v1']`), "Continue to Plaid" → proceeds.
+- [x] Card: connections counter, Sandbox chip (from `environment`), result banner on return, Connect disabled at the cap.
 
 ### Task 5: Legal text + version bump
 
