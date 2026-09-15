@@ -13,7 +13,9 @@
  * paired here — recorded in KNOWN_LIMITATIONS.
  */
 import { LIABILITY_TYPES, type AccountType } from "@/lib/financial-engine";
-import type { ISODate } from "./types";
+import { dayGap } from "@/lib/csv-import/transfers";
+
+export { dayGap };
 
 export interface PairCandidate {
   /** Plan-local reference: an existing row id, or `ext:<external_id>` for an insert. */
@@ -22,7 +24,7 @@ export interface PairCandidate {
   accountRef: string;
   accountType: AccountType;
   accountArchived: boolean;
-  postedDate: ISODate;
+  postedDate: string;
   amount: number;
   direction: "inflow" | "outflow";
   pfcPrimary: string | null;
@@ -39,10 +41,6 @@ export interface PairingResult {
 export const PAIR_WINDOW_DAYS = 3;
 
 const TRANSFER_KINDS: ReadonlySet<string> = new Set(["TRANSFER_IN", "TRANSFER_OUT", "LOAN_PAYMENTS"]);
-
-export function dayGap(a: ISODate, b: ISODate): number {
-  return Math.abs((Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10)) - Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10))) / 86_400_000);
-}
 
 function eligible(c: PairCandidate): boolean {
   return !c.alreadyPaired && !c.accountArchived && c.pfcPrimary !== null && TRANSFER_KINDS.has(c.pfcPrimary);

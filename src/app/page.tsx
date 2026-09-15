@@ -27,7 +27,9 @@ export default async function HomePage() {
   // rebuild under the per-user lease before reading (never throws).
   const prep = await prepareDashboard(supabase, profile.id);
   let data = await getDashboardData(supabase);
-  if (data.staleIndex || prep.repairDeferred) {
+  // Another tab holding the rebuild lease means: show the stale notice, do NOT
+  // start a second rebuild (spec §5 step 7).
+  if (data.staleIndex && !prep.repairDeferred) {
     // Idempotent reconciliation: a prior rebuild failed or was skipped. Safe in
     // a GET — rebuildSnapshots never calls revalidatePath and always converges.
     await rebuildSnapshots(supabase);
@@ -83,7 +85,7 @@ export default async function HomePage() {
           snapshots={snapshots}
           events={events}
           scoreSummary={scoreSummary}
-          staleIndex={staleIndex}
+          staleIndex={staleIndex || prep.repairDeferred}
           historyLoading={!connected.historicalDataComplete}
           freshness={freshness}
           narration={narration}

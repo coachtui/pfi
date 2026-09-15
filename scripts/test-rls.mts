@@ -360,6 +360,23 @@ try {
     rpcForeignTxn?.message ?? "no error",
   );
 
+  // A's OWN manual row cannot be rewritten through a self-forged sync either (Item-scoped assertions).
+  const { error: rpcOwnManual } = await a.client.rpc("commit_connected_sync", {
+    p_batch_id: batch1,
+    p_plan: { updates: [{ id: aTxn!.id, posted_date: "2026-07-01", amount: 999, direction: "outflow", description: "x" }] },
+  });
+  check(
+    "commit_connected_sync: plan naming the caller's own non-Plaid row raises (Item-scoped)",
+    !!rpcOwnManual && /ownership \(updates\)/.test(rpcOwnManual.message),
+    rpcOwnManual?.message ?? "no error",
+  );
+
+  // plaid_items: bookkeeping columns and deletes are not client-writable.
+  const { error: cursorErr } = await a.client.from("plaid_items").update({ transactions_cursor: "forged" }).eq("id", aItem!.id);
+  check("plaid_items: client cannot write transactions_cursor (guard trigger)", !!cursorErr && /bookkeeping/.test(cursorErr.message), cursorErr?.message ?? "no error");
+  const { data: itemDel, error: itemDelErr } = await a.client.from("plaid_items").delete().eq("id", aItem!.id).select("id");
+  check("plaid_items: owner cannot DELETE (no policy/grant)", !!itemDelErr || (itemDel ?? []).length === 0, itemDelErr?.message ?? "");
+
   // set_config is not reachable through PostgREST.
   const { error: setConfigErr } = await a.client.rpc("set_config", { setting_name: "pfi.provider_write", new_value: batch1, is_local: true });
   check("set_config is not callable via PostgREST", !!setConfigErr, setConfigErr?.message ?? "no error");

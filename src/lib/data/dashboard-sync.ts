@@ -33,7 +33,7 @@ export async function prepareDashboard(supabase: SupabaseClient, userId: string,
     const hasActive = newest !== null;
     const lastSynced = newest?.last_synced_at ? Date.parse(newest.last_synced_at as string) : null;
     if (hasActive && (lastSynced === null || now.getTime() - lastSynced > DASHBOARD_SYNC_AFTER_MS)) {
-      await syncAllItems(supabase, userId, { revalidate: false });
+      await syncAllItems(supabase, userId, { trigger: "auto", revalidate: false });
       prep.synced = true;
     }
   } catch (e) {
@@ -41,17 +41,22 @@ export async function prepareDashboard(supabase: SupabaseClient, userId: string,
   }
 
   try {
-    const { data: pending } = await supabase.from("import_batches").select("id")
-      .eq("source_type", "connected_account").eq("status", "confirmed").is("rebuild_completed_at", null).limit(50);
+    const [{ data: pending }, { data: profile }] = await Promise.all([
+      supabase.from("import_batches").select("id")
+        .eq("source_type", "connected_account").eq("status", "confirmed").is("rebuild_completed_at", null).limit(50),
+      supabase.from("user_profiles").select("rebuild_pending_at").eq("id", userId).maybeSingle(),
+    ]);
     const pendingIds = ((pending ?? []) as { id: string }[]).map((b) => b.id);
-    if (pendingIds.length === 0) return prep;
+    const profilePending = Boolean(profile?.rebuild_pending_at);
+    if (pendingIds.length === 0 && !profilePending) return prep;
 
     const token = await claimRebuild(supabase, userId, now);
     if (!token) { prep.repairDeferred = true; return prep; }
     try {
       const { error } = await rebuildSnapshots(supabase);
       if (!error) {
-        await supabase.from("import_batches").update({ rebuild_completed_at: new Date().toISOString() }).in("id", pendingIds);
+        if (pendingIds.length > 0) await supabase.from("import_batches").update({ rebuild_completed_at: new Date().toISOString() }).in("id", pendingIds);
+        if (profilePending) await supabase.from("user_profiles").update({ rebuild_pending_at: null }).eq("id", userId);
         prep.repaired = true;
       }
     } finally {

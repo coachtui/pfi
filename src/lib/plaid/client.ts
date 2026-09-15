@@ -134,7 +134,7 @@ export async function fetchSyncPages(api: PlaidApi, accessToken: string, cursor:
 
 async function pageOnce(api: PlaidApi, accessToken: string, startCursor: string | null): Promise<SyncPages> {
   const pages: SyncPages = { added: [], modified: [], removed: [], nextCursor: startCursor ?? "", updateStatus: "TRANSACTIONS_UPDATE_STATUS_UNKNOWN", requestIds: [] };
-  let cursor = startCursor ?? undefined;
+  let cursor = startCursor || undefined; // "" (no cursor yet) must be sent as absent
   let hasMore = true;
   while (hasMore) {
     const { data, requestId } = await plaidCall<TransactionsSyncResponse>("transactions/sync", () =>

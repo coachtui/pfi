@@ -129,6 +129,7 @@ export function HomeDashboard({
 
   return (
     <div className="flex flex-col gap-4">
+      {historyLoading && <HistoryLoadingNotice />}
       <CompanyHeader
         companyName={profile.companyName}
         ticker={profile.ticker}
@@ -182,8 +183,6 @@ export function HomeDashboard({
           />
         </div>
       </Card>
-
-      {historyLoading && <HistoryLoadingNotice />}
 
       {freshness.showNudge && freshness.currentThrough && (
         <StaleDataBanner currentThrough={freshness.currentThrough} />

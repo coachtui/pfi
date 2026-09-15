@@ -78,7 +78,10 @@ export function keyVersionOf(key: Uint8Array): number {
 /** Ring from config: the current key plus the previous key during rotation. */
 export function keyRingFor(current: Uint8Array, previous: Uint8Array | null): KeyRing {
   const ring = new Map<number, Uint8Array>([[keyVersionOf(current), current]]);
-  if (previous) ring.set(keyVersionOf(previous), previous);
+  if (previous) {
+    if (keyVersionOf(previous) === keyVersionOf(current)) throw new Error("token key fingerprint collision — pick a different new key");
+    ring.set(keyVersionOf(previous), previous);
+  }
   return ring;
 }
 

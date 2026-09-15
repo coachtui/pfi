@@ -176,7 +176,8 @@ export interface RosterAudit {
 
 export interface SyncPlan {
   item: {
-    cursor: string;
+    /** Null when Plaid returned no cursor yet (NOT_READY): the RPC keeps the stored one. */
+    cursor: string | null;
     update_status: UpdateStatus;
     status: ItemStatus;
     history_complete: boolean;
@@ -199,7 +200,7 @@ export interface SyncPlan {
     request_ids: string[];
     update_status: UpdateStatus;
     cursor_before: string | null;
-    cursor_after: string;
+    cursor_after: string | null;
     pending_skipped: number;
   };
 }

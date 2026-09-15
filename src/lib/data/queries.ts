@@ -219,7 +219,7 @@ export async function fetchScoreSources(supabase: SupabaseClient): Promise<Score
     // Plaid Slice 1: connection facts + the Item's history flag feed source-reliability confidence.
     supabase
       .from("financial_accounts")
-      .select("id, type, institution, provider, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at, connection_status, last_synced_at, plaid_items(history_complete_at)"),
+      .select("id, type, institution, provider, current_balance, credit_limit, interest_rate, include_in_calculations, archived_at, connection_status, last_synced_at, plaid_items(status, history_complete_at)"),
     paginateSelect<EventRow & { id: string }>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
       supabase.from("financial_events").select("*")
         .order("date", { ascending: true })
@@ -265,7 +265,7 @@ export async function fetchScoreSources(supabase: SupabaseClient): Promise<Score
       current_balance: number | string; credit_limit: number | string | null;
       interest_rate: number | string | null; include_in_calculations: boolean;
       archived_at: string | null; connection_status: string | null; last_synced_at: string | null;
-      plaid_items: { history_complete_at: string | null } | null;
+      plaid_items: { status: string; history_complete_at: string | null } | null;
     }>)
       .filter((row) => row.archived_at === null)
       .map((row) => {
@@ -287,7 +287,10 @@ export async function fetchScoreSources(supabase: SupabaseClient): Promise<Score
           provider: row.provider,
           connectionStatus: connected ? row.connection_status : null,
           lastSyncedAt: connected ? row.last_synced_at : null,
-          historyComplete: connected ? row.plaid_items?.history_complete_at !== null && row.plaid_items !== null : null,
+          // A disconnected Item can never finish loading; don't cap confidence on its leftover accounts.
+          historyComplete: connected && row.plaid_items && row.plaid_items.status !== "disconnected"
+            ? row.plaid_items.history_complete_at !== null
+            : null,
           balanceFreshness: (eff?.freshness as ScoreAccountInput["balanceFreshness"]) ?? null,
           balanceObservedAt: eff?.observedAt ?? null,
           latestSyncDiscrepancy: eff && eff.source === "sync" ? eff.discrepancy : null,
@@ -464,14 +467,25 @@ export async function getFreshnessData(supabase: SupabaseClient): Promise<Freshn
 export async function getRecentImports(supabase: SupabaseClient): Promise<RecentImport[]> {
   interface RecentImportRow {
     id: string; import_batch_id: string; posted_date: string; created_at: string;
-    financial_accounts: { display_name: string };
+    financial_accounts: { display_name: string; provider: string };
   }
-  const rows = await paginateSelect<RecentImportRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
-    supabase.from("transactions")
-      .select("id, import_batch_id, posted_date, created_at, financial_accounts!inner(display_name)")
-      .not("import_batch_id", "is", null)
-      .order("id", { ascending: true })
-      .range(from, to) as unknown as PromiseLike<{ data: RecentImportRow[] | null; error: { message: string } | null }>);
+  // Non-synced (csv/pdf/manual) batches are derived from their rows, as before.
+  // Synced rows are excluded here so the scan stays bounded to imports; synced
+  // batches come from import_batches (bounded, newest first) with the counts
+  // the commit recorded in sync_metadata.
+  const [rows, syncedRes] = await Promise.all([
+    paginateSelect<RecentImportRow>(TRANSACTIONS_PAGE_SIZE, (from, to) =>
+      supabase.from("transactions")
+        .select("id, import_batch_id, posted_date, created_at, financial_accounts!inner(display_name, provider)")
+        .not("import_batch_id", "is", null)
+        .neq("financial_accounts.provider", "plaid")
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: RecentImportRow[] | null; error: { message: string } | null }>),
+    supabase.from("import_batches")
+      .select("id, source_type, detected_institution, confirmed_at, created_at, sync_metadata")
+      .eq("source_type", "connected_account").eq("status", "confirmed")
+      .order("created_at", { ascending: false }).limit(20),
+  ]);
   const groups = new Map<string, RecentImport>();
   for (const r of rows) {
     const g = groups.get(r.import_batch_id);
@@ -492,8 +506,6 @@ export async function getRecentImports(supabase: SupabaseClient): Promise<Recent
       if (r.created_at > g.importedAt) g.importedAt = r.created_at;
     }
   }
-  // Label each batch by its source (Synced / CSV / PDF). Batches predating
-  // migration 0013 have no import_batches row and stay unlabeled.
   const batchIds = [...groups.keys()];
   if (batchIds.length > 0) {
     const { data: batchRows } = await supabase.from("import_batches").select("id, source_type").in("id", batchIds);
@@ -502,7 +514,22 @@ export async function getRecentImports(supabase: SupabaseClient): Promise<Recent
       if (g) g.source = b.source_type as RecentImport["source"];
     }
   }
-  return [...groups.values()].sort((a, b) => (a.importedAt < b.importedAt ? 1 : -1));
+  interface SyncedBatchRow {
+    id: string; source_type: string; detected_institution: string | null; confirmed_at: string | null; created_at: string;
+    sync_metadata: { counts?: { inserted?: number } } | null;
+  }
+  const synced: RecentImport[] = ((syncedRes.data ?? []) as SyncedBatchRow[])
+    .map((b) => ({
+      batchId: b.id,
+      accountName: b.detected_institution ?? "Connected institution",
+      rowCount: b.sync_metadata?.counts?.inserted ?? 0,
+      firstDate: (b.confirmed_at ?? b.created_at).slice(0, 10),
+      lastDate: (b.confirmed_at ?? b.created_at).slice(0, 10),
+      importedAt: b.confirmed_at ?? b.created_at,
+      source: "connected_account" as const,
+    }))
+    .filter((b) => b.rowCount > 0);
+  return [...groups.values(), ...synced].sort((a, b) => (a.importedAt < b.importedAt ? 1 : -1));
 }
 
 const STILL_BILLABLE_AFTER_DAYS = 30;

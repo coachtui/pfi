@@ -70,6 +70,7 @@ export function ConnectedInstitutionsCard({
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const modeRef = useRef<LinkMode>({ kind: "connect" });
   const autoSynced = useRef(false);
+  const [autoSyncing, setAutoSyncing] = useState(false);
 
   const run = (label: string, fn: () => Promise<{ error: string; warning?: string }>, onOk?: (r: { error: string; warning?: string }) => string | null) => {
     setError(null);
@@ -110,10 +111,13 @@ export function ConnectedInstitutionsCard({
             : "Connected.";
         });
       } else {
-        run(mode.itemId, () => syncItem(mode.itemId, true), (r) => summarize(r as SyncResult));
+        run(mode.itemId, () => syncItem(mode.itemId), (r) => summarize(r as SyncResult));
       }
     },
-    onExit: () => setLinkToken(null),
+    onExit: (err) => {
+      setLinkToken(null);
+      if (err) setError(`Plaid Link closed with an error (${err.error_code ?? "unknown"}). Try again.`);
+    },
   });
 
   useEffect(() => {
@@ -127,11 +131,15 @@ export function ConnectedInstitutionsCard({
     if (loading.length === 0) return;
     autoSynced.current = true;
     startTransition(async () => {
+      setAutoSyncing(true);
       let changed = false;
       for (const i of loading) {
+        setBusy(i.id);
         const r = await syncItem(i.id);
         if (!r.error && !r.throttled) changed = true;
       }
+      setBusy(null);
+      setAutoSyncing(false);
       if (changed) router.refresh();
     });
   }, [items, router]);
@@ -165,9 +173,14 @@ export function ConnectedInstitutionsCard({
       ) : (
         <>
           <p className="text-xs text-secondary">
-            Connect a bank through Plaid to keep transactions and balances synced. Balances show as of the last sync with Plaid, not live.
+            Connect a bank through Plaid to keep transactions and balances synced. Balances show as of the last sync with Plaid.
             Manual accounts — cash on hand, property, anything a bank doesn&apos;t see — stay exactly as they are.
           </p>
+          {autoSyncing && (
+            <p role="status" className="flex items-center gap-1 text-xs text-secondary">
+              <Hourglass size={12} aria-hidden /> Checking with Plaid for new history…
+            </p>
+          )}
           {hasDemo && visible.length === 0 && (
             <p role="status" className="text-xs text-warning">
               Demo data is loaded. Clear it first (Demo data card below) so your dashboard shows only your own accounts.
@@ -192,7 +205,7 @@ export function ConnectedInstitutionsCard({
                           {item.status === "error" && item.errorCode ? ` (${item.errorCode})` : ""}
                           {" · "}{item.accountCount} account{item.accountCount === 1 ? "" : "s"}
                         </p>
-                        <p className="text-[11px] text-tertiary">
+                        <p className="text-[11px] text-tertiary" suppressHydrationWarning>
                           Last synced with Plaid {relativeTime(item.lastSyncedAt)}
                         </p>
                         {loading && (
@@ -237,7 +250,7 @@ export function ConnectedInstitutionsCard({
                           <button
                             type="button"
                             disabled={pending}
-                            onClick={() => run(item.id, () => syncItem(item.id, true), (r) => summarize(r as SyncResult))}
+                            onClick={() => run(item.id, () => syncItem(item.id), (r) => summarize(r as SyncResult))}
                             className={actionCls}
                           >
                             {isBusy ? "Syncing…" : "Sync now"}

@@ -88,6 +88,36 @@ describe("buildSyncPlan — steady state", () => {
     expect(plan.reconciliation_results.retractions[0]).toMatchObject({ external_id: "t1", action: "modified", prior: { amount: 25, posted_date: "2026-09-10" } });
   });
 
+  it("pairing uses the post-modification values of a row modified this sync (no stale-amount pairing)", () => {
+    const plan = buildSyncPlan(steady({
+      existingTxns: [existing("out", { amount: 500, pfcPrimary: "TRANSFER_OUT", pfcDetailed: "TRANSFER_OUT_ACCOUNT_TRANSFER" })],
+      pages: pages({
+        modified: [txn("out", { amount: 450, personalFinanceCategory: { primary: "TRANSFER_OUT", detailed: "TRANSFER_OUT_ACCOUNT_TRANSFER", confidenceLevel: "HIGH" } })],
+        added: [txn("in", { accountId: "sav", amount: -500, personalFinanceCategory: { primary: "TRANSFER_IN", detailed: "TRANSFER_IN_ACCOUNT_TRANSFER", confidenceLevel: "HIGH" } })],
+      }),
+    }));
+    expect(plan.updates[0]).toMatchObject({ id: "row-out", amount: 450 });
+    expect(plan.inserts[0].pair_key).toBeNull(); // 450 ≠ 500: no pair
+    expect(plan.pair_existing).toEqual([]);
+  });
+
+  it("a row unpaired by a modification this sync re-enters pairing with its new value", () => {
+    const plan = buildSyncPlan(steady({
+      existingTxns: [
+        existing("out", { amount: 500, pfcPrimary: "TRANSFER_OUT", pfcDetailed: "TRANSFER_OUT_ACCOUNT_TRANSFER", isTransfer: true, transferPairId: "row-old" }),
+        existing("old", { accountId: "pfi-sav", amount: 500, direction: "inflow", pfcPrimary: "TRANSFER_IN", isTransfer: true, transferPairId: "row-out" }),
+      ],
+      pages: pages({
+        modified: [txn("out", { amount: 450, personalFinanceCategory: { primary: "TRANSFER_OUT", detailed: "TRANSFER_OUT_ACCOUNT_TRANSFER", confidenceLevel: "HIGH" } })],
+        added: [txn("in", { accountId: "sav", amount: -450, personalFinanceCategory: { primary: "TRANSFER_IN", detailed: "TRANSFER_IN_ACCOUNT_TRANSFER", confidenceLevel: "HIGH" } })],
+      }),
+    }));
+    expect(plan.updates[0]).toMatchObject({ id: "row-out", amount: 450, unpair: true });
+    expect(plan.unpair_ids).toEqual(["row-old"]);
+    expect(plan.inserts[0].pair_key).toBe("pair-1");
+    expect(plan.pair_existing).toEqual([{ id: "row-out", pair_key: "pair-1" }]);
+  });
+
   it("modified for a row PFI has never seen (pending→posted with a new id) becomes an insert", () => {
     const plan = buildSyncPlan(steady({ pages: pages({ modified: [txn("t-new")] }) }));
     expect(plan.inserts.map((i) => i.external_id)).toEqual(["t-new"]);
@@ -184,6 +214,12 @@ describe("deriveItemStatus / anchorDateFor", () => {
     expect(deriveItemStatus("TRANSACTIONS_UPDATE_STATUS_UNKNOWN", "history_loading", null)).toBe("history_loading");
     expect(deriveItemStatus("TRANSACTIONS_UPDATE_STATUS_UNKNOWN", "login_required", "2026-09-01T00:00:00Z")).toBe("connected");
     expect(deriveItemStatus("TRANSACTIONS_UPDATE_STATUS_UNKNOWN", "error", null)).toBe("history_loading");
+  });
+
+  it("an empty next_cursor (NOT_READY) yields a null cursor so the RPC keeps the stored one", () => {
+    const plan = buildSyncPlan(base({ pages: pages({ updateStatus: "NOT_READY", nextCursor: "" }), item: { id: ITEM, status: "initializing", historyCompleteAt: null, cursor: "cur-1" } }));
+    expect(plan.item.cursor).toBeNull();
+    expect(plan.sync_metadata.cursor_after).toBeNull();
   });
 
   it("history_complete is set only from HISTORICAL_UPDATE_COMPLETE (the RPC sets history_complete_at once)", () => {

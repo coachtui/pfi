@@ -125,9 +125,11 @@ export function buildSyncPlan(input: SyncPlanInput): SyncPlan {
   const updates: PlanUpdate[] = [];
   const unpairIds = new Set<string>();
   const retractions: RetractionAudit[] = [];
+  const seenUpdate = new Set<string>();
   for (const txn of pages.modified) {
     const existing = existingByExternal.get(txn.transactionId);
-    if (!existing || txn.pending) continue;
+    if (!existing || txn.pending || seenUpdate.has(txn.transactionId)) continue;
+    seenUpdate.add(txn.transactionId);
     const cols: ProviderColumns = toProviderColumns(txn);
     const prior: ProviderColumns = { ...cols, posted_date: existing.postedDate, amount: existing.amount, direction: existing.direction, description: existing.description };
     const substantive = substantiveChange(prior, cols);
@@ -147,7 +149,7 @@ export function buildSyncPlan(input: SyncPlanInput): SyncPlan {
   const deletedIds = new Set<string>();
   for (const r of pages.removed) {
     const existing = existingByExternal.get(r.transactionId);
-    if (!existing) continue;
+    if (!existing || deletedIds.has(existing.id)) continue;
     deletes.push({ id: existing.id });
     deletedIds.add(existing.id);
     retractions.push({
@@ -157,6 +159,9 @@ export function buildSyncPlan(input: SyncPlanInput): SyncPlan {
   }
 
   // ---- Pairing (§7): inserts + the user's unpaired, classified existing rows ----
+  // Existing rows modified THIS sync are seen with their new provider values,
+  // and a row unpaired this sync re-enters pairing (both sides, spec §5).
+  const updatedById = new Map(updates.map((u) => [u.id, u]));
   const candidates: PairCandidate[] = [];
   for (const ins of inserts) {
     const acct = resolve.get(ins.external_account_id)!;
@@ -166,15 +171,19 @@ export function buildSyncPlan(input: SyncPlanInput): SyncPlan {
     });
   }
   for (const t of existingTxns) {
-    if (t.provider !== "plaid" || t.pfcPrimary === null || deletedIds.has(t.id)) continue;
+    if (t.provider !== "plaid" || deletedIds.has(t.id)) continue;
     const acct = pfiById.get(t.accountId);
     if (!acct) continue;
+    const upd = updatedById.get(t.id);
+    const pfcPrimary = upd ? upd.pfc_primary : t.pfcPrimary;
+    if (pfcPrimary === null) continue;
     const ext = externalByPfiId.get(acct.id);
     const archived = acct.archivedAt !== null && !(ext && unarchivedThisSync.has(ext));
+    const reenters = unpairIds.has(t.id) || (upd?.unpair ?? false);
     candidates.push({
       ref: t.id, accountRef: acct.id, accountType: acct.type, accountArchived: archived || (ext ? archivedThisSync.has(ext) : false),
-      postedDate: t.postedDate, amount: t.amount, direction: t.direction, pfcPrimary: t.pfcPrimary,
-      alreadyPaired: (t.isTransfer || t.transferPairId !== null) && !unpairIds.has(t.id),
+      postedDate: upd ? upd.posted_date : t.postedDate, amount: upd ? upd.amount : t.amount, direction: upd ? upd.direction : t.direction,
+      pfcPrimary, alreadyPaired: (t.isTransfer || t.transferPairId !== null) && !reenters,
     });
   }
   const pairing = pairTransfers(candidates);
@@ -194,8 +203,10 @@ export function buildSyncPlan(input: SyncPlanInput): SyncPlan {
   const discrepancies: { external_account_id: string; discrepancy: number }[] = [];
   const anchorsByAccount = new Map<string, BalanceAnchor[]>();
   for (const a of priorAnchors) anchorsByAccount.set(a.accountId, [...(anchorsByAccount.get(a.accountId) ?? []), a]);
+  // One anchor per account Plaid currently shares (user-archived-but-shared
+  // accounts included: their balance history stays truthful for un-archiving).
   for (const a of accountsGet) {
-    if (a.balances.current === null || archivedThisSync.has(a.accountId)) continue;
+    if (a.balances.current === null) continue;
     const acct = resolve.get(a.accountId)!;
     const anchorDate = anchorDateFor(a.balances.lastUpdatedDatetime, today);
     const balance = Math.round(a.balances.current * 100) / 100;
@@ -206,7 +217,10 @@ export function buildSyncPlan(input: SyncPlanInput): SyncPlan {
       const eff = effectiveAnchor(prior);
       const engineAccount: AccountInput = { id: acct.pfiId, type: acct.type, currentBalance: 0, includeInCalculations: true };
       const txns: TransactionInput[] = [
-        ...existingTxns.filter((t) => t.accountId === acct.pfiId && !deletedIds.has(t.id)).map(toTxnInput),
+        ...existingTxns.filter((t) => t.accountId === acct.pfiId && !deletedIds.has(t.id)).map((t) => {
+          const upd = updatedById.get(t.id);
+          return toTxnInput(upd ? { ...t, postedDate: upd.posted_date, amount: upd.amount, direction: upd.direction } : t);
+        }),
         ...inserts.filter((i) => i.external_account_id === a.accountId).map((i, idx) => toTxnInput({
           id: `pending-${idx}`, accountId: acct.pfiId as string, postedDate: i.posted_date, amount: i.amount, direction: i.direction,
           description: i.description, isTransfer: false, transferPairId: null,
@@ -226,7 +240,8 @@ export function buildSyncPlan(input: SyncPlanInput): SyncPlan {
 
   return {
     item: {
-      cursor: pages.nextCursor, update_status: pages.updateStatus, status,
+      // Plaid returns an empty next_cursor before the initial pull completes; keep the stored cursor (RPC coalesces null).
+      cursor: pages.nextCursor || null, update_status: pages.updateStatus, status,
       history_complete: pages.updateStatus === "HISTORICAL_UPDATE_COMPLETE", error_code: null,
     },
     accounts: roster.ops,
@@ -241,7 +256,7 @@ export function buildSyncPlan(input: SyncPlanInput): SyncPlan {
     },
     sync_metadata: {
       request_ids: pages.requestIds, update_status: pages.updateStatus,
-      cursor_before: item.cursor, cursor_after: pages.nextCursor, pending_skipped: pendingSkipped,
+      cursor_before: item.cursor, cursor_after: pages.nextCursor || null, pending_skipped: pendingSkipped,
       ...(unknownAccount.length > 0 ? { unknown_account_transactions: unknownAccount.length } : {}),
     },
   };

@@ -18,12 +18,12 @@
 -- 1. Enum widening
 -- ---------------------------------------------------------------------------
 alter table public.financial_accounts
-  drop constraint financial_accounts_provider_check,
+  drop constraint if exists financial_accounts_provider_check,
   add constraint financial_accounts_provider_check
     check (provider in ('demo', 'manual', 'csv', 'plaid'));
 
 alter table public.balance_anchors
-  drop constraint balance_anchors_source_check,
+  drop constraint if exists balance_anchors_source_check,
   add constraint balance_anchors_source_check
     check (source in ('manual', 'import', 'sync'));
 
@@ -36,6 +36,11 @@ alter table public.balance_anchors
   add column source_updated_at timestamptz,
   add column freshness text not null default 'entered'
     check (freshness in ('entered', 'cached', 'realtime'));
+-- Existing (typed/statement) anchors were observed when they were created.
+update public.balance_anchors set observed_at = created_at where freshness = 'entered' and observed_at <> created_at;
+-- Per-user id-ordered scans (sync loads, score sources) get supporting indexes.
+create index balance_anchors_user_id_idx on public.balance_anchors (user_id, id);
+create index transactions_user_id_idx on public.transactions (user_id, id);
 
 -- ---------------------------------------------------------------------------
 -- 3. plaid_items — one row per linked Item (institution login). Non-secret.
@@ -69,12 +74,63 @@ create index plaid_items_user_idx on public.plaid_items (user_id, status);
 
 alter table public.plaid_items enable row level security;
 
-create policy "own_select" on public.plaid_items for select using ((select auth.uid()) = user_id);
-create policy "own_insert" on public.plaid_items for insert with check ((select auth.uid()) = user_id);
-create policy "own_update" on public.plaid_items for update using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
-create policy "own_delete" on public.plaid_items for delete using ((select auth.uid()) = user_id);
+-- No client DELETE: deleting an Item row would cascade its secret and strand a
+-- still-billable Plaid Item. Disconnect flows mark rows `disconnected` instead.
+create policy "own_select" on public.plaid_items for select to authenticated using ((select auth.uid()) = user_id);
+create policy "own_insert" on public.plaid_items for insert to authenticated with check ((select auth.uid()) = user_id);
+create policy "own_update" on public.plaid_items for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
-grant select, insert, update, delete on public.plaid_items to authenticated;
+grant select, insert, update on public.plaid_items to authenticated;
+
+-- One active Item per institution per user: the app's duplicate-institution
+-- guard, backed by the database. (Tradeoff, KNOWN_LIMITATIONS: two logins at
+-- one institution are not supported in Slice 1.)
+create unique index plaid_items_user_institution_active_idx
+  on public.plaid_items (user_id, institution_id)
+  where institution_id is not null and status <> 'disconnected';
+
+-- Sync bookkeeping columns are written only by commit_connected_sync (under a
+-- batch of this Item); identity columns never change. Status/error_code/
+-- last_sync_attempt_at stay app-writable (throttle claim, error marking).
+create function public.plaid_items_guard_client_writes()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_flag uuid;
+  v_ok boolean := false;
+begin
+  if new.id is distinct from old.id or new.user_id is distinct from old.user_id or new.item_id is distinct from old.item_id then
+    raise exception 'plaid_items: id, user_id, and item_id are immutable';
+  end if;
+  if new.transactions_cursor is distinct from old.transactions_cursor
+     or new.history_complete_at is distinct from old.history_complete_at
+     or new.last_synced_at is distinct from old.last_synced_at
+     or new.update_status is distinct from old.update_status then
+    begin
+      v_flag := nullif(current_setting('pfi.provider_write', true), '')::uuid;
+    exception when invalid_text_representation then v_flag := null;
+    end;
+    if v_flag is not null then
+      select exists (
+        select 1 from public.import_batches b
+        where b.id = v_flag and b.plaid_item_id = old.id and b.user_id = old.user_id
+          and b.source_type = 'connected_account' and b.status = 'extracting'
+      ) into v_ok;
+    end if;
+    if not v_ok then
+      raise exception 'plaid_items: sync bookkeeping columns are written only by commit_connected_sync';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger plaid_items_guard_client_writes
+  before update on public.plaid_items
+  for each row
+  execute function public.plaid_items_guard_client_writes();
 
 -- ---------------------------------------------------------------------------
 -- 4. plaid_item_secrets — service-role only. RLS enabled with NO policies and
@@ -140,44 +196,29 @@ create index import_batches_rebuild_pending_idx
 -- ---------------------------------------------------------------------------
 alter table public.user_profiles
   add column rebuild_claimed_at timestamptz,
-  add column rebuild_claim_token uuid;
+  add column rebuild_claim_token uuid,
+  -- Set when a disconnect/delete's rebuild failed; cleared by the dashboard repair.
+  add column rebuild_pending_at timestamptz;
 
 -- ---------------------------------------------------------------------------
 -- 9. Immutability trigger (0002/0004/0006 — 0006 dropped recurring_status)
---    re-created: five new frozen columns, and
---    a provider-write mode that permits changes to the PROVIDER-OWNED set only
---    (spec §6) while `pfi.provider_write` names an in-flight
---    `connected_account` batch owned by the row's owner. Everything else stays
---    frozen even in provider mode. The mode is only ever set inside
---    commit_connected_sync / delete_connected_item_data, after their
---    ownership assertions.
+--    re-created: five new frozen columns, and a provider-write mode that
+--    permits changes to the PROVIDER-OWNED set only (spec §6) while
+--    `pfi.provider_write` names an in-flight `connected_account` batch or a
+--    Plaid Item owned by the row's owner. The lookup runs ONLY when a
+--    provider-owned column actually changed, so user paths (user_override,
+--    notes) pay nothing. The mode is set only inside the two audited RPCs,
+--    after their ownership assertions.
 -- ---------------------------------------------------------------------------
 create or replace function public.transactions_prevent_source_update()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 declare
-  v_flag text := current_setting('pfi.provider_write', true);
+  v_flag uuid;
   v_provider_mode boolean := false;
 begin
-  if v_flag is not null and v_flag <> '' then
-    -- Implementation detail, not authorization: the flag must name either a
-    -- live sync batch (commit_connected_sync) or a Plaid Item
-    -- (delete_connected_item_data) belonging to this row's owner. Both are
-    -- RLS-visible reads under security invoker.
-    select exists (
-      select 1 from public.import_batches b
-      where b.id::text = v_flag
-        and b.user_id = old.user_id
-        and b.source_type = 'connected_account'
-        and b.status = 'extracting'
-    ) or exists (
-      select 1 from public.plaid_items i
-      where i.id::text = v_flag
-        and i.user_id = old.user_id
-    ) into v_provider_mode;
-  end if;
-
   -- Always frozen, in every mode.
   if (
     new.id is distinct from old.id
@@ -193,8 +234,9 @@ begin
     raise exception 'transactions: source columns are immutable after insert; corrections must go in user_override';
   end if;
 
-  -- Provider-owned: frozen for users, rewritable only inside a live sync commit.
-  if not v_provider_mode and (
+  -- Provider-owned: frozen for users, rewritable only inside a live sync commit
+  -- (or an Item deletion) belonging to this row's owner.
+  if (
     new.posted_date is distinct from old.posted_date
     or new.authorized_date is distinct from old.authorized_date
     or new.amount is distinct from old.amount
@@ -209,7 +251,23 @@ begin
     or new.is_transfer is distinct from old.is_transfer
     or new.transfer_pair_id is distinct from old.transfer_pair_id
   ) then
-    raise exception 'transactions: source columns are immutable after insert; corrections must go in user_override';
+    begin
+      v_flag := nullif(current_setting('pfi.provider_write', true), '')::uuid;
+    exception when invalid_text_representation then v_flag := null;
+    end;
+    if v_flag is not null then
+      select exists (
+        select 1 from public.import_batches b
+        where b.id = v_flag and b.user_id = old.user_id
+          and b.source_type = 'connected_account' and b.status = 'extracting'
+      ) or exists (
+        select 1 from public.plaid_items i
+        where i.id = v_flag and i.user_id = old.user_id
+      ) into v_provider_mode;
+    end if;
+    if not v_provider_mode then
+      raise exception 'transactions: source columns are immutable after insert; corrections must go in user_override';
+    end if;
   end if;
 
   return new;
@@ -223,7 +281,7 @@ $$;
 -- Plaid external ids so first-sync inserts can target accounts created in the
 -- same commit):
 -- {
---   "item":     { "cursor": text, "update_status": text, "status": text,
+--   "item":     { "cursor": text|null, "update_status": text, "status": text,
 --                 "history_complete": bool, "error_code": text|null },
 --   "accounts": [ { "op": "create"|"archive"|"unarchive"|"keep",
 --                   "external_account_id", "type", "display_name", "institution",
@@ -246,18 +304,24 @@ $$;
 -- }
 -- pair_key: rows sharing a key (exactly two, across inserts and/or
 -- pair_existing) are linked as a transfer pair after inserts have ids.
+--
+-- Scoping: provider-column rewrites (updates/deletes) are limited to THIS
+-- Item's own Plaid accounts; pairing-column changes (unpair/pair_existing)
+-- may touch any of the caller's Plaid rows (a transfer can span two
+-- institutions). csv/demo/manual rows are unreachable, even for their owner.
 -- ---------------------------------------------------------------------------
 create or replace function public.commit_connected_sync(p_batch_id uuid, p_plan jsonb)
 returns jsonb
 language plpgsql
 security invoker
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   v_uid uuid := auth.uid();
   v_item_id uuid;
   v_ids uuid[];
   v_count int;
+  v_rows int;
   v_inserted int := 0;
   v_updated int := 0;
   v_deleted int := 0;
@@ -283,38 +347,47 @@ begin
     raise exception 'commit_connected_sync: ownership (batch)';
   end if;
 
-  if not exists (select 1 from plaid_items i where i.id = v_item_id and i.user_id = v_uid) then
+  -- Lock the Item row: two syncs of one Item serialize here instead of both
+  -- committing from the same cursor.
+  perform 1 from plaid_items i where i.id = v_item_id and i.user_id = v_uid for update;
+  if not found then
     raise exception 'commit_connected_sync: ownership (item)';
   end if;
 
-  select coalesce(array_agg((e->>'id')::uuid), '{}') into v_ids
+  select coalesce(array_agg(distinct (e->>'id')::uuid), '{}') into v_ids
   from jsonb_array_elements(coalesce(p_plan->'updates', '[]')) e;
   select count(*) into v_count from transactions t
-    where t.id = any(v_ids) and t.user_id = v_uid;
+    join financial_accounts a on a.id = t.account_id
+    where t.id = any(v_ids) and t.user_id = v_uid and a.user_id = v_uid
+      and a.provider = 'plaid' and a.plaid_item_id = v_item_id;
   if v_count <> coalesce(array_length(v_ids, 1), 0) then
     raise exception 'commit_connected_sync: ownership (updates)';
   end if;
 
-  select coalesce(array_agg((e->>'id')::uuid), '{}') into v_ids
+  select coalesce(array_agg(distinct (e->>'id')::uuid), '{}') into v_ids
   from jsonb_array_elements(coalesce(p_plan->'deletes', '[]')) e;
   select count(*) into v_count from transactions t
-    where t.id = any(v_ids) and t.user_id = v_uid;
+    join financial_accounts a on a.id = t.account_id
+    where t.id = any(v_ids) and t.user_id = v_uid and a.user_id = v_uid
+      and a.provider = 'plaid' and a.plaid_item_id = v_item_id;
   if v_count <> coalesce(array_length(v_ids, 1), 0) then
     raise exception 'commit_connected_sync: ownership (deletes)';
   end if;
 
-  select coalesce(array_agg(e::uuid), '{}') into v_ids
+  select coalesce(array_agg(distinct e::uuid), '{}') into v_ids
   from jsonb_array_elements_text(coalesce(p_plan->'unpair_ids', '[]')) e;
   select count(*) into v_count from transactions t
-    where t.id = any(v_ids) and t.user_id = v_uid;
+    join financial_accounts a on a.id = t.account_id
+    where t.id = any(v_ids) and t.user_id = v_uid and a.user_id = v_uid and a.provider = 'plaid';
   if v_count <> coalesce(array_length(v_ids, 1), 0) then
     raise exception 'commit_connected_sync: ownership (unpair)';
   end if;
 
-  select coalesce(array_agg((e->>'id')::uuid), '{}') into v_ids
+  select coalesce(array_agg(distinct (e->>'id')::uuid), '{}') into v_ids
   from jsonb_array_elements(coalesce(p_plan->'pair_existing', '[]')) e;
   select count(*) into v_count from transactions t
-    where t.id = any(v_ids) and t.user_id = v_uid;
+    join financial_accounts a on a.id = t.account_id
+    where t.id = any(v_ids) and t.user_id = v_uid and a.user_id = v_uid and a.provider = 'plaid';
   if v_count <> coalesce(array_length(v_ids, 1), 0) then
     raise exception 'commit_connected_sync: ownership (pair_existing)';
   end if;
@@ -335,13 +408,15 @@ begin
         v_uid, 'plaid', v_item_id, r.external_account_id, r.type, r.display_name,
         r.institution, r.mask, r.credit_limit, coalesce(r.roster_status, 'shared'), 'ok', v_now)
       on conflict (plaid_item_id, external_account_id) where plaid_item_id is not null and external_account_id is not null
-      do update set archived_at = null, roster_status = 'shared', connection_status = 'ok', last_synced_at = excluded.last_synced_at;
-      v_created_accounts := v_created_accounts + 1;
+      do nothing;
+      get diagnostics v_rows = row_count;
+      v_created_accounts := v_created_accounts + v_rows;
     elsif r.op = 'archive' then
       update financial_accounts
         set archived_at = coalesce(archived_at, v_now), roster_status = coalesce(r.roster_status, 'unshared')
         where plaid_item_id = v_item_id and external_account_id = r.external_account_id and user_id = v_uid;
-      v_archived_accounts := v_archived_accounts + 1;
+      get diagnostics v_rows = row_count;
+      v_archived_accounts := v_archived_accounts + v_rows;
     elsif r.op = 'unarchive' then
       update financial_accounts
         set archived_at = null, roster_status = 'shared'
@@ -358,7 +433,7 @@ begin
   end loop;
 
   -- (d) Deletes (provider retractions). Audit lives in reconciliation_results.
-  select coalesce(array_agg((e->>'id')::uuid), '{}') into v_ids
+  select coalesce(array_agg(distinct (e->>'id')::uuid), '{}') into v_ids
   from jsonb_array_elements(coalesce(p_plan->'deletes', '[]')) e;
   if coalesce(array_length(v_ids, 1), 0) > 0 then
     -- Survivors of a deleted transfer counterpart lose their pairing.
@@ -369,7 +444,7 @@ begin
   end if;
 
   -- (e) Explicit unpairs (provider amount/date/direction changed on a paired row).
-  select coalesce(array_agg(e::uuid), '{}') into v_ids
+  select coalesce(array_agg(distinct e::uuid), '{}') into v_ids
   from jsonb_array_elements_text(coalesce(p_plan->'unpair_ids', '[]')) e;
   if coalesce(array_length(v_ids, 1), 0) > 0 then
     update transactions set is_transfer = false, transfer_pair_id = null
@@ -396,38 +471,41 @@ begin
       is_transfer = case when coalesce(r.unpair, false) then false else is_transfer end,
       transfer_pair_id = case when coalesce(r.unpair, false) then null else transfer_pair_id end
     where id = r.id and user_id = v_uid;
-    v_updated := v_updated + 1;
+    get diagnostics v_rows = row_count;
+    v_updated := v_updated + v_rows;
   end loop;
 
-  -- (g) Inserts. Idempotent via the partial unique index; pair keys captured
-  -- so pairing can run once ids exist.
+  -- (g) Inserts: ONE set-based statement (a first sync can carry thousands
+  -- of rows; a per-row loop would risk statement_timeout and wedge the
+  -- cursor). Idempotent via the partial unique index; pair keys captured so
+  -- pairing can run once ids exist.
   create temp table if not exists sync_pairs (pair_key text, txn_id uuid) on commit drop;
   delete from sync_pairs;
 
-  for r in select * from jsonb_to_recordset(coalesce(p_plan->'inserts', '[]')) as x(
-    external_account_id text, posted_date date, authorized_date date, amount numeric,
-    direction text, description text, category text, category_confidence text,
-    pfc_primary text, pfc_detailed text, category_taxonomy_version text,
-    external_id text, pair_key text)
-  loop
-    with ins as (
-      insert into transactions (
-        account_id, user_id, posted_date, authorized_date, amount, direction, description,
-        category, category_confidence, pfc_primary, pfc_detailed, category_taxonomy_version,
-        external_id, import_batch_id)
-      select a.id, v_uid, r.posted_date, r.authorized_date, r.amount, r.direction, r.description,
-             r.category, r.category_confidence, r.pfc_primary, r.pfc_detailed, r.category_taxonomy_version,
-             r.external_id, p_batch_id
-      from financial_accounts a
-      where a.plaid_item_id = v_item_id and a.external_account_id = r.external_account_id and a.user_id = v_uid
-      on conflict (account_id, external_id) where external_id is not null do nothing
-      returning id
-    )
-    insert into sync_pairs (pair_key, txn_id)
-    select r.pair_key, ins.id from ins where r.pair_key is not null;
-    get diagnostics v_count = row_count;
-    -- row_count here counts sync_pairs rows; recount inserted rows by batch below.
-  end loop;
+  with src as (
+    select * from jsonb_to_recordset(coalesce(p_plan->'inserts', '[]')) as x(
+      external_account_id text, posted_date date, authorized_date date, amount numeric,
+      direction text, description text, category text, category_confidence text,
+      pfc_primary text, pfc_detailed text, category_taxonomy_version text,
+      external_id text, pair_key text)
+  ), ins as (
+    insert into transactions (
+      account_id, user_id, posted_date, authorized_date, amount, direction, description,
+      category, category_confidence, pfc_primary, pfc_detailed, category_taxonomy_version,
+      external_id, import_batch_id)
+    select a.id, v_uid, s.posted_date, s.authorized_date, s.amount, s.direction, s.description,
+           s.category, s.category_confidence, s.pfc_primary, s.pfc_detailed, s.category_taxonomy_version,
+           s.external_id, p_batch_id
+    from src s
+    join financial_accounts a
+      on a.plaid_item_id = v_item_id and a.external_account_id = s.external_account_id and a.user_id = v_uid
+    on conflict (account_id, external_id) where external_id is not null do nothing
+    returning id, external_id
+  )
+  insert into sync_pairs (pair_key, txn_id)
+  select s.pair_key, i.id
+  from ins i join src s on s.external_id = i.external_id
+  where s.pair_key is not null;
   select count(*) into v_inserted from transactions t where t.import_batch_id = p_batch_id and t.user_id = v_uid;
 
   -- Existing rows that take part in a pair with a new row.
@@ -512,7 +590,7 @@ create or replace function public.delete_connected_item_data(p_item_id uuid)
 returns jsonb
 language plpgsql
 security invoker
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   v_uid uuid := auth.uid();
@@ -525,7 +603,8 @@ begin
   if v_uid is null then
     raise exception 'delete_connected_item_data: not authenticated';
   end if;
-  if not exists (select 1 from plaid_items i where i.id = p_item_id and i.user_id = v_uid) then
+  perform 1 from plaid_items i where i.id = p_item_id and i.user_id = v_uid for update;
+  if not found then
     raise exception 'delete_connected_item_data: ownership (item)';
   end if;
 

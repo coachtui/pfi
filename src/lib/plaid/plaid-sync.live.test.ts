@@ -85,9 +85,10 @@ describe.skipIf(!plaidReady)("Plaid Slice 1 — sandbox link + sync (live)", () 
 
     // §13.4: partial history is a real state; poll until HISTORICAL_UPDATE_COMPLETE.
     let status = linked.status ?? "initializing";
-    for (let i = 0; i < 24 && status !== "connected"; i++) {
-      await new Promise((r) => setTimeout(r, 5_000));
-      const r = await syncItem(itemId, true);
+    for (let i = 0; i < 16 && status !== "connected"; i++) {
+      await new Promise((r) => setTimeout(r, 25_000)); // user-initiated floor is 20s
+      const r = await syncItem(itemId);
+      if (r.throttled) continue;
       expect(r.error).toBe("");
       status = r.status ?? status;
     }
@@ -113,14 +114,15 @@ describe.skipIf(!plaidReady)("Plaid Slice 1 — sandbox link + sync (live)", () 
 
     const { data: snaps } = await userClient.from("daily_snapshots").select("date").limit(1);
     expect((snaps ?? []).length).toBe(1);
-  }, 240_000);
+  }, 480_000);
 
   it("re-sync is idempotent and preserves a user override; a stale token surfaces login_required", async () => {
     const { data: row } = await userClient.from("transactions").select("id").not("external_id", "is", null).limit(1).single();
     const { error: ovErr } = await userClient.from("transactions").update({ user_override: { category: "groceries" } }).eq("id", row!.id);
     expect(ovErr).toBeNull();
 
-    const again = await syncItem(itemId, true);
+    await new Promise((r) => setTimeout(r, 21_000));
+    const again = await syncItem(itemId);
     expect(again.error).toBe("");
     expect(again.counts?.inserted).toBe(0);
     const { data: after } = await userClient.from("transactions").select("user_override").eq("id", row!.id).single();
@@ -128,9 +130,10 @@ describe.skipIf(!plaidReady)("Plaid Slice 1 — sandbox link + sync (live)", () 
 
     // Reset the sandbox login: next sync must flag login_required, never wipe data.
     const client = getPlaidClient()!;
-    const accessToken = await loadAccessToken(itemId);
-    await client.api.sandboxItemResetLogin({ access_token: accessToken });
-    const broken = await syncItem(itemId, true);
+    const accessToken = await loadAccessToken(userId, itemId);
+    await client.api.sandboxItemResetLogin({ access_token: accessToken as string });
+    await new Promise((r) => setTimeout(r, 21_000));
+    const broken = await syncItem(itemId);
     expect(broken.error).toMatch(/reconnect/i);
     const { data: item } = await userClient.from("plaid_items").select("status").eq("id", itemId).single();
     expect(item?.status).toBe("login_required");
