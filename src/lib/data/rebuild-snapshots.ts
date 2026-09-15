@@ -127,13 +127,21 @@ export async function rebuildSnapshots(supabase: SupabaseClient): Promise<{ erro
       await insertChunked(supabase, "daily_snapshots", snapshots.map((s) => snapshotToRow(user.id, s)));
     }
 
-    await rebuildDerivedEvents(supabase, user.id, {
-      accounts: acctRes.data as RebuildAccountRow[],
-      transactions: transactionRows,
-      recurringOverrides: overrideRows,
-      anchorsByAccount,
-      referenceDate: config?.endDate ?? null,
-    });
+    try {
+      await rebuildDerivedEvents(supabase, user.id, {
+        accounts: acctRes.data as RebuildAccountRow[],
+        transactions: transactionRows,
+        recurringOverrides: overrideRows,
+        anchorsByAccount,
+        referenceDate: config?.endDate ?? null,
+      });
+    } catch (e) {
+      // Snapshots are already correct, so the stale-index check would not fire
+      // again; remember the failure on the profile so the dashboard repairs it
+      // under the lease on the next load (same flag the sync path uses).
+      await supabase.from("user_profiles").update({ rebuild_pending_at: new Date().toISOString() }).eq("id", user.id);
+      throw e;
+    }
     return { error: "" };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Snapshot rebuild failed" };
