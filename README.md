@@ -55,7 +55,7 @@ Full detail (exit criteria, alternatives considered) lives in `docs/ROADMAP.md`;
 
 ## Documentation
 
-Everything important lives in `docs/`: PRODUCT_VISION, ROADMAP, CURRENT_PHASE (session status), ARCHITECTURE, DATA_MODEL, DECISIONS (ADR log), FINANCIAL_INDEX_METHODOLOGY, FINANCIAL_HEALTH_SCORE, AI_RECOMMENDATION_POLICY, SECURITY_MODEL, KNOWN_LIMITATIONS.
+Everything important lives in `docs/`: PRODUCT_VISION, ROADMAP, CURRENT_PHASE (session status), ARCHITECTURE, DATA_MODEL, DECISIONS (ADR log), FINANCIAL_INDEX_METHODOLOGY, FINANCIAL_HEALTH_SCORE, AI_RECOMMENDATION_POLICY, INFORMATION_SECURITY_POLICY (governing policy), SECURITY_MODEL (its implementation record), KNOWN_LIMITATIONS.
 
 ## Disclaimers
 
