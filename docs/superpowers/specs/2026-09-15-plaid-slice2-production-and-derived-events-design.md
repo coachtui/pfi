@@ -1,6 +1,6 @@
 # Plaid Slice 2 — Production cut-over & derived driver events — Design
 
-_Date: 2026-09-15. Status: **draft for owner review** (round 1). Follows Slice 1 (DECISIONS #43, merged 2026-09-15 as PR #34)._
+_Date: 2026-09-15. Status: **frozen** — approved by the owner after one review round (the relative large-purchase rule was questioned and kept). Follows Slice 1 (DECISIONS #43, merged 2026-09-15 as PR #34)._
 
 ## Problem
 
@@ -16,7 +16,7 @@ Both halves are needed before the owner links a real bank and looks at the resul
 - **Production is a configuration and consent change, not a code path change.** The sync pipeline is environment-agnostic; what changes is the key material, one redirect page, one link-token field, and the legal text that discloses the data flow.
 - **Driver events are a derivation, like snapshots.** `daily_snapshots` are rebuilt deterministically from source rows on every mutation (DECISIONS #8). Derived events should be the same kind of thing: a versioned pure function over effective transactions, accounts, and recurring series, rebuilt in the same step, never hand-edited, never conflated with the demo loader's authored events. The demo generators' own conventions (paychecks from payroll series, contributions from transfers into investment accounts, debt payments from transfers into liabilities, hand-picked unusual purchases) are the rules to reproduce.
 
-## Decisions taken in brainstorming (proposed; confirm or amend)
+## Decisions taken in brainstorming (approved)
 
 - **OAuth return page, not a rebuilt card.** A dedicated `/plaid/oauth` page re-initializes Link with the same token and `receivedRedirectUri`; the card persists the in-flight token in `sessionStorage` before opening Link. Sandbox's Platypus OAuth Bank (`ins_127287`) tests the whole path before Production approval.
 - **Consent via policy version bump plus a just-in-time disclosure, not a third legal document.** The privacy policy gains a "Connected accounts (Plaid)" section and `PRIVACY_VERSION` bumps, so the existing consent gate re-prompts every user. The Connect button additionally shows a one-time disclosure sheet before Link opens. Adding a `bank_data` document to `user_agreements` was the alternative; it needs a migration, a cookie-format change, and consent-UI generalization for the same legal effect.
@@ -140,7 +140,7 @@ Rules, applied in this order, one event per transaction at most, only for accoun
 
 DECISIONS #44 (this design); DATA_MODEL.md (`financial_events` source/provenance, the derived-events rebuild); SECURITY_MODEL.md (production runbook, OAuth, consent); FINANCIAL_INDEX_METHODOLOGY.md or a new `docs/DRIVER_EVENTS.md` (the v1 rules, versioning policy: rule changes bump `EVENT_DERIVATION_VERSION` and re-derive); KNOWN_LIMITATIONS (payoff rule needs balance history; unlinked-destination contributions rely on Plaid's category; sandbox-only OAuth test); ROADMAP Phase 7; CURRENT_PHASE.
 
-## Acceptance criteria (to freeze after review)
+## Acceptance criteria (frozen)
 
 1. **OAuth round-trip.** Linking Platypus OAuth Bank in Sandbox completes through `/plaid/oauth`, the Item reaches `connected`, and a stale/expired session shows the recovery message instead of an error.
 2. **Consent gate.** After deploy, an existing user is routed to `/consent` once and the privacy policy names Plaid and the disconnect/delete rights; the disclosure sheet shows before the first Link open.
