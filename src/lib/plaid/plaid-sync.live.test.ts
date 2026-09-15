@@ -23,6 +23,15 @@ vi.mock("@/lib/supabase/server", () => ({
     return state.client;
   },
 }));
+// Under Vitest, src/lib/config/env.ts substitutes placeholder Supabase values, so
+// the real admin client (used only for plaid_item_secrets) must be built here
+// from .env.local's service-role key, exactly as the app builds it in production.
+vi.mock("@/lib/supabase/admin", () => ({
+  createAdminClient: () =>
+    createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL as string, process.env.SUPABASE_SERVICE_ROLE_KEY as string, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    }),
+}));
 
 import { Products } from "plaid";
 import { disconnectItem, exchangePublicToken, syncItem } from "@/app/actions/plaid";
