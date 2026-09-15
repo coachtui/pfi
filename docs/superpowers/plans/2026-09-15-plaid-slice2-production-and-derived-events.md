@@ -29,25 +29,25 @@
 
 **Files:** `src/lib/config/env.server.ts` (+ test), `.env.example`, `playwright.config.ts` (unset `PLAID_REDIRECT_URI`), `docs/SECURITY_MODEL.md` (runbook stub)
 
-- [ ] `plaidConfig()` gains `redirectUri: string | null` (`PLAID_REDIRECT_URI`, must be an absolute `https:` URL, or `http://localhost…` only when `PLAID_ENV=sandbox`) and `maxItems: number` (`PLAID_MAX_ITEMS`, integer 1–20, default 5). Tests for both, including the localhost/sandbox rule.
-- [ ] `.env.example` documents both; note the Production value.
+- [x] `plaidConfig()` gains `redirectUri: string | null` (`PLAID_REDIRECT_URI`, must be an absolute `https:` URL, or `http://localhost…` only when `PLAID_ENV=sandbox`) and `maxItems: number` (`PLAID_MAX_ITEMS`, integer 1–20, default 5). Tests for both, including the localhost/sandbox rule.
+- [x] `.env.example` documents both; note the Production value.
 
 ### Task 1: Migration `0016_derived_events` + RPC balance fix + RLS tests
 
 **Files:** `supabase/migrations/0016_derived_events.sql`, `scripts/test-rls.mts`, `docs/DATA_MODEL.md`
 
-- [ ] `financial_events`: `source` (`demo`|`derived`, default `demo`), `transaction_id uuid references transactions on delete cascade`, `derivation_version text`; partial unique index `(user_id, transaction_id, type) where source='derived' and transaction_id is not null`; index `(user_id, source)`; ownership trigger `financial_events_check_transaction_ownership` (transaction_id must belong to user_id; same pattern as 0008).
-- [ ] `commit_connected_sync`: roster `create` op leaves balance null, then step (i) also `update financial_accounts a set current_balance = x.balance … where a.current_balance is null` for the anchored accounts (rebuild still recomputes via roll-forward). Re-apply via MCP `apply_migration` (recorded).
-- [ ] RLS script: B cannot insert a derived event referencing A's transaction; A cannot reference B's transaction (trigger); owner can insert/delete derived rows; demo rows unaffected.
+- [x] `financial_events`: `source` (`demo`|`derived`, default `demo`), `transaction_id uuid references transactions on delete cascade`, `derivation_version text`; partial unique index `(user_id, transaction_id, type) where source='derived' and transaction_id is not null`; index `(user_id, source)`; ownership trigger `financial_events_check_transaction_ownership` (transaction_id must belong to user_id; same pattern as 0008).
+- [x] `commit_connected_sync`: roster `create` op leaves balance null, then step (i) also `update financial_accounts a set current_balance = x.balance … where a.current_balance is null` for the anchored accounts (rebuild still recomputes via roll-forward). Re-apply via MCP `apply_migration` (recorded).
+- [x] RLS script: B cannot insert a derived event referencing A's transaction; A cannot reference B's transaction (trigger); owner can insert/delete derived rows; demo rows unaffected.
 
 ### Task 2: Engine — `derived-events.ts`
 
 **Files:** `src/lib/financial-engine/derived-events.ts`, `derived-events.test.ts`, `index.ts` export, `docs/DRIVER_EVENTS.md`
 
-- [ ] Types `EventAccountInput`, `EventTransactionInput`, `DerivedEvent`; `EVENT_DERIVATION_VERSION = "v1"`; `deriveEvents(input)` implementing the spec §2b rules in order, one event per transaction, demo/archived/excluded accounts skipped, monthly cap (3) for `large_purchase`/`unexpected_expense`, relative threshold `max(250, 2.5 × median non-recurring outflow over trailing 90 days ending at the transaction date)`, `debt_payoff` from an optional liability balance series (skip when absent).
-- [ ] Series-occurrence matching: a transaction is an occurrence of a series when `seriesKeyOf(accountId, direction, normalizeDescription(description))` matches a non-dismissed series (`recurring_overrides` status ≠ `dismissed`; confidence high/medium or confirmed).
-- [ ] Tests: table-driven per rule; overrides change the category and thus the event; demo exclusion; idempotence; cap; threshold examples ($80 median → $250 bar, $200 median → $500 bar); payoff; Koa reproduction (paycheck/mortgage/investment/debt dates+amounts match the generator's authored events; large purchases asserted loosely).
-- [ ] `docs/DRIVER_EVENTS.md`: the v1 rules in plain language + versioning policy (linked from the dashboard "How is this calculated?" later).
+- [x] Types `EventAccountInput`, `EventTransactionInput`, `DerivedEvent`; `EVENT_DERIVATION_VERSION = "v1"`; `deriveEvents(input)` implementing the spec §2b rules in order, one event per transaction, demo/archived/excluded accounts skipped, monthly cap (3) for `large_purchase`/`unexpected_expense`, relative threshold `max(250, 2.5 × median non-recurring outflow over trailing 90 days ending at the transaction date)`, `debt_payoff` from an optional liability balance series (skip when absent).
+- [x] Series-occurrence matching: a transaction is an occurrence of a series when `seriesKeyOf(accountId, direction, normalizeDescription(description))` matches a non-dismissed series (`recurring_overrides` status ≠ `dismissed`; confidence high/medium or confirmed).
+- [x] Tests: table-driven per rule; overrides change the category and thus the event; demo exclusion; idempotence; cap; threshold examples ($80 median → $250 bar, $200 median → $500 bar); payoff; Koa reproduction (paycheck/mortgage/investment/debt dates+amounts match the generator's authored events; large purchases asserted loosely).
+- [x] `docs/DRIVER_EVENTS.md`: the v1 rules in plain language + versioning policy (linked from the dashboard "How is this calculated?" later).
 
 ### Task 3: Data — rebuild integration + demo scoping
 
