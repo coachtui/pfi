@@ -301,6 +301,31 @@ try {
     .delete().eq("user_id", a.id).select("concept_id");
   check("B cannot delete A's academy progress", (apDel?.length ?? 0) === 0);
 
+  // ---- Plaid Slice 2 (migration 0016, DECISIONS #44): derived events provenance ----
+  const { error: evOwn } = await a.client.from("financial_events").insert({
+    user_id: a.id, date: "2026-07-01", type: "large_purchase", label: "rls derived", amount: 300, direction: "outflow",
+    source: "derived", transaction_id: aTxn!.id, derivation_version: "v1",
+  });
+  check("financial_events: owner can insert a derived event for own transaction", !evOwn, evOwn?.message ?? "");
+  const { error: evForeignTxn } = await a.client.from("financial_events").insert({
+    user_id: a.id, date: "2026-07-01", type: "large_purchase", label: "forged", amount: 1, direction: "outflow",
+    source: "derived", transaction_id: bAcct ? (await b.client.from("transactions").insert({ account_id: bAcct.id, user_id: b.id, posted_date: "2026-07-03", amount: 9, direction: "outflow", description: "B row 2" }).select("id").single()).data!.id : aTxn!.id,
+  });
+  check("financial_events: cannot reference another user's transaction (ownership trigger)", !!evForeignTxn && /does not belong/.test(evForeignTxn.message), evForeignTxn?.message ?? "no error");
+  const { error: evDup } = await a.client.from("financial_events").insert({
+    user_id: a.id, date: "2026-07-01", type: "large_purchase", label: "dup", amount: 300, direction: "outflow",
+    source: "derived", transaction_id: aTxn!.id, derivation_version: "v1",
+  });
+  check("financial_events: one derived event per (transaction, type)", !!evDup && /duplicate|unique/i.test(evDup.message), evDup?.message ?? "no error");
+  const { data: evCross } = await b.client.from("financial_events").select("id").eq("user_id", a.id);
+  check("financial_events: cross-user read returns nothing", (evCross ?? []).length === 0);
+  const { error: evBadSource } = await a.client.from("financial_events").insert({
+    user_id: a.id, date: "2026-07-01", type: "paycheck", label: "x", amount: 1, direction: "inflow", source: "guess",
+  });
+  check("financial_events: unknown source rejected by check constraint", !!evBadSource);
+  const { error: evDelOwn } = await a.client.from("financial_events").delete().eq("user_id", a.id).eq("source", "derived");
+  check("financial_events: owner can delete own derived rows", !evDelOwn, evDelOwn?.message ?? "");
+
   // ---- Plaid Slice 1 (migration 0015, DECISIONS #43): items, secrets, RPC authorization ----
   const { data: aItem, error: aItemErr } = await a.client.from("plaid_items")
     .insert({ user_id: a.id, item_id: `rls-item-${randomUUID().slice(0, 8)}`, institution_id: "ins_test", institution_name: "RLS Bank" })
@@ -390,6 +415,8 @@ try {
   };
   const { data: rpcOk, error: rpcOkErr } = await a.client.rpc("commit_connected_sync", { p_batch_id: batch1, p_plan: plan1 });
   check("commit_connected_sync: owner happy path commits", !rpcOkErr && rpcOk?.inserted === 1 && rpcOk?.anchored === 1 && rpcOk?.accounts_created === 1, rpcOkErr?.message ?? JSON.stringify(rpcOk));
+  const { data: seeded } = await a.client.from("financial_accounts").select("current_balance").eq("external_account_id", "ext-acct-1").eq("plaid_item_id", aItem!.id).single();
+  check("balance_anchors seed trigger: a newly created account gets its balance in the same commit (0016)", Number(seeded?.current_balance) === 1000, `current_balance=${seeded?.current_balance}`);
 
   const { data: itemAfter } = await a.client.from("plaid_items").select("transactions_cursor, status, history_complete_at").eq("id", aItem!.id).single();
   check("commit_connected_sync: cursor + status + history_complete_at advanced together", itemAfter?.transactions_cursor === "cursor-1" && itemAfter?.status === "connected" && !!itemAfter?.history_complete_at);
