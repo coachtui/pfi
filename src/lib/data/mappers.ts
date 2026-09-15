@@ -37,10 +37,13 @@ export function rowToSnapshot(row: SnapshotRow): DailySnapshot {
 export interface EventRow {
   id?: string; user_id: string; date: string; type: string; label: string;
   amount: number; direction: string;
+  /** Provenance (migration 0016): authored demo rows vs. rows derived from a transaction. */
+  source?: "demo" | "derived"; transaction_id?: string | null; derivation_version?: string | null;
 }
 
+/** Demo-authored event row (the derivation path writes its own rows in rebuild-derived-events.ts). */
 export function eventToRow(userId: string, e: FinancialEvent): EventRow {
-  return { user_id: userId, date: e.date, type: e.type, label: e.label, amount: e.amount, direction: e.direction };
+  return { user_id: userId, date: e.date, type: e.type, label: e.label, amount: e.amount, direction: e.direction, source: "demo" };
 }
 
 export function rowToEvent(row: EventRow & { id: string }): FinancialEvent {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateKoaHoldings } from "@/lib/demo-data/koa-holdings";
 import {
-  BONUS_FLOOR, LARGE_PURCHASE_FLOOR, ONE_OFF_MONTHLY_CAP, deriveEvents, oneOffThreshold,
+  BONUS_FLOOR, LARGE_PURCHASE_FLOOR, ONE_OFF_MONTHLY_CAP, deriveEvents, liabilityBalanceHistory, oneOffThreshold,
   type DeriveEventsInput, type EventAccountInput, type EventSeriesInput, type EventTransactionInput,
 } from "./derived-events";
 import { detectRecurringSeries, normalizeDescription, seriesKeyOf } from "./recurring";
@@ -120,6 +120,24 @@ describe("deriveEvents — transfers into other accounts", () => {
     expect(run({ transactions: [out, inn], liabilityBalances: balances }).map((e) => e.type)).toEqual(["debt_payoff"]);
     expect(run({ transactions: [out, inn], liabilityBalances: [...balances, { accountId: "card", date: "2026-08-20", balance: 40 }] }).map((e) => e.type)).toEqual(["debt_payment"]);
     expect(run({ transactions: [out, inn] }).map((e) => e.type)).toEqual(["debt_payment"]); // no history → never payoff
+    // History that starts after the payment cannot vouch for it.
+    const late = [{ accountId: "card", date: "2026-09-01", balance: 0 }];
+    expect(run({ transactions: [out, inn], liabilityBalances: late }).map((e) => e.type)).toEqual(["debt_payment"]);
+  });
+
+  it("liabilityBalanceHistory rolls a card's anchor through its transactions in both directions", () => {
+    const card = { id: "card", type: "credit_card" as const, currentBalance: 0, includeInCalculations: true };
+    const txns = [
+      { id: "a", accountId: "card", postedDate: "2026-08-05", amount: 300, direction: "outflow" as const, description: "Store", category: "shopping", essential: null, isTransfer: false, transferPairId: null },
+      { id: "b", accountId: "card", postedDate: "2026-08-13", amount: 1200, direction: "inflow" as const, description: "Payment", category: "other", essential: null, isTransfer: true, transferPairId: null },
+      { id: "c", accountId: "chk", postedDate: "2026-08-13", amount: 1200, direction: "outflow" as const, description: "Payment", category: "other", essential: null, isTransfer: true, transferPairId: null },
+    ];
+    const history = liabilityBalanceHistory(card, { balance: 1200, anchorDate: "2026-08-10" }, txns);
+    expect(history).toEqual([
+      { accountId: "card", date: "2026-08-05", balance: 1200 }, // end of day: the $300 purchase is already in; nothing else moved before the anchor
+      { accountId: "card", date: "2026-08-10", balance: 1200 },
+      { accountId: "card", date: "2026-08-13", balance: 0 },
+    ]);
   });
 
   it("unpaired LOAN_PAYMENTS (unlinked lender) is a debt payment; tax payments from Plaid's detail", () => {

@@ -51,11 +51,11 @@
 
 ### Task 3: Data — rebuild integration + demo scoping
 
-**Files:** `src/lib/data/rebuild-derived-events.ts`, `src/lib/data/finish-mutation.ts`, `src/lib/data/dashboard-sync.ts`, `src/app/page.tsx` (repair branch), `src/lib/plaid/sync.ts` (post-commit), `src/app/actions/demo.ts` (`clearDemoRows` scoped; loader rows `source='demo'`), `src/lib/data/queries.ts` (+`pfc_primary/pfc_detailed` in the reads that feed derivation), `src/lib/data/mappers.ts`
+**Files:** `src/lib/data/rebuild-derived-events.ts` (new), `src/lib/data/rebuild-snapshots.ts` (calls it at the tail), `src/app/actions/demo.ts` (`clearDemoRows` scoped; loader rows `source='demo'`), `src/lib/data/mappers.ts` (`EventRow` provenance columns)
 
-- [ ] `rebuildDerivedEvents(supabase)`: loads accounts, effective transactions (with PFC columns, override applied), recurring series + overrides (reuse `detectRecurringSeries` with the same referenceDate logic as `getRecurringData`), liability balance series from `daily_snapshots`? — v1: derive payoff from the counterpart account's anchor/roll-forward history is out of scope; use per-account balance history only if cheaply available, else skip (document). Delete `source='derived'` rows, `insertChunked` the new set with `derivation_version`.
-- [ ] Called after `rebuildSnapshots` in `finishWithRebuild`, `prepareDashboard`'s repair, `page.tsx`'s stale-index rebuild, and `syncPlaidItem`'s post-commit step (both revalidate paths). Failure → same warning semantics.
-- [ ] `clearDemoRows`: `.eq("source","demo")` on the events delete; `loadDemoData` inserts with `source: "demo"` (explicit).
+- [x] `rebuildDerivedEvents(supabase, userId, src)`: assembles engine inputs from the rows `rebuildSnapshots` already loaded (accounts + provider, transactions + `user_override`/`pfc_primary`/`pfc_detailed`, recurring overrides, anchors, `config.endDate` as the series reference date), detects series on source transactions (same keys as the Recurring page), applies category overrides, builds liability balance history from each liability's effective anchor (`liabilityBalanceHistory`), deletes `source='derived'` rows, `insertChunked`s the new set with `derivation_version`.
+- [x] Called from the tail of `rebuildSnapshots` — so `finishWithRebuild`, `prepareDashboard`'s repair, `page.tsx`'s stale-index rebuild, and `syncPlaidItem`'s post-commit step all refresh events with one data load. A derivation failure surfaces as the rebuild warning and retries on the next rebuild (idempotent). *(Plan deviation: one call site instead of four, to avoid loading every transaction twice.)*
+- [x] `clearDemoRows`: `.eq("source","demo")` on the events delete; `eventToRow` writes `source: "demo"` explicitly.
 
 ### Task 4: OAuth + Link lifecycle + card
 

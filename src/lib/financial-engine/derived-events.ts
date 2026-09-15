@@ -12,8 +12,9 @@
  * Versioning: any rule change bumps EVENT_DERIVATION_VERSION and every
  * derived row is regenerated on the next rebuild.
  */
+import { derivedBalanceAt, type BalanceAnchor } from "./anchors";
 import { normalizeDescription, seriesKeyOf, type Cadence, type RecurringConfidence } from "./recurring";
-import { LIABILITY_TYPES, LIQUID_TYPES, type AccountType } from "./snapshot-builder";
+import { LIABILITY_TYPES, LIQUID_TYPES, type AccountInput, type AccountType, type TransactionInput } from "./snapshot-builder";
 import type { FinancialEventType, ISODate } from "./types";
 
 export const EVENT_DERIVATION_VERSION = "v1";
@@ -50,6 +51,7 @@ export interface EventTransactionInput {
   category: string | null;
   isTransfer: boolean;
   transferPairId: string | null;
+  /** Source description: series keys and confirm/dismiss statuses are keyed on it, so it must match what the Recurring page detected. */
   description: string;
   pfcPrimary: string | null;
   pfcDetailed: string | null;
@@ -124,6 +126,21 @@ function seriesEligible(s: EventSeriesInput): boolean {
   return s.occurrenceCount >= 3 && (s.confidence === "high" || s.confidence === "medium");
 }
 
+/**
+ * A liability account's balance at the anchor date and at every date it had a
+ * transaction, derived from its effective anchor (direction-agnostic, so dates
+ * before the anchor are covered too). Positive means owed. Feeds debt_payoff.
+ */
+export function liabilityBalanceHistory(
+  account: AccountInput,
+  anchor: Pick<BalanceAnchor, "balance" | "anchorDate">,
+  transactions: TransactionInput[],
+): LiabilityBalancePoint[] {
+  const dates = new Set<ISODate>([anchor.anchorDate]);
+  for (const t of transactions) if (t.accountId === account.id) dates.add(t.postedDate);
+  return [...dates].sort().map((date) => ({ accountId: account.id, date, balance: derivedBalanceAt(account, anchor, date, transactions) }));
+}
+
 /** The one-off purchase bar for a transaction: max(floor, multiplier × trailing-window median of one-off outflows). */
 export function oneOffThreshold(windowSamples: number[]): number {
   if (windowSamples.length < THRESHOLD_MIN_SAMPLES) return LARGE_PURCHASE_FLOOR;
@@ -165,8 +182,12 @@ export function deriveEvents(input: DeriveEventsInput): DerivedEvent[] {
     balancesByAccount.set(p.accountId, [...(balancesByAccount.get(p.accountId) ?? []), p]);
   }
   for (const list of balancesByAccount.values()) list.sort((a, b) => (a.date < b.date ? -1 : 1));
+  // Payoff needs history that actually covers the payment date: a balance
+  // series that starts later says nothing about what happened in between.
   const paidOffAfter = (accountId: string, date: ISODate): boolean => {
-    const after = (balancesByAccount.get(accountId) ?? []).filter((p) => p.date >= date);
+    const points = balancesByAccount.get(accountId) ?? [];
+    if (points.length === 0 || points[0].date > date) return false;
+    const after = points.filter((p) => p.date >= date);
     return after.length > 0 && after.every((p) => p.balance <= 0);
   };
 

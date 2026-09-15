@@ -27,10 +27,13 @@ receives:
 
 - **Accounts** — only accounts that are not demo, not archived, and included
   in calculations produce events.
-- **Effective transactions** — user overrides already applied, so a purchase
-  you recategorise to groceries stops being a large purchase on the next
-  rebuild. Plaid's personal-finance category (`pfc_primary`, `pfc_detailed`)
-  rides along when present; CSV-imported rows have none.
+- **Effective transactions** — the user's category override is applied, so a
+  purchase you recategorise to groceries stops being a large purchase on the
+  next rebuild. Descriptions stay as the source recorded them, because series
+  keys and your confirm/dismiss choices are built from source descriptions;
+  a description override therefore does not relabel an event. Plaid's
+  personal-finance category (`pfc_primary`, `pfc_detailed`) rides along when
+  present; CSV-imported rows have none.
 - **Recurring series** — the same series the Recurring page shows, plus your
   confirm/dismiss status. A transaction "belongs" to a series when its account,
   direction, and normalised description match. A series counts only when you
@@ -106,6 +109,10 @@ Old rows are never patched in place, so an event's provenance is always
 
 ## Where the rebuild runs
 
-Derived events are rebuilt right after snapshots: after an import or
-account mutation finishes, after a connected-account sync commits, and when
-the dashboard repairs a stale index. See `src/lib/data/rebuild-derived-events.ts`.
+Derived events are regenerated at the tail of every snapshot rebuild
+(`rebuildSnapshots`), from the same loaded accounts, transactions, overrides,
+and anchors: after an import or account mutation finishes, after a
+connected-account sync commits, and when the dashboard repairs a stale index.
+Liability balance history for payoff detection comes from each liability's
+effective balance anchor rolled through its transactions; a liability with no
+anchor never yields a payoff. See `src/lib/data/rebuild-derived-events.ts`.
